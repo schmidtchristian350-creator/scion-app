@@ -3,7 +3,7 @@ import streamlit as st
 from openai import OpenAI
 
 # OpenAI Client initialisieren
-client = OpenAI(api_key="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")
+client = OpenAI(api_key="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")
 
 # --- BENUTZEROBERFLÄCHE ---
 st.title("Scion Mind")
