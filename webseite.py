@@ -66,13 +66,13 @@ def erstelle_pptx_mit_bildern(textinhalt, client):
         if not f_text.strip():
             continue
             
-        slide_layout = prs.slide_layouts[6] # Leeres Layout für perfekte Platzierung
+        slide_layout = prs.slide_layouts[6]
         slide = prs.slides.add_slide(slide_layout)
         
         zeilen = f_text.strip().split("\n")
         titel = bereinige_text(zeilen[0].replace(":", ""))
         
-        # Titel oben hinzufügen
+        # Titel oben
         txBox = slide.shapes.add_textbox(Inches(0.8), Inches(0.6), Inches(11.5), Inches(1.0))
         tf = txBox.text_frame
         p = tf.paragraphs[0]
@@ -80,35 +80,35 @@ def erstelle_pptx_mit_bildern(textinhalt, client):
         p.font.size = 32
         p.font.bold = True
         
-        # Inhalt links hinzufügen
+        # Inhalt
         inhalt_zeilen = []
         for z in zeilen[1:]:
             bereinigt = bereinige_text(z)
             if bereinigt:
                 inhalt_zeilen.append("• " + bereinigt)
                 
-        contentBox = slide.shapes.add_textbox(Inches(0.8), Inches(1.8), Inches(6.0), Inches(5.0))
+        contentBox = slide.shapes.add_textbox(Inches(0.8), Inches(1.8), Inches(6.5), Inches(5.0))
         tf_content = contentBox.text_frame
         tf_content.word_wrap = True
         tf_content.text = "\n".join(inhalt_zeilen)
         
-        # Passendes Bild via DALL-E generieren und rechts einfügen
+        # Bild sicher generieren und einfügen
         try:
             img_response = client.images.generate(
                 model="dall-e-3",
-                prompt=f"Professional business illustration or photo representing: {titel}",
+                prompt=f"Professional modern business illustration representing: {titel}",
                 size="1024x1024",
                 quality="standard",
                 n=1,
             )
             img_url = img_response.data[0].url
             img_data = requests.get(img_url).content
-            img_stream = BytesIO(img_data)
             
-            # Bild rechts auf der Folie platzieren
-            slide.shapes.add_picture(img_stream, Inches(7.2), Inches(1.8), width=Inches(5.0))
+            if len(img_data) > 100: # Prüfen ob Daten da sind
+                img_stream = BytesIO(img_data)
+                slide.shapes.add_picture(img_stream, Inches(7.5), Inches(1.8), width=Inches(4.8))
         except Exception:
-            pass # Falls ein Bild fehlschlägt, läuft die Erstellung stabil weiter
+            pass # Ohne Bild fortfahren, falls DALL-E blockiert
             
     pptx_io = BytesIO()
     prs.save(pptx_io)
@@ -200,7 +200,7 @@ else:
                         messages_payload = [{"role": "system", "content": system_prompts.get(modus, "Du bist ein hilfreicher Assistent.")}]
                         messages_payload.extend(st.session_state.chats[current_chat])
 
-                        with st.spinner("Die KI verarbeitet deine Anfrage und generiert passende Bilder für jede Folie..."):
+                        with st.spinner("Die KI verarbeitet deine Anfrage und generiert die PowerPoint-Datei..."):
                             response = client.chat.completions.create(
                                 model="gpt-4o-mini",
                                 messages=messages_payload
