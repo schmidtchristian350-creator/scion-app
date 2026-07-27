@@ -1,8 +1,10 @@
 import streamlit as st
 from openai import OpenAI
 from pptx import Presentation
+from pptx.util import Inches
 from io import BytesIO
 import re
+import requests
 
 st.set_page_config(page_title="Scion Mind", layout="wide")
 
@@ -50,14 +52,13 @@ with st.sidebar:
             st.rerun()
 
 def bereinige_text(text):
-    # Entfernt Markdown-Sternchen und Trennstriche für saubere Folien
     text = re.sub(r'\*\*', '', text)
     text = re.sub(r'___+', '', text)
     text = re.sub(r'---+', '', text)
     text = text.replace('###', '')
     return text.strip()
 
-def erstelle_pptx(textinhalt):
+def erstelle_pptx_mit_bildern(textinhalt, client):
     prs = Presentation()
     folien_teile = textinhalt.split("Folie")
     
@@ -65,23 +66,50 @@ def erstelle_pptx(textinhalt):
         if not f_text.strip():
             continue
             
-        slide_layout = prs.slide_layouts[1]
+        slide_layout = prs.slide_layouts[6] # Leeres Layout für perfekte Platzierung
         slide = prs.slides.add_slide(slide_layout)
-        title_shape = slide.shapes.title
-        body_shape = slide.placeholders[1]
         
         zeilen = f_text.strip().split("\n")
         titel = bereinige_text(zeilen[0].replace(":", ""))
-        title_shape.text = titel if titel else "Präsentation"
         
+        # Titel oben hinzufügen
+        txBox = slide.shapes.add_textbox(Inches(0.8), Inches(0.6), Inches(11.5), Inches(1.0))
+        tf = txBox.text_frame
+        p = tf.paragraphs[0]
+        p.text = titel if titel else "Präsentation"
+        p.font.size = 32
+        p.font.bold = True
+        
+        # Inhalt links hinzufügen
         inhalt_zeilen = []
         for z in zeilen[1:]:
             bereinigt = bereinige_text(z)
             if bereinigt:
-                inhalt_zeilen.append(bereinigt)
+                inhalt_zeilen.append("• " + bereinigt)
                 
-        body_shape.text = "\n".join(inhalt_zeilen)
+        contentBox = slide.shapes.add_textbox(Inches(0.8), Inches(1.8), Inches(6.0), Inches(5.0))
+        tf_content = contentBox.text_frame
+        tf_content.word_wrap = True
+        tf_content.text = "\n".join(inhalt_zeilen)
         
+        # Passendes Bild via DALL-E generieren und rechts einfügen
+        try:
+            img_response = client.images.generate(
+                model="dall-e-3",
+                prompt=f"Professional business illustration or photo representing: {titel}",
+                size="1024x1024",
+                quality="standard",
+                n=1,
+            )
+            img_url = img_response.data[0].url
+            img_data = requests.get(img_url).content
+            img_stream = BytesIO(img_data)
+            
+            # Bild rechts auf der Folie platzieren
+            slide.shapes.add_picture(img_stream, Inches(7.2), Inches(1.8), width=Inches(5.0))
+        except Exception:
+            pass # Falls ein Bild fehlschlägt, läuft die Erstellung stabil weiter
+            
     pptx_io = BytesIO()
     prs.save(pptx_io)
     pptx_io.seek(0)
@@ -172,7 +200,7 @@ else:
                         messages_payload = [{"role": "system", "content": system_prompts.get(modus, "Du bist ein hilfreicher Assistent.")}]
                         messages_payload.extend(st.session_state.chats[current_chat])
 
-                        with st.spinner("Die KI verarbeitet deine Anfrage..."):
+                        with st.spinner("Die KI verarbeitet deine Anfrage und generiert passende Bilder für jede Folie..."):
                             response = client.chat.completions.create(
                                 model="gpt-4o-mini",
                                 messages=messages_payload
@@ -184,17 +212,17 @@ else:
                                 st.markdown(antwort)
                                 
                                 if modus == "Präsentations-Struktur & Folien":
-                                    pptx_datei = erstelle_pptx(antwort)
+                                    pptx_datei = erstelle_pptx_mit_bildern(antwort, client)
                                     st.download_button(
-                                        label="📥 PowerPoint (.pptx) herunterladen",
+                                        label="📥 PowerPoint mit Bildern (.pptx) herunterladen",
                                         data=pptx_datei,
-                                        file_name="Scion_Mind_Praesentation.pptx",
+                                        file_name="Scion_Mind_Praesentation_mit_Bildern.pptx",
                                         mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
                                         use_container_width=True
                                     )
                                 
                 except Exception as e:
-                    st.error(f"Ein Fehler is aufgetreten: {e}")
+                    st.error(f"Ein Fehler ist aufgetreten: {e}")
 
     with spalte_rechts:
         st.subheader("🎧 Text vorlesen lassen")
