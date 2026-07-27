@@ -1,4 +1,3 @@
-import os
 import streamlit as st
 from openai import OpenAI
 
@@ -26,9 +25,7 @@ else:
     if st.button("Analyse starten"):
         if aufgabe:
             st.info("Die KI verarbeitet deine Anfrage...")
-            
             try:
-                # Direkte, schnelle Abfrage über die OpenAI-Schnittstelle
                 response = client.chat.completions.create(
                     model="gpt-4o",
                     messages=[
@@ -36,11 +33,9 @@ else:
                         {"role": "user", "content": aufgabe}
                     ]
                 )
-                
                 antwort = response.choices[0].message.content
                 st.success("Ergebnis:")
                 st.write(antwort)
-                
             except Exception as e:
                 st.error(f"Ein Fehler ist aufgetreten: {e}")
         else:
