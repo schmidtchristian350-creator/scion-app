@@ -3,7 +3,37 @@ from openai import OpenAI
 
 st.set_page_config(page_title="Scion Mind", layout="wide")
 
-st.title("Scion-Mind")
+# --- DESIGN & FARBEN ANPASSEN (CSS) ---
+st.markdown("""
+    <style>
+    /* Hintergrundfarbe der Hauptseite */
+    .stApp {
+        background-color: #f8f9fa;
+    }
+    /* Seitenleiste (Sidebar) farblich absetzen */
+    [data-testid="stSidebar"] {
+        background-color: #1e293b;
+        color: white;
+    }
+    [data-testid="stSidebar"] label, [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3, [data-testid="stSidebar"] p {
+        color: white !important;
+    }
+    /* Buttons stylen */
+    .stButton button {
+        background-color: #0f172a;
+        color: white;
+        border-radius: 8px;
+        border: none;
+        font-weight: bold;
+    }
+    .stButton button:hover {
+        background-color: #334155;
+        color: white;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+st.title("Scion Mind")
 st.markdown("*designed by Christian Schmidt*")
 st.write("---")
 
@@ -53,7 +83,7 @@ else:
         current_chat = st.session_state.aktiver_chat
         st.markdown(f"**Aktiver Chat:** `{current_chat}`")
 
-        # NEU: Spracheingabe über das Mikrofon
+        # Spracheingabe über das Mikrofon
         st.markdown("🎙️ **Sprachaufnahme (optional):**")
         audio_aufnahme = st.audio_input("Klicke zum Aufnehmen auf das Mikrofon:")
         
@@ -65,13 +95,12 @@ else:
                 with st.spinner("Wandle Sprache in Text um..."):
                     try:
                         client = OpenAI(api_key=openai_key_eingabe)
-                        # Audio an OpenAI Whisper senden
                         transcript = client.audio.transcriptions.create(
                             model="whisper-1",
                             file=("audio.wav", audio_aufnahme.read(), "audio/wav")
                         )
                         sprach_text = transcript.text
-                        st.success(erkannt := f"Erkannter Text: {sprach_text}")
+                        st.success(f"Erkannter Text: {sprach_text}")
                     except Exception as e:
                         st.error(f"Fehler bei der Spracherkennung: {e}")
 
@@ -80,7 +109,6 @@ else:
                 with st.chat_message(message["role"]):
                     st.markdown(message["content"])
 
-        # Wenn per Sprache etwas aufgenommen wurde, nutzen wir das, ansonsten das Texteingabefeld
         standard_text = sprach_text if sprach_text else ""
         
         if aufgabe := st.chat_input("Stelle deine Frage oder Aufgabe...") if modus == "Text-Recherche & Chat" else st.text_area("Deine Beschreibung oder Aufgabe dafür:", value=standard_text):
