@@ -25,12 +25,12 @@ st.write("---")
 MASTER_OPENAI_KEY = "sk-DEIN-ECHTER-OPENAI-API-SCHLUESSEL-HIER"
 
 # Admin-Name (hier kannst du deinen Namen eintragen, mit dem du dich einloggst)
-ADMIN_NAME = "Christian Admin"
+ADMIN_NAME = "Christian"
 
 # Kundendatenbank im Speicher
 if "kunden_daten" not in st.session_state:
     st.session_state.kunden_daten = {
-        "Christian": {"passwort": "Petra-Renate-2701", "guthaben": 999.00}, # Dein Admin-Account
+        "Christian": {"passwort": "admin", "guthaben": 999.00}, # Dein Admin-Account
         "kunde1": {"passwort": "123", "guthaben": 5.00}
     }
 
