@@ -25,7 +25,7 @@ else:
             st.info("Die KI verarbeitet deine Anfrage...")
             try:
                 response = client.chat.completions.create(
-                    model="gpt-4o",
+                    model="gpt-4o-mini",
                     messages=[
                         {"role": "system", "content": "Du bist ein professioneller, präziser KI-Assistent für Markt- und Web-Recherchen. Antworte immer auf Deutsch."},
                         {"role": "user", "content": aufgabe}
