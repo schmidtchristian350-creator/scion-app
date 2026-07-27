@@ -1,16 +1,16 @@
 import streamlit as st
 from openai import OpenAI
+from pptx import Presentation
+from io import BytesIO
 
 st.set_page_config(page_title="Scion Mind", layout="wide")
 
 # --- DESIGN & FARBEN ANPASSEN (CSS) ---
 st.markdown("""
     <style>
-    /* Hintergrundfarbe der Hauptseite */
     .stApp {
         background-color: #f8f9fa;
     }
-    /* Seitenleiste (Sidebar) farblich absetzen */
     [data-testid="stSidebar"] {
         background-color: #1e293b;
         color: white;
@@ -18,7 +18,6 @@ st.markdown("""
     [data-testid="stSidebar"] label, [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3, [data-testid="stSidebar"] p {
         color: white !important;
     }
-    /* Allgemeine Buttons stylen */
     .stButton button {
         background-color: #0f172a;
         color: white;
@@ -30,7 +29,6 @@ st.markdown("""
         background-color: #334155;
         color: white;
     }
-    /* Eingabefelder und Textbereiche sauber hervorheben */
     input, textarea, [data-baseweb="input"] div, [data-baseweb="base-input"] {
         background-color: #ffffff !important;
         border-radius: 8px !important;
@@ -43,7 +41,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("Scion-Mind")
+st.title("Scion Mind")
 st.markdown("*designed by Christian Schmidt*")
 st.write("---")
 
@@ -75,6 +73,35 @@ with st.sidebar:
             st.session_state.aktiver_chat = chat_name
             st.rerun()
 
+# Funktion zum Generieren einer PowerPoint-Datei aus dem Text
+def erstelle_pptx(textinhalt):
+    prs = Presentation()
+    
+    # Text in Abschnitte / Folien unterteilen (anhand von Überschriften oder Folien-Markern)
+    folien_texte = textinhalt.split("Folie")
+    
+    for f_text in folien_texte:
+        if not f_text.strip():
+            continue
+            
+        slide_layout = prs.slide_layouts[1] # Titel und Inhalt Layout
+        slide = prs.slides.add_slide(slide_layout)
+        title_shape = slide.shapes.title
+        body_shape = slide.placeholders[1]
+        
+        zeilen = f_text.strip().split("\n")
+        titel = zeilen[0].replace(":", "").replace("*", "").strip()
+        title_shape.text = titel if titel else "Präsentation"
+        
+        inhalt_zeilen = [z for z in zeilen[1:] if z.strip()]
+        body_shape.text = "\n".join(inhalt_zeilen)
+        
+    # In Arbeitsspeicher speichern
+    pptx_io = BytesIO()
+    prs.save(pptx_io)
+    pptx_io.seek(0)
+    return pptx_io
+
 # Hauptbereichprüfung
 if passwort_eingabe != GEHEIMES_PASSWORT:
     if passwort_eingabe != "":
@@ -93,7 +120,6 @@ else:
         current_chat = st.session_state.aktiver_chat
         st.markdown(f"**Aktiver Chat:** `{current_chat}`")
 
-        # Spracheingabe über das Mikrofon
         st.markdown("🎙️ **Sprachaufnahme (optional):**")
         audio_aufnahme = st.audio_input("Klicke zum Aufnehmen auf das Mikrofon:")
         
@@ -121,16 +147,13 @@ else:
 
         standard_text = sprach_text if sprach_text else ""
         
-        # Eingabe-Logik mit sauberem Textbereich und einem gut sichtbaren Button direkt darunter
         if modus == "Text-Recherche & Chat":
             aufgabe = st.chat_input("Stelle deine Frage oder Aufgabe...")
         else:
             aufgabe_input = st.text_area("Deine Beschreibung oder Aufgabe dafür:", value=standard_text, height=120)
-            # Hier ist der extra gut sichtbare Button für die anderen Modi
             Absenden = st.button("🚀 Aufgabe jetzt ausführen", use_container_width=True)
             aufgabe = aufgabe_input if Absenden else None
 
-        # Wenn im Chat-Modus etwas eingegeben wurde oder im anderen Modus der Button gedrückt wurde:
         if aufgabe:
             if not openai_key_eingabe:
                 st.warning("Bitte trage in der linken Seitenleiste zuerst deinen OpenAI API-Schlüssel ein.")
@@ -158,7 +181,7 @@ else:
 
                         system_prompts = {
                             "Text-Recherche & Chat": "Du bist ein präziser, professioneller KI-Assistent. Antworte immer auf Deutsch.",
-                            "Präsentations-Struktur & Folien": "Du bist ein Experte für Business-Präsentationen. Erstelle eine klare, professionelle Folienstruktur mit Stichpunkten für jede Folie auf Deutsch.",
+                            "Präsentations-Struktur & Folien": "Du bist ein Experte für Business-Präsentationen. Erstelle eine strukturierte Präsentation, bei der jede Folie klar mit 'Folie X: [Titel]' beginnt und Stichpunkte enthält, auf Deutsch.",
                             "Video-Skript & Storyboard": "Du bist ein professioneller Videoproduzent. Erstelle ein detailliertes Video-Skript mit Szenenbeschreibung, visuellen Hinweisen und Sprechtext auf Deutsch."
                         }
                         
@@ -175,6 +198,17 @@ else:
                             st.session_state.chats[current_chat].append({"role": "assistant", "content": antwort})
                             with st.chat_message("assistant"):
                                 st.markdown(antwort)
+                                
+                                # Wenn im Präsentations-Modus, direkt einen Download-Button anbieten
+                                if modus == "Präsentations-Struktur & Folien":
+                                    pptx_datei = erstelle_pptx(antwort)
+                                    st.download_button(
+                                        label="📥 PowerPoint (.pptx) herunterladen",
+                                        data=pptx_datei,
+                                        file_name="Scion_Mind_Praesentation.pptx",
+                                        mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                                        use_container_width=True
+                                    )
                                 
                 except Exception as e:
                     st.error(f"Ein Fehler ist aufgetreten: {e}")
