@@ -24,13 +24,14 @@ st.write("---")
 
 MASTER_OPENAI_KEY = "sk-DEIN-ECHTER-OPENAI-API-SCHLUESSEL-HIER"
 
-# Admin-Name (hier kannst du deinen Namen eintragen, mit dem du dich einloggst)
+# Admin-Zugangsdaten (Hier ein sicheres Passwort hinterlegt)
 ADMIN_NAME = "Christian"
+ADMIN_PASS = "ScionMind#2026!Secured"
 
 # Kundendatenbank im Speicher
 if "kunden_daten" not in st.session_state:
     st.session_state.kunden_daten = {
-        "Christian": {"passwort": "admin", "guthaben": 999.00}, # Dein Admin-Account
+        ADMIN_NAME: {"passwort": ADMIN_PASS, "guthaben": 999.00},
         "kunde1": {"passwort": "123", "guthaben": 5.00}
     }
 
@@ -74,13 +75,11 @@ with st.sidebar:
         st.write("---")
         st.success(f"Eingeloggt als: **{eingeloggter_kunde}**")
         
-        # Wenn du der Admin bist, zeige "Admin-Modus (Unendlich)" an
         if eingeloggter_kunde == ADMIN_NAME:
             st.metric(label="Status", value="👑 Admin (Kostenlos)")
         else:
             st.metric(label="Dein Guthaben", value=f"{guthaben:.2f} €")
             
-            # Zahlungsoptionen nur für normale Kunden anzeigen
             st.markdown("### 💳 Guthaben & Abos aufladen")
             paket_wahl = st.selectbox(
                 "Wähle dein Paket:",
@@ -168,7 +167,6 @@ def erstelle_saubere_pptx(textinhalt):
 # Hauptbereich-Prüfung
 if not eingeloggter_kunde or eingeloggter_kunde not in st.session_state.kunden_daten:
     st.warning("👈 Bitte melde dich links an oder registriere dich, um den Service zu nutzen.")
-# Admin wird hier komplett durchgewunken, normale Kunden brauchen Guthaben > 0
 elif eingeloggter_kunde != ADMIN_NAME and st.session_state.kunden_daten[eingeloggter_kunde]["guthaben"] <= 0:
     st.error("Dein Guthaben ist aufgebraucht. Bitte lade über das Menü links dein Konto auf.")
 else:
@@ -197,7 +195,6 @@ else:
             aufgabe = aufgabe_input if Absenden else None
 
         if aufgabe:
-            # Guthaben nur bei normalen Kunden abziehen, der Admin (Christian) nutzt es frei
             if eingeloggter_kunde != ADMIN_NAME:
                 st.session_state.kunden_daten[eingeloggter_kunde]["guthaben"] -= 0.05
             
@@ -242,9 +239,9 @@ else:
             except Exception as e:
                 st.error(f"Ein Fehler ist aufgetreten: {e}")
 
-    with spalte_rechts:
+    with spalers_rechts := spalte_rechts:
         st.subheader("🎧 Text vorlesen lassen")
-        vorlese_text = st.text_area("Text vorlesen lassen:", height=200, placeholder="Füge hier deinen Text ein...")
+        vorlese_text = st.text_area("Text zum Vorlesen:", height=200, placeholder="Füge hier deinen Text ein...")
         stimme = st.selectbox("Wähle eine Stimme:", ["alloy", "echo", "fable", "onyx", "nova", "shimmer"])
         
         if st.button("🔊 Audio generieren", use_container_width=True):
