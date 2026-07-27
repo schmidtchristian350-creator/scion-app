@@ -1,9 +1,6 @@
 import streamlit as st
 from openai import OpenAI
 
-# Dein echter, neuer Schlüssel ist hier hinterlegt
-client = OpenAI(api_key="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")
-
 st.title("Scion Mind")
 st.markdown("*designed by Christian Schmidt*")
 st.write("---")
@@ -18,12 +15,20 @@ if passwort_eingabe != GEHEIMES_PASSWORT:
 else:
     st.success("Zugriff erfolgreich! Willkommen bei Scion Mind.")
     
+    # Hier tippst du den Schlüssel gleich einfach selbst ein
+    openai_key_eingabe = st.text_input("Trage hier deinen OpenAI API-Schlüssel ein:", type="password")
+    
     aufgabe = st.text_input("Deine Frage oder Recherche-Aufgabe:")
 
     if st.button("Analyse starten"):
-        if aufgabe:
+        if not openai_key_eingabe:
+            st.warning("Bitte trage zuerst deinen OpenAI API-Schlüssel ein.")
+        elif not aufgabe:
+            st.warning("Bitte trage eine Recherche-Aufgabe ein.")
+        else:
             st.info("Die KI verarbeitet deine Anfrage...")
             try:
+                client = OpenAI(api_key=openai_key_eingabe)
                 response = client.chat.completions.create(
                     model="gpt-4o-mini",
                     messages=[
@@ -36,5 +41,3 @@ else:
                 st.write(antwort)
             except Exception as e:
                 st.error(f"Ein Fehler ist aufgetreten: {e}")
-        else:
-            st.warning("Bitte trage zuerst eine Aufgabe ein.")
