@@ -1,8 +1,8 @@
 import streamlit as st
 from openai import OpenAI
 
-# Trage hier deinen echten OpenAI API-Schlüssel direkt in die Anführungszeichen ein
-client = OpenAI(api_key="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")
+# Dein echter, neuer Schlüssel ist hier hinterlegt
+client = OpenAI(api_key="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")
 
 st.title("Scion Mind")
 st.markdown("*designed by Christian Schmidt*")
