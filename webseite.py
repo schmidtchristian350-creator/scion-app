@@ -22,13 +22,29 @@ st.title("Scion Mind")
 st.markdown("*designed by Christian Schmidt*")
 st.write("---")
 
-GEHEIMES_PASSWORT = "scion2026"
+# DEIN MASTER-SCHLÜSSEL (Hier kommt dein echter OpenAI-Key rein, den deine Kunden NICHT sehen)
+MASTER_OPENAI_KEY = "sk-DEIN-ECHTER-OPENAI-API-SCHLUESSEL-HIER-EINTRAGEN"
+
+# Kundendatenbank im Speicher (In Zukunft kannst du das an eine echte Datenbank wie SQLite anbinden)
+if "kunden_guthaben" not in st.session_state:
+    st.session_state.kunden_guthaben = {
+        "kunde1": 5.00,  # Startguthaben in Euro zum Testen
+        "kunde2": 10.00
+    }
 
 with st.sidebar:
-    st.header("🔑 Authentifizierung")
-    passwort_eingabe = st.text_input("Passwort:", type="password")
-    openai_key_eingabe = st.text_input("OpenAI API-Schlüssel:", type="password").strip()
+    st.header("🔑 Kunden-Login")
+    kunden_name = st.text_input("Dein Kunden-Token / Name:")
     
+    if kunden_name in st.session_state.kunden_guthaben:
+        guthaben = st.session_state.kunden_guthaben[kunden_name]
+        st.success(f"Eingeloggt als: {kunden_name}")
+        st.metric(label="Dein Guthaben", value=f"{guthaben:.2f} €")
+        if guthaben <= 0:
+            st.error("Dein Guthaben ist leer. Bitte lade dein Konto auf!")
+    elif kunden_name != "":
+        st.error("Unbekannter Token / Kein Guthaben gefunden.")
+
     st.write("---")
     st.header("💬 Deine Chats")
     
@@ -59,12 +75,10 @@ def bereinige_text(text):
 def erstelle_saubere_pptx(textinhalt):
     prs = Presentation()
     folien_teile = textinhalt.split("Folie")
-    
     for f_text in folien_teile:
         if not f_text.strip():
             continue
-            
-        slide_layout = prs.slide_layouts[1] # Titel und Inhalt Layout
+        slide_layout = prs.slide_layouts[1]
         slide = prs.slides.add_slide(slide_layout)
         title_shape = slide.shapes.title
         body_shape = slide.placeholders[1]
@@ -73,12 +87,7 @@ def erstelle_saubere_pptx(textinhalt):
         titel = bereinige_text(zeilen[0].replace(":", ""))
         title_shape.text = titel if titel else "Präsentation"
         
-        inhalt_zeilen = []
-        for z in zeilen[1:]:
-            bereinigt = bereinige_text(z)
-            if bereinigt:
-                inhalt_zeilen.append(bereinigt)
-                
+        inhalt_zeilen = [bereinige_text(z) for z in zeilen[1:] if bereinigt := bereinige_text(z)]
         body_shape.text = "\n".join(inhalt_zeilen)
         
     pptx_io = BytesIO()
@@ -86,10 +95,11 @@ def erstelle_saubere_pptx(textinhalt):
     pptx_io.seek(0)
     return pptx_io
 
-if passwort_eingabe != GEHEIMES_PASSWORT:
-    if passwort_eingabe != "":
-        st.error("Falsches Passwort oder ungültiger Schlüssel.")
-    st.warning("Bitte gib links dein Passwort ein, um den Service zu nutzen.")
+# Hauptbereich-Prüfung
+if not kunden_name or kunden_name not in st.session_state.kunden_guthaben:
+    st.warning("👈 Bitte gib links deinen Kundennamen / Token ein, um den Service zu starten.")
+elif st.session_state.kunden_guthaben[kunden_name] <= 0:
+    st.error("Dein Prepaid-Guthaben ist aufgebraucht. Bitte wende dich an den Administrator, um neues Guthaben aufzuladen.")
 else:
     spalte_links, spalte_rechts = st.columns([1.2, 0.8])
 
@@ -97,119 +107,82 @@ else:
         st.subheader("🤖 KI-Arbeitsbereich")
         modus = st.selectbox(
             "Was möchtest du erstellen lassen?",
-            ["Text-Recherche & Chat", "Bild generieren (DALL-E)", "Präsentations-Struktur & Folien", "Video-Skript & Storyboard"]
+            ["Text-Recherche & Chat", "Präsentations-Struktur & Folien", "Video-Skript & Storyboard"]
         )
         
         current_chat = st.session_state.aktiver_chat
         st.markdown(f"**Aktiver Chat:** `{current_chat}`")
-
-        st.markdown("🎙️ **Sprachaufnahme (optional):**")
-        audio_aufnahme = st.audio_input("Klicke zum Aufnehmen auf das Mikrofon:")
-        
-        sprach_text = ""
-        if audio_aufnahme is not None:
-            if not openai_key_eingabe:
-                st.warning("Bitte trage erst deinen API-Schlüssel ein, um Sprachaufnahmen zu transkribieren.")
-            else:
-                with st.spinner("Wandle Sprache in Text um..."):
-                    try:
-                        client = OpenAI(api_key=openai_key_eingabe)
-                        transcript = client.audio.transcriptions.create(
-                            model="whisper-1",
-                            file=("audio.wav", audio_aufnahme.read(), "audio/wav")
-                        )
-                        sprach_text = transcript.text
-                        st.success(f"Erkannter Text: {sprach_text}")
-                    except Exception as e:
-                        st.error(f"Fehler bei der Spracherkennung: {e}")
 
         if modus == "Text-Recherche & Chat":
             for message in st.session_state.chats[current_chat]:
                 with st.chat_message(message["role"]):
                     st.markdown(message["content"])
 
-        standard_text = sprach_text if sprach_text else ""
-        
         if modus == "Text-Recherche & Chat":
             aufgabe = st.chat_input("Stelle deine Frage oder Aufgabe...")
         else:
-            aufgabe_input = st.text_area("Deine Beschreibung oder Aufgabe dafür:", value=standard_text, height=120)
+            aufgabe_input = st.text_area("Deine Beschreibung oder Aufgabe dafür:", height=120)
             Absenden = st.button("🚀 Aufgabe jetzt ausführen", use_container_width=True)
             aufgabe = aufgabe_input if Absenden else None
 
         if aufgabe:
-            if not openai_key_eingabe:
-                st.warning("Bitte trage in der linken Seitenleiste zuerst deinen OpenAI API-Schlüssel ein.")
-            else:
-                try:
-                    client = OpenAI(api_key=openai_key_eingabe)
-                    
-                    if modus == "Bild generieren (DALL-E)":
-                        with st.spinner("Die KI generiert dein Bild..."):
-                            response = client.images.generate(
-                                model="dall-e-2",
-                                prompt=aufgabe,
-                                size="512x512",
-                                n=1,
-                            )
-                            image_url = response.data[0].url
-                            st.success("Dein Bild wurde erfolgreich erstellt:")
-                            st.image(image_url, caption=aufgabe)
-                    
-                    else:
-                        st.session_state.chats[current_chat].append({"role": "user", "content": aufgabe})
-                        with st.chat_message("user"):
-                            st.markdown(aufgabe)
+            # Guthaben bei Nutzung um einen kleinen Cent-Betrag reduzieren (z.B. 0.05 € pro Anfrage)
+            st.session_state.kunden_guthaben[kunden_name] -= 0.05
+            
+            try:
+                client = OpenAI(api_key=MASTER_OPENAI_KEY)
+                
+                st.session_state.chats[current_chat].append({"role": "user", "content": aufgabe})
+                with st.chat_message("user"):
+                    st.markdown(aufgabe)
 
-                        system_prompts = {
-                            "Text-Recherche & Chat": "Du bist ein präziser, professioneller KI-Assistent. Antworte immer auf Deutsch.",
-                            "Präsentations-Struktur & Folien": "Du bist ein Experte für Business-Präsentationen. Erstelle eine saubere Präsentation, bei der jede Folie mit 'Folie X: [Titel]' beginnt, gefolgt von prägnanten Stichpunkten. Vermeide überflüssige Sonderzeichen.",
-                            "Video-Skript & Storyboard": "Du bist ein professioneller Videoproduzent. Erstelle ein detailliertes Video-Skript mit Szenenbeschreibung, visuellen Hinweisen und Sprechtext auf Deutsch."
-                        }
+                system_prompts = {
+                    "Text-Recherche & Chat": "Du bist ein präziser, professioneller KI-Assistent. Antworte immer auf Deutsch.",
+                    "Präsentations-Struktur & Folien": "Du bist ein Experte für Business-Präsentationen. Erstelle eine saubere Präsentation, bei der jede Folie mit 'Folie X: [Titel]' beginnt, gefolgt von prägnanten Stichpunkten.",
+                    "Video-Skript & Storyboard": "Du bist ein professioneller Videoproduzent. Erstelle ein detailliertes Video-Skript mit Szenenbeschreibung und Sprechtext auf Deutsch."
+                }
+                
+                messages_payload = [{"role": "system", "content": system_prompts.get(modus, "Du bist ein hilfreicher Assistent.")}]
+                messages_payload.extend(st.session_state.chats[current_chat])
+
+                with st.spinner("Die KI verarbeitet deine Anfrage..."):
+                    response = client.chat.completions.create(
+                        model="gpt-4o-mini",
+                        messages=messages_payload
+                    )
+                    antwort = response.choices[0].message.content
+                    
+                    st.session_state.chats[current_chat].append({"role": "assistant", "content": antwort})
+                    with st.chat_message("assistant"):
+                        st.markdown(antwort)
                         
-                        messages_payload = [{"role": "system", "content": system_prompts.get(modus, "Du bist ein hilfreicher Assistent.")}]
-                        messages_payload.extend(st.session_state.chats[current_chat])
-
-                        with st.spinner("Die KI verarbeitet deine Anfrage..."):
-                            response = client.chat.completions.create(
-                                model="gpt-4o-mini",
-                                messages=messages_payload
+                        if modus == "Präsentations-Struktur & Folien":
+                            pptx_datei = erstelle_saubere_pptx(antwort)
+                            st.download_button(
+                                label="📥 PowerPoint (.pptx) herunterladen",
+                                data=pptx_datei,
+                                file_name="Scion_Mind_Praesentation.pptx",
+                                mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                                use_container_width=True
                             )
-                            antwort = response.choices[0].message.content
-                            
-                            st.session_state.chats[current_chat].append({"role": "assistant", "content": antwort})
-                            with st.chat_message("assistant"):
-                                st.markdown(antwort)
+                st.rerun() # Aktualisiert die Guthaben-Anzeige direkt
                                 
-                                if modus == "Präsentations-Struktur & Folien":
-                                    pptx_datei = erstelle_saubere_pptx(antwort)
-                                    st.download_button(
-                                        label="📥 PowerPoint (.pptx) herunterladen",
-                                        data=pptx_datei,
-                                        file_name="Scion_Mind_Praesentation.pptx",
-                                        mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
-                                        use_container_width=True
-                                    )
-                                
-                except Exception as e:
-                    st.error(f"Ein Fehler ist aufgetreten: {e}")
+            except Exception as e:
+                st.error(f"Ein Fehler ist aufgetreten: {e}")
 
     with spalte_rechts:
         st.subheader("🎧 Text vorlesen lassen")
-        st.markdown("Kopiere hier deinen Text hinein. Zu lange Texte werden automatisch aufgeteilt.")
-        
         vorlese_text = st.text_area("Text zum Vorlesen:", height=200, placeholder="Füge hier deinen Text ein...")
         stimme = st.selectbox("Wähle eine Stimme:", ["alloy", "echo", "fable", "onyx", "nova", "shimmer"])
         
         if st.button("🔊 Audio generieren", use_container_width=True):
-            if not openai_key_eingabe:
-                st.warning("Bitte trage in der linken Seitenleiste deinen API-Schlüssel ein.")
-            elif not vorlese_text:
+            if not vorlese_text:
                 st.warning("Bitte gib einen Text zum Vorlesen ein.")
             else:
+                st.session_state.kunden_guthaben[kunden_name] -= 0.02 # Kleiner Abzug für Audio
                 with st.spinner("Erstelle Sprachdatei..."):
                     try:
-                        client = OpenAI(api_key=openai_key_eingabe)
+                        client = OpenAI(api_key=MASTER_OPENAI_KEY)
                         chunks = [vorlese_text[i:i + 4000] for i in range(0, len(vorlese_text), 4000)]
                         audio_bytes_gesammt = bytearray()
                         
@@ -219,6 +192,6 @@ else:
                         
                         st.success("Audio erfolgreich generiert!")
                         st.audio(bytes(audio_bytes_gesammt), format="audio/mp3")
-                        st.info("💡 **Tipp:** Du kannst die Geschwindigkeit im Player rechts unten auf **1.2x**, **1.4x** oder **1.6x** einstellen!")
+                        st.rerun()
                     except Exception as e:
                         st.error(f"Fehler bei der Audioerstellung: {e}")
