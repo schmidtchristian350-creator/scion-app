@@ -24,11 +24,9 @@ st.write("---")
 
 MASTER_OPENAI_KEY = "sk-DEIN-ECHTER-OPENAI-API-SCHLUESSEL-HIER"
 
-# Admin-Zugangsdaten (Hier ein sicheres Passwort hinterlegt)
 ADMIN_NAME = "Christian"
 ADMIN_PASS = "ScionMind#2026!Secured"
 
-# Kundendatenbank im Speicher
 if "kunden_daten" not in st.session_state:
     st.session_state.kunden_daten = {
         ADMIN_NAME: {"passwort": ADMIN_PASS, "guthaben": 999.00},
@@ -239,7 +237,7 @@ else:
             except Exception as e:
                 st.error(f"Ein Fehler ist aufgetreten: {e}")
 
-    with spalers_rechts := spalte_rechts:
+    with spalte_rechts:
         st.subheader("🎧 Text vorlesen lassen")
         vorlese_text = st.text_area("Text zum Vorlesen:", height=200, placeholder="Füge hier deinen Text ein...")
         stimme = st.selectbox("Wähle eine Stimme:", ["alloy", "echo", "fable", "onyx", "nova", "shimmer"])
