@@ -30,6 +30,17 @@ st.markdown("""
         background-color: #334155;
         color: white;
     }
+    /* Eingabefelder und Textbereiche sauber hervorheben */
+    input, textarea, [data-baseweb="input"] div, [data-baseweb="base-input"] {
+        background-color: #ffffff !important;
+        border-radius: 8px !important;
+        border: 1px solid #cbd5e1 !important;
+    }
+    /* Rahmenverstärkung beim Anklicken/Fokus */
+    input:focus, textarea:focus, [data-baseweb="input"] input:focus {
+        border-color: #0f172a !important;
+        box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.1) !important;
+    }
     </style>
 """, unsafe_allow_html=True)
 
