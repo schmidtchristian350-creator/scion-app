@@ -18,13 +18,11 @@ with st.sidebar:
     st.write("---")
     st.header("💬 Deine Chats")
     
-    # Speicher für alle Chats initialisieren
     if "chats" not in st.session_state:
         st.session_state.chats = {"Chat 1": []}
     if "aktiver_chat" not in st.session_state:
         st.session_state.aktiver_chat = "Chat 1"
 
-    # Button um einen neuen Chat zu erstellen
     if st.button("➕ Neuer Chat"):
         neuer_name = f"Chat {len(st.session_state.chats) + 1}"
         st.session_state.chats[neuer_name] = []
@@ -37,76 +35,112 @@ with st.sidebar:
             st.session_state.aktiver_chat = chat_name
             st.rerun()
 
-# Hauptbereich
+# Hauptbereichprüfung
 if passwort_eingabe != GEHEIMES_PASSWORT:
     if passwort_eingabe != "":
         st.error("Falsches Passwort oder ungültiger Schlüssel.")
     st.warning("Bitte gib links dein Passwort ein, um den Service zu nutzen.")
 else:
-    # Auswahl der gewünschten Funktion
-    modus = st.selectbox(
-        "Was möchtest du erstellen lassen?",
-        ["Text-Recherche & Chat", "Bild generieren (DALL-E)", "Präsentations-Struktur & Folien", "Video-Skript & Storyboard"]
-    )
-    
-    current_chat = st.session_state.aktiver_chat
-    st.subheader(f"Aktiver Bereich: {current_chat}")
+    # Bildschirm in zwei Spalten aufteilen (Links: Chat/Tools, Rechts: Vorlese-Fenster)
+    spalte_links, spalte_rechts = st.columns([1.2, 0.8])
 
-    # Zeige den Verlauf des aktuellen Chats an (nur im Chat-Modus)
-    if modus == "Text-Recherche & Chat":
-        for message in st.session_state.chats[current_chat]:
-            with st.chat_message(message["role"]):
-                st.markdown(message["content"])
-
-    # Eingabefeld
-    if aufgabe := st.chat_input("Stelle deine Frage oder Aufgabe...") if modus == "Text-Recherche & Chat" else st.text_area("Deine Beschreibung oder Aufgabe dafür:"):
+    with spalte_links:
+        st.subheader("🤖 KI-Arbeitsbereich")
+        modus = st.selectbox(
+            "Was möchtest du erstellen lassen?",
+            ["Text-Recherche & Chat", "Bild generieren (DALL-E)", "Präsentations-Struktur & Folien", "Video-Skript & Storyboard"]
+        )
         
-        if not openai_key_eingabe:
-            st.warning("Bitte trage in der linken Seitenleiste zuerst deinen OpenAI API-Schlüssel ein.")
-        else:
-            try:
-                client = OpenAI(api_key=openai_key_eingabe)
-                
-                # Modus: Bild generieren
-                if modus == "Bild generieren (DALL-E)":
-                    with st.spinner("Die KI generiert dein Bild..."):
-                        response = client.images.generate(
-                            model="dall-e-3",
-                            prompt=aufgabe,
-                            size="1024x1024",
-                            quality="standard",
-                            n=1,
-                        )
-                        image_url = response.data[0].url
-                        st.success("Dein Bild wurde erfolgreich erstellt:")
-                        st.image(image_url, caption=aufgabe)
-                
-                # Modus: Chat / Text / Präsentation / Video
-                else:
-                    # Dem aktuellen Chat hinzufügen
-                    st.session_state.chats[current_chat].append({"role": "user", "content": aufgabe})
-                    with st.chat_message("user"):
-                        st.markdown(aufgabe)
+        current_chat = st.session_state.aktiver_chat
+        st.markdown(f"**Aktiver Chat:** `{current_chat}`")
 
-                    system_prompts = {
-                        "Text-Recherche & Chat": "Du bist ein präziser, professioneller KI-Assistent. Antworte immer auf Deutsch.",
-                        "Präsentations-Struktur & Folien": "Du bist ein Experte für Business-Präsentationen. Erstelle eine klare, professionelle Folienstruktur mit Stichpunkten für jede Folie auf Deutsch.",
-                        "Video-Skript & Storyboard": "Du bist ein professioneller Videoproduzent. Erstelle ein detailliertes Video-Skript mit Szenenbeschreibung, visuellen Hinweisen und Sprechtext auf Deutsch."
-                    }
+        if modus == "Text-Recherche & Chat":
+            for message in st.session_state.chats[current_chat]:
+                with st.chat_message(message["role"]):
+                    st.markdown(message["content"])
+
+        if aufgabe := st.chat_input("Stelle deine Frage oder Aufgabe...") if modus == "Text-Recherche & Chat" else st.text_area("Deine Beschreibung oder Aufgabe dafür:"):
+            
+            if not openai_key_eingabe:
+                st.warning("Bitte trage in der linken Seitenleiste zuerst deinen OpenAI API-Schlüssel ein.")
+            else:
+                try:
+                    client = OpenAI(api_key=openai_key_eingabe)
                     
-                    messages_payload = [{"role": "system", "content": system_prompts.get(modus, "Du bist ein hilfreicher Assistent.")}]
-                    messages_payload.extend(st.session_state.chats[current_chat])
+                    if modus == "Bild generieren (DALL-E)":
+                        with st.spinner("Die KI generiert dein Bild..."):
+                            response = client.images.generate(
+                                model="dall-e-3",
+                                prompt=aufgabe,
+                                size="1024x1024",
+                                quality="standard",
+                                n=1,
+                            )
+                            image_url = response.data[0].url
+                            st.success("Dein Bild wurde erfolgreich erstellt:")
+                            st.image(image_url, caption=aufgabe)
+                    
+                    else:
+                        st.session_state.chats[current_chat].append({"role": "user", "content": aufgabe})
+                        with st.chat_message("user"):
+                            st.markdown(aufgabe)
 
-                    with st.spinner("Die KI verarbeitet deine Anfrage..."):
-                        response = client.chat.completions.create(
-                            model="gpt-4o-mini",
-                            messages=messages_payload
-                        )
-                        antwort = response.choices[0].message.content
+                        system_prompts = {
+                            "Text-Recherche & Chat": "Du bist ein präziser, professioneller KI-Assistent. Antworte immer auf Deutsch.",
+                            "Präsentations-Struktur & Folien": "Du bist ein Experte für Business-Präsentationen. Erstelle eine klare, professionelle Folienstruktur mit Stichpunkten für jede Folie auf Deutsch.",
+                            "Video-Skript & Storyboard": "Du bist ein professioneller Videoproduzent. Erstelle ein detailliertes Video-Skript mit Szenenbeschreibung, visuellen Hinweisen und Sprechtext auf Deutsch."
+                        }
                         
-                        st.session_state.chats[current_chat].append({"role": "assistant", "content":antwort})
-                        with st.chat_message("assistant"):
-                            st.markdown(antwort)
+                        messages_payload = [{"role": "system", "content": system_prompts.get(modus, "Du bist ein hilfreicher Assistent.")}]
+                        messages_payload.extend(st.session_state.chats[current_chat])
+
+                        with st.spinner("Die KI verarbeitet deine Anfrage..."):
+                            response = client.chat.completions.create(
+                                model="gpt-4o-mini",
+                                messages=messages_payload
+                            )
+                            antwort = response.choices[0].message.content
                             
-            except Exception as e:
-                st.error(f"Ein Fehler ist aufgetreten: {e}")
+                            st.session_state.chats[current_chat].append({"role": "assistant", "content": antwort})
+                            with st.chat_message("assistant"):
+                                st.markdown(antwort)
+                                
+                except Exception as e:
+                    st.error(f"Ein Fehler ist aufgetreten: {e}")
+
+    # Rechte Spalte: Das neue Vorlese-Fenster
+    with spalte_rechts:
+        st.subheader("🎧 Text vorlesen lassen")
+        st.markdown("Kopiere hier deinen Text hinein, den die KI in Sprache umwandeln soll.")
+        
+        vorlese_text = st.text_area("Text zum Vorlesen:", height=200, placeholder="Füge hier deinen Text ein...")
+        
+        # Auswahl der Stimme
+        stimme = st.selectbox("Wähle eine Stimme:", ["alloy", "echo", "fable", "onyx", "nova", "shimmer"])
+        
+        if st.button("Audio generieren"):
+            if not openai_key_eingabe:
+                st.warning("Bitte trage in der linken Seitenleiste deinen API-Schlüssel ein.")
+            elif not vorlese_text:
+                st.warning("Bitte gib einen Text zum Vorlesen ein.")
+            else:
+                with st.spinner("Erstelle Sprachdatei..."):
+                    try:
+                        client = OpenAI(api_key=openai_key_eingabe)
+                        
+                        # OpenAI Audio API Aufruf
+                        response = client.audio.speech.create(
+                            model="tts-1",
+                            voice=stimme,
+                            input=vorlese_text
+                        )
+                        
+                        # Audio direkt im Browser abspielbar machen
+                        audio_bytes = response.content
+                        st.success("Audio erfolgreich generiert!")
+                        st.audio(audio_bytes, format="audio/mp3")
+                        
+                        st.info("💡 **Tipp zur Geschwindigkeit:** Im Player rechts unten (die drei Punkte `...`) kannst du die Wiedergabegeschwindigkeit auf **1.2x**, **1.4x** oder **1.6x** einstellen!")
+                        
+                    except Exception as e:
+                        st.error(f"Fehler bei der Audioerstellung: {e}")
