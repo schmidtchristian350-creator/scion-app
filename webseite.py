@@ -2,42 +2,19 @@ import streamlit as st
 from openai import OpenAI
 from pptx import Presentation
 from io import BytesIO
+import re
 
 st.set_page_config(page_title="Scion Mind", layout="wide")
 
-# --- DESIGN & FARBEN ANPASSEN (CSS) ---
 st.markdown("""
     <style>
-    .stApp {
-        background-color: #f8f9fa;
-    }
-    [data-testid="stSidebar"] {
-        background-color: #1e293b;
-        color: white;
-    }
-    [data-testid="stSidebar"] label, [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3, [data-testid="stSidebar"] p {
-        color: white !important;
-    }
-    .stButton button {
-        background-color: #0f172a;
-        color: white;
-        border-radius: 8px;
-        border: none;
-        font-weight: bold;
-    }
-    .stButton button:hover {
-        background-color: #334155;
-        color: white;
-    }
-    input, textarea, [data-baseweb="input"] div, [data-baseweb="base-input"] {
-        background-color: #ffffff !important;
-        border-radius: 8px !important;
-        border: 1px solid #cbd5e1 !important;
-    }
-    input:focus, textarea:focus, [data-baseweb="input"] input:focus {
-        border-color: #0f172a !important;
-        box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.1) !important;
-    }
+    .stApp { background-color: #f8f9fa; }
+    [data-testid="stSidebar"] { background-color: #1e293b; color: white; }
+    [data-testid="stSidebar"] label, [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3, [data-testid="stSidebar"] p { color: white !important; }
+    .stButton button { background-color: #0f172a; color: white; border-radius: 8px; border: none; font-weight: bold; }
+    .stButton button:hover { background-color: #334155; color: white; }
+    input, textarea, [data-baseweb="input"] div, [data-baseweb="base-input"] { background-color: #ffffff !important; border-radius: 8px !important; border: 1px solid #cbd5e1 !important; }
+    input:focus, textarea:focus, [data-baseweb="input"] input:focus { border-color: #0f172a !important; box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.1) !important; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -47,7 +24,6 @@ st.write("---")
 
 GEHEIMES_PASSWORT = "scion2026"
 
-# Sidebar für die Chat-Historie und Einstellungen
 with st.sidebar:
     st.header("🔑 Authentifizierung")
     passwort_eingabe = st.text_input("Passwort:", type="password")
@@ -73,36 +49,44 @@ with st.sidebar:
             st.session_state.aktiver_chat = chat_name
             st.rerun()
 
-# Funktion zum Generieren einer PowerPoint-Datei aus dem Text
+def bereinige_text(text):
+    # Entfernt Markdown-Sternchen und Trennstriche für saubere Folien
+    text = re.sub(r'\*\*', '', text)
+    text = re.sub(r'___+', '', text)
+    text = re.sub(r'---+', '', text)
+    text = text.replace('###', '')
+    return text.strip()
+
 def erstelle_pptx(textinhalt):
     prs = Presentation()
+    folien_teile = textinhalt.split("Folie")
     
-    # Text in Abschnitte / Folien unterteilen (anhand von Überschriften oder Folien-Markern)
-    folien_texte = textinhalt.split("Folie")
-    
-    for f_text in folien_texte:
+    for f_text in folien_teile:
         if not f_text.strip():
             continue
             
-        slide_layout = prs.slide_layouts[1] # Titel und Inhalt Layout
+        slide_layout = prs.slide_layouts[1]
         slide = prs.slides.add_slide(slide_layout)
         title_shape = slide.shapes.title
         body_shape = slide.placeholders[1]
         
         zeilen = f_text.strip().split("\n")
-        titel = zeilen[0].replace(":", "").replace("*", "").strip()
+        titel = bereinige_text(zeilen[0].replace(":", ""))
         title_shape.text = titel if titel else "Präsentation"
         
-        inhalt_zeilen = [z for z in zeilen[1:] if z.strip()]
+        inhalt_zeilen = []
+        for z in zeilen[1:]:
+            bereinigt = bereinige_text(z)
+            if bereinigt:
+                inhalt_zeilen.append(bereinigt)
+                
         body_shape.text = "\n".join(inhalt_zeilen)
         
-    # In Arbeitsspeicher speichern
     pptx_io = BytesIO()
     prs.save(pptx_io)
     pptx_io.seek(0)
     return pptx_io
 
-# Hauptbereichprüfung
 if passwort_eingabe != GEHEIMES_PASSWORT:
     if passwort_eingabe != "":
         st.error("Falsches Passwort oder ungültiger Schlüssel.")
@@ -181,7 +165,7 @@ else:
 
                         system_prompts = {
                             "Text-Recherche & Chat": "Du bist ein präziser, professioneller KI-Assistent. Antworte immer auf Deutsch.",
-                            "Präsentations-Struktur & Folien": "Du bist ein Experte für Business-Präsentationen. Erstelle eine strukturierte Präsentation, bei der jede Folie klar mit 'Folie X: [Titel]' beginnt und Stichpunkte enthält, auf Deutsch.",
+                            "Präsentations-Struktur & Folien": "Du bist ein Experte für Business-Präsentationen. Erstelle eine saubere Präsentation, bei der jede Folie mit 'Folie X: [Titel]' beginnt, gefolgt von prägnanten Stichpunkten. Vermeide überflüssige Sonderzeichen.",
                             "Video-Skript & Storyboard": "Du bist ein professioneller Videoproduzent. Erstelle ein detailliertes Video-Skript mit Szenenbeschreibung, visuellen Hinweisen und Sprechtext auf Deutsch."
                         }
                         
@@ -199,7 +183,6 @@ else:
                             with st.chat_message("assistant"):
                                 st.markdown(antwort)
                                 
-                                # Wenn im Präsentations-Modus, direkt einen Download-Button anbieten
                                 if modus == "Präsentations-Struktur & Folien":
                                     pptx_datei = erstelle_pptx(antwort)
                                     st.download_button(
@@ -211,15 +194,13 @@ else:
                                     )
                                 
                 except Exception as e:
-                    st.error(f"Ein Fehler ist aufgetreten: {e}")
+                    st.error(f"Ein Fehler is aufgetreten: {e}")
 
-    # Rechte Spalte: Vorlese-Fenster
     with spalte_rechts:
         st.subheader("🎧 Text vorlesen lassen")
         st.markdown("Kopiere hier deinen Text hinein. Zu lange Texte werden automatisch aufgeteilt.")
         
         vorlese_text = st.text_area("Text zum Vorlesen:", height=200, placeholder="Füge hier deinen Text ein...")
-        
         stimme = st.selectbox("Wähle eine Stimme:", ["alloy", "echo", "fable", "onyx", "nova", "shimmer"])
         
         if st.button("🔊 Audio generieren", use_container_width=True):
@@ -231,22 +212,15 @@ else:
                 with st.spinner("Erstelle Sprachdatei..."):
                     try:
                         client = OpenAI(api_key=openai_key_eingabe)
-                        
                         chunks = [vorlese_text[i:i + 4000] for i in range(0, len(vorlese_text), 4000)]
                         audio_bytes_gesammt = bytearray()
                         
                         for chunk in chunks:
-                            response = client.audio.speech.create(
-                                model="tts-1",
-                                voice=stimme,
-                                input=chunk
-                            )
+                            response = client.audio.speech.create(model="tts-1", voice=stimme, input=chunk)
                             audio_bytes_gesammt.extend(response.content)
                         
                         st.success("Audio erfolgreich generiert!")
                         st.audio(bytes(audio_bytes_gesammt), format="audio/mp3")
-                        
                         st.info("💡 **Tipp:** Du kannst die Geschwindigkeit im Player rechts unten auf **1.2x**, **1.4x** oder **1.6x** einstellen!")
-                        
                     except Exception as e:
                         st.error(f"Fehler bei der Audioerstellung: {e}")
