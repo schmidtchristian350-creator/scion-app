@@ -22,19 +22,16 @@ st.title("Scion Mind")
 st.markdown("*designed by Christian Schmidt*")
 st.write("---")
 
-MASTER_OPENAI_KEY = "sk-DEIN-ECHTER-OPENAI-API-SCHLUESSEL-HIER-EINTRAGEN"
+MASTER_OPENAI_KEY = "sk-DEIN-ECHTER-OPENAI-API-SCHLUESSEL-HIER"
 
-# Kundendatenbank & Passwörter im Speicher
+# Kundendatenbank im Speicher
 if "kunden_daten" not in st.session_state:
     st.session_state.kunden_daten = {
-        "kunde1": {"passwort": "123", "guthaben": 5.00},
-        "kunde2": {"passwort": "123", "guthaben": 10.00}
+        "kunde1": {"passwort": "123", "guthaben": 5.00}
     }
 
 with st.sidebar:
     st.header("🔑 Account & Login")
-    
-    # Auswahl zwischen Login und Registrierung
     auth_modus = st.radio("Aktion wählen:", ["Einloggen", "Neuen Account erstellen"])
     
     eingeloggter_kunde = None
@@ -51,7 +48,7 @@ with st.sidebar:
             else:
                 st.error("Falscher Benutzername oder Passwort.")
                 
-    else: # Registrierung
+    else:
         reg_name = st.text_input("Neuer Benutzername:")
         reg_pass = st.text_input("Neues Passwort:", type="password")
         
@@ -61,21 +58,61 @@ with st.sidebar:
             elif reg_name in st.session_state.kunden_daten:
                 st.error("Dieser Benutzername ist bereits vergeben.")
             else:
-                # Neuen Kunden mit z.B. 2.00 € Startguthaben anlegen
                 st.session_state.kunden_daten[reg_name] = {"passwort": reg_pass, "guthaben": 2.00}
                 st.session_state.aktueller_user = reg_name
-                st.success("Account erfolgreich erstellt! 2 € Startguthaben gutgeschrieben.")
+                st.success("Account erstellt! 2 € Startguthaben.")
                 st.rerun()
 
-    # Prüfen, wer aktuell eingeloggt ist
     eingeloggter_kunde = st.session_state.get("aktueller_user", None)
 
     if eingeloggter_kunde and eingeloggter_kunde in st.session_state.kunden_daten:
         guthaben = st.session_state.kunden_daten[eingeloggter_kunde]["guthaben"]
         st.write("---")
-        st.success(Eingeloggt := f"Eingeloggt als: **{eingeloggter_kunde}**")
+        st.success(f"Eingeloggt als: **{eingeloggter_kunde}**")
         st.metric(label="Dein Guthaben", value=f"{guthaben:.2f} €")
         
+        # --- PREPAID & ABO AUSWAHL ---
+        st.markdown("### 💳 Guthaben & Abos aufladen")
+        
+        paket_wahl = st.selectbox(
+            "Wähle dein Paket:",
+            [
+                "10 € Guthaben (Prepaid)", 
+                "25 € Guthaben (Prepaid)", 
+                "50 € Guthaben (Prepaid)", 
+                "Abo 10 € / Monat", 
+                "Abo 25 € / Monat"
+            ]
+        )
+        
+        # Die jeweiligen Stripe Links hinterlegt
+        stripe_links = {
+            "10 € Guthaben (Prepaid)": "https://buy.stripe.com/test_cNidRa5GPaUD4BnfSf9sk00",
+            "25 € Guthaben (Prepaid)": "https://buy.stripe.com/test_cNi3cwb198Mv3xj6hF9sk01",
+            "50 € Guthaben (Prepaid)": "https://buy.stripe.com/test_bJe9AU8T1aUDfg15dB9sk02",
+            "Abo 10 € / Monat": "https://buy.stripe.com/test_6oU28s3yH9Qz4Bn8pN9sk03",
+            "Abo 25 € / Monat": "https://buy.stripe.com/test_28E28sfhpd2L3xjbBZ9sk04"
+        }
+        
+        aktiver_link = stripe_links[paket_wahl]
+        
+        st.markdown(f"[⚡ Ausgeführtes Paket bezahlen]({aktiver_link})", unsafe_allow_html=True)
+        st.caption("Nach erfolgreicher Zahlung klicke unten, um dein Guthaben zu aktualisieren.")
+        
+        if st.button("Guthaben aktualisieren"):
+            if "Abo" in paket_wahl:
+                st.session_state.kunden_daten[eingeloggter_kunde]["guthaben"] += 50.00 # Beispielhafte monatliche Gutschrift für Abos
+            elif "10 €" in paket_wahl:
+                st.session_state.kunden_daten[eingeloggter_kunde]["guthaben"] += 10.00
+            elif "25 €" in paket_wahl:
+                st.session_state.kunden_daten[eingeloggter_kunde]["guthaben"] += 25.00
+            elif "50 €" in paket_wahl:
+                st.session_state.kunden_daten[eingeloggter_kunde]["guthaben"] += 50.00
+                
+            st.success("Erfolgreich aktualisiert!")
+            st.rerun()
+
+        st.write("---")
         if st.button("Abmelden"):
             st.session_state.aktueller_user = None
             st.rerun()
@@ -137,9 +174,9 @@ def erstelle_saubere_pptx(textinhalt):
 
 # Hauptbereich-Prüfung
 if not eingeloggter_kunde or eingeloggter_kunde not in st.session_state.kunden_daten:
-    st.warning("👈 Bitte melde dich links an oder erstelle dir einen neuen Account, um den Service zu nutzen.")
+    st.warning("👈 Bitte melde dich links an oder registriere dich, um den Service zu nutzen.")
 elif st.session_state.kunden_daten[eingeloggter_kunde]["guthaben"] <= 0:
-    st.error("Dein Prepaid-Guthaben ist aufgebraucht. Bitte lade dein Konto auf.")
+    st.error("Dein Guthaben ist aufgebraucht. Bitte lade über das Menü links dein Konto auf.")
 else:
     spalte_links, spalte_rechts = st.columns([1.2, 0.8])
 
@@ -221,7 +258,7 @@ else:
                 st.session_state.kunden_daten[eingeloggter_kunde]["guthaben"] -= 0.02
                 with st.spinner("Erstelle Sprachdatei..."):
                     try:
-                        client = OpenAI(api_key=MASTER_OPENAI_Key if 'MASTER_OPENAI_Key' in locals() else MASTER_OPENAI_KEY)
+                        client = OpenAI(api_key=MASTER_OPENAI_KEY)
                         chunks = [vorlese_text[i:i + 4000] for i in range(0, len(vorlese_text), 4000)]
                         audio_bytes_gesammt = bytearray()
                         
@@ -233,4 +270,4 @@ else:
                         st.audio(bytes(audio_bytes_gesammt), format="audio/mp3")
                         st.rerun()
                     except Exception as e:
-                        st.error(f"Fehler bei der Audioerstellung: {e}")
+                        st.error(f"Fehler: {e}")
