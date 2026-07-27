@@ -1,8 +1,8 @@
 import streamlit as st
 from openai import OpenAI
 
-# OpenAI Client sicher über die Streamlit Cloud Secrets initialisieren
-client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+# Trage hier deinen echten OpenAI API-Schlüssel direkt in die Anführungszeichen ein
+client = OpenAI(api_key="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")
 
 st.title("Scion Mind")
 st.markdown("*designed by Christian Schmidt*")
