@@ -24,9 +24,13 @@ st.write("---")
 
 MASTER_OPENAI_KEY = "sk-DEIN-ECHTER-OPENAI-API-SCHLUESSEL-HIER"
 
+# Admin-Name (hier kannst du deinen Namen eintragen, mit dem du dich einloggst)
+ADMIN_NAME = "Christian"
+
 # Kundendatenbank im Speicher
 if "kunden_daten" not in st.session_state:
     st.session_state.kunden_daten = {
+        "Christian": {"passwort": "admin", "guthaben": 999.00}, # Dein Admin-Account
         "kunde1": {"passwort": "123", "guthaben": 5.00}
     }
 
@@ -69,48 +73,37 @@ with st.sidebar:
         guthaben = st.session_state.kunden_daten[eingeloggter_kunde]["guthaben"]
         st.write("---")
         st.success(f"Eingeloggt als: **{eingeloggter_kunde}**")
-        st.metric(label="Dein Guthaben", value=f"{guthaben:.2f} €")
         
-        # --- PREPAID & ABO AUSWAHL ---
-        st.markdown("### 💳 Guthaben & Abos aufladen")
-        
-        paket_wahl = st.selectbox(
-            "Wähle dein Paket:",
-            [
-                "10 € Guthaben (Prepaid)", 
-                "25 € Guthaben (Prepaid)", 
-                "50 € Guthaben (Prepaid)", 
-                "Abo 10 € / Monat", 
-                "Abo 25 € / Monat"
-            ]
-        )
-        
-        # Die jeweiligen Stripe Links hinterlegt
-        stripe_links = {
-            "10 € Guthaben (Prepaid)": "https://buy.stripe.com/test_cNidRa5GPaUD4BnfSf9sk00",
-            "25 € Guthaben (Prepaid)": "https://buy.stripe.com/test_cNi3cwb198Mv3xj6hF9sk01",
-            "50 € Guthaben (Prepaid)": "https://buy.stripe.com/test_bJe9AU8T1aUDfg15dB9sk02",
-            "Abo 10 € / Monat": "https://buy.stripe.com/test_6oU28s3yH9Qz4Bn8pN9sk03",
-            "Abo 25 € / Monat": "https://buy.stripe.com/test_28E28sfhpd2L3xjbBZ9sk04"
-        }
-        
-        aktiver_link = stripe_links[paket_wahl]
-        
-        st.markdown(f"[⚡ Ausgeführtes Paket bezahlen]({aktiver_link})", unsafe_allow_html=True)
-        st.caption("Nach erfolgreicher Zahlung klicke unten, um dein Guthaben zu aktualisieren.")
-        
-        if st.button("Guthaben aktualisieren"):
-            if "Abo" in paket_wahl:
-                st.session_state.kunden_daten[eingeloggter_kunde]["guthaben"] += 50.00 # Beispielhafte monatliche Gutschrift für Abos
-            elif "10 €" in paket_wahl:
-                st.session_state.kunden_daten[eingeloggter_kunde]["guthaben"] += 10.00
-            elif "25 €" in paket_wahl:
-                st.session_state.kunden_daten[eingeloggter_kunde]["guthaben"] += 25.00
-            elif "50 €" in paket_wahl:
-                st.session_state.kunden_daten[eingeloggter_kunde]["guthaben"] += 50.00
-                
-            st.success("Erfolgreich aktualisiert!")
-            st.rerun()
+        # Wenn du der Admin bist, zeige "Admin-Modus (Unendlich)" an
+        if eingeloggter_kunde == ADMIN_NAME:
+            st.metric(label="Status", value="👑 Admin (Kostenlos)")
+        else:
+            st.metric(label="Dein Guthaben", value=f"{guthaben:.2f} €")
+            
+            # Zahlungsoptionen nur für normale Kunden anzeigen
+            st.markdown("### 💳 Guthaben & Abos aufladen")
+            paket_wahl = st.selectbox(
+                "Wähle dein Paket:",
+                ["10 € Guthaben (Prepaid)", "25 € Guthaben (Prepaid)", "50 € Guthaben (Prepaid)", "Abo 10 € / Monat", "Abo 25 € / Monat"]
+            )
+            
+            stripe_links = {
+                "10 € Guthaben (Prepaid)": "https://buy.stripe.com/test_cNidRa5GPaUD4BnfSf9sk00",
+                "25 € Guthaben (Prepaid)": "https://buy.stripe.com/test_cNi3cwb198Mv3xj6hF9sk01",
+                "50 € Guthaben (Prepaid)": "https://buy.stripe.com/test_bJe9AU8T1aUDfg15dB9sk02",
+                "Abo 10 € / Monat": "https://buy.stripe.com/test_6oU28s3yH9Qz4Bn8pN9sk03",
+                "Abo 25 € / Monat": "https://buy.stripe.com/test_28E28sfhpd2L3xjbBZ9sk04"
+            }
+            
+            aktiver_link = stripe_links[paket_wahl]
+            st.markdown(f"[⚡ Ausgeführtes Paket bezahlen]({aktiver_link})", unsafe_allow_html=True)
+            
+            if st.button("Guthaben aktualisieren"):
+                if "10 €" in paket_wahl: st.session_state.kunden_daten[eingeloggter_kunde]["guthaben"] += 10.00
+                elif "25 €" in paket_wahl: st.session_state.kunden_daten[eingeloggter_kunde]["guthaben"] += 25.00
+                elif "50 €" in paket_wahl: st.session_state.kunden_daten[eingeloggter_kunde]["guthaben"] += 50.00
+                st.success("Erfolgreich aktualisiert!")
+                st.rerun()
 
         st.write("---")
         if st.button("Abmelden"):
@@ -175,7 +168,8 @@ def erstelle_saubere_pptx(textinhalt):
 # Hauptbereich-Prüfung
 if not eingeloggter_kunde or eingeloggter_kunde not in st.session_state.kunden_daten:
     st.warning("👈 Bitte melde dich links an oder registriere dich, um den Service zu nutzen.")
-elif st.session_state.kunden_daten[eingeloggter_kunde]["guthaben"] <= 0:
+# Admin wird hier komplett durchgewunken, normale Kunden brauchen Guthaben > 0
+elif eingeloggter_kunde != ADMIN_NAME and st.session_state.kunden_daten[eingeloggter_kunde]["guthaben"] <= 0:
     st.error("Dein Guthaben ist aufgebraucht. Bitte lade über das Menü links dein Konto auf.")
 else:
     spalte_links, spalte_rechts = st.columns([1.2, 0.8])
@@ -203,7 +197,9 @@ else:
             aufgabe = aufgabe_input if Absenden else None
 
         if aufgabe:
-            st.session_state.kunden_daten[eingeloggter_kunde]["guthaben"] -= 0.05
+            # Guthaben nur bei normalen Kunden abziehen, der Admin (Christian) nutzt es frei
+            if eingeloggter_kunde != ADMIN_NAME:
+                st.session_state.kunden_daten[eingeloggter_kunde]["guthaben"] -= 0.05
             
             try:
                 client = OpenAI(api_key=MASTER_OPENAI_KEY)
@@ -248,14 +244,15 @@ else:
 
     with spalte_rechts:
         st.subheader("🎧 Text vorlesen lassen")
-        vorlese_text = st.text_area("Text zum Vorlesen:", height=200, placeholder="Füge hier deinen Text ein...")
+        vorlese_text = st.text_area("Text vorlesen lassen:", height=200, placeholder="Füge hier deinen Text ein...")
         stimme = st.selectbox("Wähle eine Stimme:", ["alloy", "echo", "fable", "onyx", "nova", "shimmer"])
         
         if st.button("🔊 Audio generieren", use_container_width=True):
             if not vorlese_text:
                 st.warning("Bitte gib einen Text zum Vorlesen ein.")
             else:
-                st.session_state.kunden_daten[eingeloggter_kunde]["guthaben"] -= 0.02
+                if eingeloggter_kunde != ADMIN_NAME:
+                    st.session_state.kunden_daten[eingeloggter_kunde]["guthaben"] -= 0.02
                 with st.spinner("Erstelle Sprachdatei..."):
                     try:
                         client = OpenAI(api_key=MASTER_OPENAI_KEY)
