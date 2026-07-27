@@ -53,12 +53,37 @@ else:
         current_chat = st.session_state.aktiver_chat
         st.markdown(f"**Aktiver Chat:** `{current_chat}`")
 
+        # NEU: Spracheingabe über das Mikrofon
+        st.markdown("🎙️ **Sprachaufnahme (optional):**")
+        audio_aufnahme = st.audio_input("Klicke zum Aufnehmen auf das Mikrofon:")
+        
+        sprach_text = ""
+        if audio_aufnahme is not None:
+            if not openai_key_eingabe:
+                st.warning("Bitte trage erst deinen API-Schlüssel ein, um Sprachaufnahmen zu transkribieren.")
+            else:
+                with st.spinner("Wandle Sprache in Text um..."):
+                    try:
+                        client = OpenAI(api_key=openai_key_eingabe)
+                        # Audio an OpenAI Whisper senden
+                        transcript = client.audio.transcriptions.create(
+                            model="whisper-1",
+                            file=("audio.wav", audio_aufnahme.read(), "audio/wav")
+                        )
+                        sprach_text = transcript.text
+                        st.success(erkannt := f"Erkannter Text: {sprach_text}")
+                    except Exception as e:
+                        st.error(f"Fehler bei der Spracherkennung: {e}")
+
         if modus == "Text-Recherche & Chat":
             for message in st.session_state.chats[current_chat]:
                 with st.chat_message(message["role"]):
                     st.markdown(message["content"])
 
-        if aufgabe := st.chat_input("Stelle deine Frage oder Aufgabe...") if modus == "Text-Recherche & Chat" else st.text_area("Deine Beschreibung oder Aufgabe dafür:"):
+        # Wenn per Sprache etwas aufgenommen wurde, nutzen wir das, ansonsten das Texteingabefeld
+        standard_text = sprach_text if sprach_text else ""
+        
+        if aufgabe := st.chat_input("Stelle deine Frage oder Aufgabe...") if modus == "Text-Recherche & Chat" else st.text_area("Deine Beschreibung oder Aufgabe dafür:", value=standard_text):
             
             if not openai_key_eingabe:
                 st.warning("Bitte trage in der linken Seitenleiste zuerst deinen OpenAI API-Schlüssel ein.")
@@ -107,7 +132,7 @@ else:
                 except Exception as e:
                     st.error(f"Ein Fehler ist aufgetreten: {e}")
 
-    # Rechte Spalte: Vorlese-Fenster mit automatischem Längen-Check
+    # Rechte Spalte: Vorlese-Fenster
     with spalte_rechts:
         st.subheader("🎧 Text vorlesen lassen")
         st.markdown("Kopiere hier deinen Text hinein. Zu lange Texte werden automatisch aufgeteilt.")
@@ -122,11 +147,10 @@ else:
             elif not vorlese_text:
                 st.warning("Bitte gib einen Text zum Vorlesen ein.")
             else:
-                with st.spinner("Erstelle Sprachdatei (kann bei langen Texten einen Moment dauern)..."):
+                with st.spinner("Erstelle Sprachdatei..."):
                     try:
                         client = OpenAI(api_key=openai_key_eingabe)
                         
-                        # Text in 4000er-Häppchen aufteilen, falls er zu lang ist
                         chunks = [vorlese_text[i:i + 4000] for i in range(0, len(vorlese_text), 4000)]
                         audio_bytes_gesammt = bytearray()
                         
@@ -141,7 +165,7 @@ else:
                         st.success("Audio erfolgreich generiert!")
                         st.audio(bytes(audio_bytes_gesammt), format="audio/mp3")
                         
-                        st.info("💡 **Tipp:** Du kannst die Geschwindigkeit im Player rechts unten (über die drei Punkte `...`) auf **1.2x**, **1.4x** oder **1.6x** einstellen!")
+                        st.info("💡 **Tipp:** Du kannst die Geschwindigkeit im Player rechts unten auf **1.2x**, **1.4x** oder **1.6x** einstellen!")
                         
                     except Exception as e:
                         st.error(f"Fehler bei der Audioerstellung: {e}")
