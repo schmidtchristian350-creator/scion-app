@@ -1,51 +1,75 @@
 import streamlit as st
 from openai import OpenAI
 
+st.set_page_config(page_title="Scion Mind", layout="wide")
+
 st.title("Scion Mind")
 st.markdown("*designed by Christian Schmidt*")
 st.write("---")
 
 GEHEIMES_PASSWORT = "scion2026"
-passwort_eingabe = st.text_input("Bitte gib deinen Lizenz-Schlüssel bzw. dein Passwort ein:", type="password")
 
+# Sidebar für die Chat-Historie und Einstellungen
+with st.sidebar:
+    st.header("🔑 Authentifizierung")
+    passwort_eingabe = st.text_input("Passwort:", type="password")
+    openai_key_eingabe = st.text_input("OpenAI API-Schlüssel:", type="password").strip()
+    
+    st.write("---")
+    st.header("💬 Deine Chats")
+    
+    # Speicher für alle Chats initialisieren
+    if "chats" not in st.session_state:
+        st.session_state.chats = {"Chat 1": []}
+    if "aktiver_chat" not in st.session_state:
+        st.session_state.aktiver_chat = "Chat 1"
+
+    # Button um einen neuen Chat zu erstellen
+    if st.button("➕ Neuer Chat"):
+        neuer_name = f"Chat {len(st.session_state.chats) + 1}"
+        st.session_state.chats[neuer_name] = []
+        st.session_state.aktiver_chat = neuer_name
+        st.rerun()
+
+    st.write("Wähle einen Chat aus:")
+    for chat_name in list(st.session_state.chats.keys()):
+        if st.button(chat_name, key=f"btn_{chat_name}"):
+            st.session_state.aktiver_chat = chat_name
+            st.rerun()
+
+# Hauptbereich
 if passwort_eingabe != GEHEIMES_PASSWORT:
     if passwort_eingabe != "":
         st.error("Falsches Passwort oder ungültiger Schlüssel.")
-    st.warning("Bitte authentifiziere dich, um den Service zu nutzen.")
+    st.warning("Bitte gib links dein Passwort ein, um den Service zu nutzen.")
 else:
-    st.success("Zugriff erfolgreich! Willkommen bei Scion Mind.")
-    
-    # Schlüssel-Eingabe
-    openai_key_eingabe = st.text_input("Trage hier deinen OpenAI API-Schlüssel ein:", type="password").strip()
-    
     # Auswahl der gewünschten Funktion
     modus = st.selectbox(
         "Was möchtest du erstellen lassen?",
         ["Text-Recherche & Chat", "Bild generieren (DALL-E)", "Präsentations-Struktur & Folien", "Video-Skript & Storyboard"]
     )
     
-    # Chat-Verlauf im Speicher der App behalten, wenn der Modus wechselt
-    if "messages" not in st.session_state:
-        st.session_state.messages = []
+    current_chat = st.session_state.aktiver_chat
+    st.subheader(f"Aktiver Bereich: {current_chat}")
 
-    # Zeige den bisherigen Chatverlauf an (nur im Text-Modus sinnvoll)
+    # Zeige den Verlauf des aktuellen Chats an (nur im Chat-Modus)
     if modus == "Text-Recherche & Chat":
-        for message in st.session_state.messages:
+        for message in st.session_state.chats[current_chat]:
             with st.chat_message(message["role"]):
                 st.markdown(message["content"])
 
-    # Eingabefeld für die neue Frage/Aufgabe
+    # Eingabefeld
     if aufgabe := st.chat_input("Stelle deine Frage oder Aufgabe...") if modus == "Text-Recherche & Chat" else st.text_area("Deine Beschreibung oder Aufgabe dafür:"):
         
         if not openai_key_eingabe:
-            st.warning("Bitte trage zuerst deinen OpenAI API-Schlüssel ein.")
+            st.warning("Bitte trage in der linken Seitenleiste zuerst deinen OpenAI API-Schlüssel ein.")
         else:
             try:
                 client = OpenAI(api_key=openai_key_eingabe)
                 
                 # Modus: Bild generieren
                 if modus == "Bild generieren (DALL-E)":
-                    with st.info("Die KI generiert dein Bild..."):
+                    with st.spinner("Die KI generiert dein Bild..."):
                         response = client.images.generate(
                             model="dall-e-3",
                             prompt=aufgabe,
@@ -59,8 +83,8 @@ else:
                 
                 # Modus: Chat / Text / Präsentation / Video
                 else:
-                    # Benutzer-Nachricht dem Verlauf hinzufügen
-                    st.session_state.messages.append({"role": "user", "content": aufgabe})
+                    # Dem aktuellen Chat hinzufügen
+                    st.session_state.chats[current_chat].append({"role": "user", "content": aufgabe})
                     with st.chat_message("user"):
                         st.markdown(aufgabe)
 
@@ -70,9 +94,8 @@ else:
                         "Video-Skript & Storyboard": "Du bist ein professioneller Videoproduzent. Erstelle ein detailliertes Video-Skript mit Szenenbeschreibung, visuellen Hinweisen und Sprechtext auf Deutsch."
                     }
                     
-                    # Gesamten Chatverlauf an OpenAI übergeben
                     messages_payload = [{"role": "system", "content": system_prompts.get(modus, "Du bist ein hilfreicher Assistent.")}]
-                    messages_payload.extend(st.session_state.messages)
+                    messages_payload.extend(st.session_state.chats[current_chat])
 
                     with st.spinner("Die KI verarbeitet deine Anfrage..."):
                         response = client.chat.completions.create(
@@ -81,8 +104,7 @@ else:
                         )
                         antwort = response.choices[0].message.content
                         
-                        # Assistenten-Antwort dem Verlauf hinzufügen
-                        st.session_state.messages.append({"role": "assistant", "content": antwort})
+                        st.session_state.chats[current_chat].append({"role": "assistant", "content":antwort})
                         with st.chat_message("assistant"):
                             st.markdown(antwort)
                             
