@@ -22,13 +22,13 @@ st.title("Scion Mind")
 st.markdown("*designed by Christian Schmidt*")
 st.write("---")
 
-# DEIN MASTER-SCHLÜSSEL (Hier kommt dein echter OpenAI-Key rein, den deine Kunden NICHT sehen)
+# DEIN MASTER-SCHLÜSSEL
 MASTER_OPENAI_KEY = "sk-DEIN-ECHTER-OPENAI-API-SCHLUESSEL-HIER-EINTRAGEN"
 
-# Kundendatenbank im Speicher (In Zukunft kannst du das an eine echte Datenbank wie SQLite anbinden)
+# Kundendatenbank im Speicher
 if "kunden_guthaben" not in st.session_state:
     st.session_state.kunden_guthaben = {
-        "kunde1": 5.00,  # Startguthaben in Euro zum Testen
+        "kunde1": 5.00,
         "kunde2": 10.00
     }
 
@@ -87,7 +87,13 @@ def erstelle_saubere_pptx(textinhalt):
         titel = bereinige_text(zeilen[0].replace(":", ""))
         title_shape.text = titel if titel else "Präsentation"
         
-        inhalt_zeilen = [bereinige_text(z) for z in zeilen[1:] if bereinigt := bereinige_text(z)]
+        # Hier behoben: klassische, saubere Schleife ohne Syntax-Fehler
+        inhalt_zeilen = []
+        for z in zeilen[1:]:
+            b = bereinige_text(z)
+            if b:
+                inhalt_zeilen.append(b)
+                
         body_shape.text = "\n".join(inhalt_zeilen)
         
     pptx_io = BytesIO()
@@ -126,7 +132,6 @@ else:
             aufgabe = aufgabe_input if Absenden else None
 
         if aufgabe:
-            # Guthaben bei Nutzung um einen kleinen Cent-Betrag reduzieren (z.B. 0.05 € pro Anfrage)
             st.session_state.kunden_guthaben[kunden_name] -= 0.05
             
             try:
@@ -165,7 +170,7 @@ else:
                                 mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
                                 use_container_width=True
                             )
-                st.rerun() # Aktualisiert die Guthaben-Anzeige direkt
+                st.rerun()
                                 
             except Exception as e:
                 st.error(f"Ein Fehler ist aufgetreten: {e}")
@@ -179,7 +184,7 @@ else:
             if not vorlese_text:
                 st.warning("Bitte gib einen Text zum Vorlesen ein.")
             else:
-                st.session_state.kunden_guthaben[kunden_name] -= 0.02 # Kleiner Abzug für Audio
+                st.session_state.kunden_guthaben[kunden_name] -= 0.02
                 with st.spinner("Erstelle Sprachdatei..."):
                     try:
                         client = OpenAI(api_key=MASTER_OPENAI_KEY)
