@@ -1,9 +1,9 @@
 import streamlit as st
 from openai import OpenAI
 
-st.set_page_config(page_title="Scion-Mind", layout="wide")
+st.set_page_config(page_title="Scion Mind", layout="wide")
 
-st.title("Scion Mind")
+st.title("Scion-Mind")
 st.markdown("*designed by Christian Schmidt*")
 st.write("---")
 
