@@ -1,10 +1,8 @@
 import streamlit as st
 from openai import OpenAI
 from pptx import Presentation
-from pptx.util import Inches
 from io import BytesIO
 import re
-import requests
 
 st.set_page_config(page_title="Scion Mind", layout="wide")
 
@@ -58,7 +56,7 @@ def bereinige_text(text):
     text = text.replace('###', '')
     return text.strip()
 
-def erstelle_pptx_mit_bildern(textinhalt, client):
+def erstelle_saubere_pptx(textinhalt):
     prs = Presentation()
     folien_teile = textinhalt.split("Folie")
     
@@ -66,47 +64,23 @@ def erstelle_pptx_mit_bildern(textinhalt, client):
         if not f_text.strip():
             continue
             
-        slide_layout = prs.slide_layouts[6]
+        slide_layout = prs.slide_layouts[1] # Titel und Inhalt Layout
         slide = prs.slides.add_slide(slide_layout)
+        title_shape = slide.shapes.title
+        body_shape = slide.placeholders[1]
         
         zeilen = f_text.strip().split("\n")
         titel = bereinige_text(zeilen[0].replace(":", ""))
-        
-        txBox = slide.shapes.add_textbox(Inches(0.8), Inches(0.6), Inches(11.5), Inches(1.0))
-        tf = txBox.text_frame
-        p = tf.paragraphs[0]
-        p.text = titel if titel else "Präsentation"
-        p.font.size = 32
-        p.font.bold = True
+        title_shape.text = titel if titel else "Präsentation"
         
         inhalt_zeilen = []
         for z in zeilen[1:]:
             bereinigt = bereinige_text(z)
             if bereinigt:
-                inhalt_zeilen.append("• " + bereinigt)
+                inhalt_zeilen.append(bereinigt)
                 
-        contentBox = slide.shapes.add_textbox(Inches(0.8), Inches(1.8), Inches(6.5), Inches(5.0))
-        tf_content = contentBox.text_frame
-        tf_content.word_wrap = True
-        tf_content.text = "\n".join(inhalt_zeilen)
+        body_shape.text = "\n".join(inhalt_zeilen)
         
-        try:
-            # Umstellung auf dall-e-2, das bei jedem Standard-Key freigeschaltet ist
-            img_response = client.images.generate(
-                model="dall-e-2",
-                prompt=f"Professional modern business illustration representing: {titel}",
-                size="512x512",
-                n=1,
-            )
-            img_url = img_response.data[0].url
-            img_data = requests.get(img_url).content
-            
-            if len(img_data) > 100:
-                img_stream = BytesIO(img_data)
-                slide.shapes.add_picture(img_stream, Inches(7.5), Inches(1.8), width=Inches(4.8))
-        except Exception:
-            pass 
-            
     pptx_io = BytesIO()
     prs.save(pptx_io)
     pptx_io.seek(0)
@@ -208,11 +182,11 @@ else:
                                 st.markdown(antwort)
                                 
                                 if modus == "Präsentations-Struktur & Folien":
-                                    pptx_datei = erstelle_pptx_mit_bildern(antwort, client)
+                                    pptx_datei = erstelle_saubere_pptx(antwort)
                                     st.download_button(
-                                        label="📥 PowerPoint mit Bildern (.pptx) herunterladen",
+                                        label="📥 PowerPoint (.pptx) herunterladen",
                                         data=pptx_datei,
-                                        file_name="Scion_Mind_Praesentation_mit_Bildern.pptx",
+                                        file_name="Scion_Mind_Praesentation.pptx",
                                         mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
                                         use_container_width=True
                                     )
