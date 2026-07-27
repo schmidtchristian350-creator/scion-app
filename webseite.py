@@ -72,7 +72,6 @@ def erstelle_pptx_mit_bildern(textinhalt, client):
         zeilen = f_text.strip().split("\n")
         titel = bereinige_text(zeilen[0].replace(":", ""))
         
-        # Titel oben
         txBox = slide.shapes.add_textbox(Inches(0.8), Inches(0.6), Inches(11.5), Inches(1.0))
         tf = txBox.text_frame
         p = tf.paragraphs[0]
@@ -80,7 +79,6 @@ def erstelle_pptx_mit_bildern(textinhalt, client):
         p.font.size = 32
         p.font.bold = True
         
-        # Inhalt
         inhalt_zeilen = []
         for z in zeilen[1:]:
             bereinigt = bereinige_text(z)
@@ -92,23 +90,22 @@ def erstelle_pptx_mit_bildern(textinhalt, client):
         tf_content.word_wrap = True
         tf_content.text = "\n".join(inhalt_zeilen)
         
-        # Bild sicher generieren und einfügen
         try:
+            # Umstellung auf dall-e-2, das bei jedem Standard-Key freigeschaltet ist
             img_response = client.images.generate(
-                model="dall-e-3",
+                model="dall-e-2",
                 prompt=f"Professional modern business illustration representing: {titel}",
-                size="1024x1024",
-                quality="standard",
+                size="512x512",
                 n=1,
             )
             img_url = img_response.data[0].url
             img_data = requests.get(img_url).content
             
-            if len(img_data) > 100: # Prüfen ob Daten da sind
+            if len(img_data) > 100:
                 img_stream = BytesIO(img_data)
                 slide.shapes.add_picture(img_stream, Inches(7.5), Inches(1.8), width=Inches(4.8))
         except Exception:
-            pass # Ohne Bild fortfahren, falls DALL-E blockiert
+            pass 
             
     pptx_io = BytesIO()
     prs.save(pptx_io)
@@ -176,10 +173,9 @@ else:
                     if modus == "Bild generieren (DALL-E)":
                         with st.spinner("Die KI generiert dein Bild..."):
                             response = client.images.generate(
-                                model="dall-e-3",
+                                model="dall-e-2",
                                 prompt=aufgabe,
-                                size="1024x1024",
-                                quality="standard",
+                                size="512x512",
                                 n=1,
                             )
                             image_url = response.data[0].url
@@ -200,7 +196,7 @@ else:
                         messages_payload = [{"role": "system", "content": system_prompts.get(modus, "Du bist ein hilfreicher Assistent.")}]
                         messages_payload.extend(st.session_state.chats[current_chat])
 
-                        with st.spinner("Die KI verarbeitet deine Anfrage und generiert die PowerPoint-Datei..."):
+                        with st.spinner("Die KI verarbeitet deine Anfrage..."):
                             response = client.chat.completions.create(
                                 model="gpt-4o-mini",
                                 messages=messages_payload
