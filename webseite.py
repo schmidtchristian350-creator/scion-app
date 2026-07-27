@@ -1,15 +1,13 @@
 import streamlit as st
 from openai import OpenAI
 
-# OpenAI Client initialisieren
-client = OpenAI(api_key="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")
+# OpenAI Client sicher über die Streamlit Cloud Secrets initialisieren
+client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
-# --- BENUTZEROBERFLÄCHE ---
 st.title("Scion Mind")
 st.markdown("*designed by Christian Schmidt*")
 st.write("---")
 
-# Sichere Login-Schranke für deine Kunden
 GEHEIMES_PASSWORT = "scion2026"
 passwort_eingabe = st.text_input("Bitte gib deinen Lizenz-Schlüssel bzw. dein Passwort ein:", type="password")
 
