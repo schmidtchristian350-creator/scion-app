@@ -18,7 +18,7 @@ st.markdown("""
     [data-testid="stSidebar"] label, [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3, [data-testid="stSidebar"] p {
         color: white !important;
     }
-    /* Buttons stylen */
+    /* Allgemeine Buttons stylen */
     .stButton button {
         background-color: #0f172a;
         color: white;
@@ -36,7 +36,6 @@ st.markdown("""
         border-radius: 8px !important;
         border: 1px solid #cbd5e1 !important;
     }
-    /* Rahmenverstärkung beim Anklicken/Fokus */
     input:focus, textarea:focus, [data-baseweb="input"] input:focus {
         border-color: #0f172a !important;
         box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.1) !important;
@@ -44,7 +43,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("Scion Mind")
+st.title("Scion-Mind")
 st.markdown("*designed by Christian Schmidt*")
 st.write("---")
 
@@ -122,8 +121,17 @@ else:
 
         standard_text = sprach_text if sprach_text else ""
         
-        if aufgabe := st.chat_input("Stelle deine Frage oder Aufgabe...") if modus == "Text-Recherche & Chat" else st.text_area("Deine Beschreibung oder Aufgabe dafür:", value=standard_text):
-            
+        # Eingabe-Logik mit sauberem Textbereich und einem gut sichtbaren Button direkt darunter
+        if modus == "Text-Recherche & Chat":
+            aufgabe = st.chat_input("Stelle deine Frage oder Aufgabe...")
+        else:
+            aufgabe_input = st.text_area("Deine Beschreibung oder Aufgabe dafür:", value=standard_text, height=120)
+            # Hier ist der extra gut sichtbare Button für die anderen Modi
+            Absenden = st.button("🚀 Aufgabe jetzt ausführen", use_container_width=True)
+            aufgabe = aufgabe_input if Absenden else None
+
+        # Wenn im Chat-Modus etwas eingegeben wurde oder im anderen Modus der Button gedrückt wurde:
+        if aufgabe:
             if not openai_key_eingabe:
                 st.warning("Bitte trage in der linken Seitenleiste zuerst deinen OpenAI API-Schlüssel ein.")
             else:
@@ -180,7 +188,7 @@ else:
         
         stimme = st.selectbox("Wähle eine Stimme:", ["alloy", "echo", "fable", "onyx", "nova", "shimmer"])
         
-        if st.button("Audio generieren"):
+        if st.button("🔊 Audio generieren", use_container_width=True):
             if not openai_key_eingabe:
                 st.warning("Bitte trage in der linken Seitenleiste deinen API-Schlüssel ein.")
             elif not vorlese_text:
