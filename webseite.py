@@ -22,28 +22,63 @@ st.title("Scion Mind")
 st.markdown("*designed by Christian Schmidt*")
 st.write("---")
 
-# DEIN MASTER-SCHLÜSSEL
 MASTER_OPENAI_KEY = "sk-DEIN-ECHTER-OPENAI-API-SCHLUESSEL-HIER-EINTRAGEN"
 
-# Kundendatenbank im Speicher
-if "kunden_guthaben" not in st.session_state:
-    st.session_state.kunden_guthaben = {
-        "kunde1": 5.00,
-        "kunde2": 10.00
+# Kundendatenbank & Passwörter im Speicher
+if "kunden_daten" not in st.session_state:
+    st.session_state.kunden_daten = {
+        "kunde1": {"passwort": "123", "guthaben": 5.00},
+        "kunde2": {"passwort": "123", "guthaben": 10.00}
     }
 
 with st.sidebar:
-    st.header("🔑 Kunden-Login")
-    kunden_name = st.text_input("Dein Kunden-Token / Name:")
+    st.header("🔑 Account & Login")
     
-    if kunden_name in st.session_state.kunden_guthaben:
-        guthaben = st.session_state.kunden_guthaben[kunden_name]
-        st.success(f"Eingeloggt als: {kunden_name}")
+    # Auswahl zwischen Login und Registrierung
+    auth_modus = st.radio("Aktion wählen:", ["Einloggen", "Neuen Account erstellen"])
+    
+    eingeloggter_kunde = None
+
+    if auth_modus == "Einloggen":
+        login_name = st.text_input("Benutzername:")
+        login_pass = st.text_input("Passwort:", type="password")
+        
+        if st.button("Anmelden"):
+            if login_name in st.session_state.kunden_daten and st.session_state.kunden_daten[login_name]["passwort"] == login_pass:
+                st.session_state.aktueller_user = login_name
+                st.success(f"Willkommen zurück, {login_name}!")
+                st.rerun()
+            else:
+                st.error("Falscher Benutzername oder Passwort.")
+                
+    else: # Registrierung
+        reg_name = st.text_input("Neuer Benutzername:")
+        reg_pass = st.text_input("Neues Passwort:", type="password")
+        
+        if st.button("Account registrieren"):
+            if not reg_name or not reg_pass:
+                st.warning("Bitte alle Felder ausfüllen.")
+            elif reg_name in st.session_state.kunden_daten:
+                st.error("Dieser Benutzername ist bereits vergeben.")
+            else:
+                # Neuen Kunden mit z.B. 2.00 € Startguthaben anlegen
+                st.session_state.kunden_daten[reg_name] = {"passwort": reg_pass, "guthaben": 2.00}
+                st.session_state.aktueller_user = reg_name
+                st.success("Account erfolgreich erstellt! 2 € Startguthaben gutgeschrieben.")
+                st.rerun()
+
+    # Prüfen, wer aktuell eingeloggt ist
+    eingeloggter_kunde = st.session_state.get("aktueller_user", None)
+
+    if eingeloggter_kunde and eingeloggter_kunde in st.session_state.kunden_daten:
+        guthaben = st.session_state.kunden_daten[eingeloggter_kunde]["guthaben"]
+        st.write("---")
+        st.success(Eingeloggt := f"Eingeloggt als: **{eingeloggter_kunde}**")
         st.metric(label="Dein Guthaben", value=f"{guthaben:.2f} €")
-        if guthaben <= 0:
-            st.error("Dein Guthaben ist leer. Bitte lade dein Konto auf!")
-    elif kunden_name != "":
-        st.error("Unbekannter Token / Kein Guthaben gefunden.")
+        
+        if st.button("Abmelden"):
+            st.session_state.aktueller_user = None
+            st.rerun()
 
     st.write("---")
     st.header("💬 Deine Chats")
@@ -87,7 +122,6 @@ def erstelle_saubere_pptx(textinhalt):
         titel = bereinige_text(zeilen[0].replace(":", ""))
         title_shape.text = titel if titel else "Präsentation"
         
-        # Hier behoben: klassische, saubere Schleife ohne Syntax-Fehler
         inhalt_zeilen = []
         for z in zeilen[1:]:
             b = bereinige_text(z)
@@ -102,10 +136,10 @@ def erstelle_saubere_pptx(textinhalt):
     return pptx_io
 
 # Hauptbereich-Prüfung
-if not kunden_name or kunden_name not in st.session_state.kunden_guthaben:
-    st.warning("👈 Bitte gib links deinen Kundennamen / Token ein, um den Service zu starten.")
-elif st.session_state.kunden_guthaben[kunden_name] <= 0:
-    st.error("Dein Prepaid-Guthaben ist aufgebraucht. Bitte wende dich an den Administrator, um neues Guthaben aufzuladen.")
+if not eingeloggter_kunde or eingeloggter_kunde not in st.session_state.kunden_daten:
+    st.warning("👈 Bitte melde dich links an oder erstelle dir einen neuen Account, um den Service zu nutzen.")
+elif st.session_state.kunden_daten[eingeloggter_kunde]["guthaben"] <= 0:
+    st.error("Dein Prepaid-Guthaben ist aufgebraucht. Bitte lade dein Konto auf.")
 else:
     spalte_links, spalte_rechts = st.columns([1.2, 0.8])
 
@@ -132,7 +166,7 @@ else:
             aufgabe = aufgabe_input if Absenden else None
 
         if aufgabe:
-            st.session_state.kunden_guthaben[kunden_name] -= 0.05
+            st.session_state.kunden_daten[eingeloggter_kunde]["guthaben"] -= 0.05
             
             try:
                 client = OpenAI(api_key=MASTER_OPENAI_KEY)
@@ -184,10 +218,10 @@ else:
             if not vorlese_text:
                 st.warning("Bitte gib einen Text zum Vorlesen ein.")
             else:
-                st.session_state.kunden_guthaben[kunden_name] -= 0.02
+                st.session_state.kunden_daten[eingeloggter_kunde]["guthaben"] -= 0.02
                 with st.spinner("Erstelle Sprachdatei..."):
                     try:
-                        client = OpenAI(api_key=MASTER_OPENAI_KEY)
+                        client = OpenAI(api_key=MASTER_OPENAI_Key if 'MASTER_OPENAI_Key' in locals() else MASTER_OPENAI_KEY)
                         chunks = [vorlese_text[i:i + 4000] for i in range(0, len(vorlese_text), 4000)]
                         audio_bytes_gesammt = bytearray()
                         
