@@ -41,7 +41,6 @@ if passwort_eingabe != GEHEIMES_PASSWORT:
         st.error("Falsches Passwort oder ungültiger Schlüssel.")
     st.warning("Bitte gib links dein Passwort ein, um den Service zu nutzen.")
 else:
-    # Bildschirm in zwei Spalten aufteilen (Links: Chat/Tools, Rechts: Vorlese-Fenster)
     spalte_links, spalte_rechts = st.columns([1.2, 0.8])
 
     with spalte_links:
@@ -108,14 +107,13 @@ else:
                 except Exception as e:
                     st.error(f"Ein Fehler ist aufgetreten: {e}")
 
-    # Rechte Spalte: Das neue Vorlese-Fenster
+    # Rechte Spalte: Vorlese-Fenster mit automatischem Längen-Check
     with spalte_rechts:
         st.subheader("🎧 Text vorlesen lassen")
-        st.markdown("Kopiere hier deinen Text hinein, den die KI in Sprache umwandeln soll.")
+        st.markdown("Kopiere hier deinen Text hinein. Zu lange Texte werden automatisch aufgeteilt.")
         
         vorlese_text = st.text_area("Text zum Vorlesen:", height=200, placeholder="Füge hier deinen Text ein...")
         
-        # Auswahl der Stimme
         stimme = st.selectbox("Wähle eine Stimme:", ["alloy", "echo", "fable", "onyx", "nova", "shimmer"])
         
         if st.button("Audio generieren"):
@@ -124,23 +122,26 @@ else:
             elif not vorlese_text:
                 st.warning("Bitte gib einen Text zum Vorlesen ein.")
             else:
-                with st.spinner("Erstelle Sprachdatei..."):
+                with st.spinner("Erstelle Sprachdatei (kann bei langen Texten einen Moment dauern)..."):
                     try:
                         client = OpenAI(api_key=openai_key_eingabe)
                         
-                        # OpenAI Audio API Aufruf
-                        response = client.audio.speech.create(
-                            model="tts-1",
-                            voice=stimme,
-                            input=vorlese_text
-                        )
+                        # Text in 4000er-Häppchen aufteilen, falls er zu lang ist
+                        chunks = [vorlese_text[i:i + 4000] for i in range(0, len(vorlese_text), 4000)]
+                        audio_bytes_gesammt = bytearray()
                         
-                        # Audio direkt im Browser abspielbar machen
-                        audio_bytes = response.content
+                        for chunk in chunks:
+                            response = client.audio.speech.create(
+                                model="tts-1",
+                                voice=stimme,
+                                input=chunk
+                            )
+                            audio_bytes_gesammt.extend(response.content)
+                        
                         st.success("Audio erfolgreich generiert!")
-                        st.audio(audio_bytes, format="audio/mp3")
+                        st.audio(bytes(audio_bytes_gesammt), format="audio/mp3")
                         
-                        st.info("💡 **Tipp zur Geschwindigkeit:** Im Player rechts unten (die drei Punkte `...`) kannst du die Wiedergabegeschwindigkeit auf **1.2x**, **1.4x** oder **1.6x** einstellen!")
+                        st.info("💡 **Tipp:** Du kannst die Geschwindigkeit im Player rechts unten (über die drei Punkte `...`) auf **1.2x**, **1.4x** oder **1.6x** einstellen!")
                         
                     except Exception as e:
                         st.error(f"Fehler bei der Audioerstellung: {e}")
