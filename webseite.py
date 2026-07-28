@@ -238,7 +238,7 @@ else:
                 st.rerun()
                                 
             except Exception as e:
-                st.error(f"Ein Fehler aufgetreten: {e}")
+                st.error(f"Ein Fehler ist aufgetreten: {e}")
 
     with spalte_rechts:
         st.subheader("🎥 Echter KI-Video Generator")
@@ -251,7 +251,6 @@ else:
                 if eingeloggter_kunde != ADMIN_NAME:
                     st.session_state.kunden_daten[eingeloggter_kunde]["guthaben"] -= 0.50
                 
-                # Live Status- und Fortschrittsanzeige in Streamlit
                 status_text = st.empty()
                 progress_bar = st.progress(0)
                 
@@ -265,7 +264,6 @@ else:
                         "Prefer": "respond-async"
                     }
                     
-                    # Offizieller Endpunkt für moderne Videomodelle (z.B. Luma Ray auf Replicate)
                     data = {
                         "version": "57b3261a9f5f0b5a32b236113b2c6df442ab6b345c2f8216cb037cfc23932e65",
                         "input": {"prompt": video_prompt}
@@ -274,13 +272,13 @@ else:
                     response = requests.post("https://api.replicate.com/v1/predictions", json=data, headers=headers)
                     res_json = response.json()
                     
-                    if "error" in res_json:
-                        st.error(f"Fehler: {res_json['error']}")
+                    # Fehlerabfrage, falls Replicate einen Fehlercode oder eine Nachricht sendet
+                    if "error" in res_json or "urls" not in res_json:
+                        st.error(f"API-Antwort von Replicate: {res_json}")
                     else:
                         get_url = res_json["urls"]["get"]
                         
-                        # Live-Polling Schleife: Prüft alle paar Sekunden den Fortschritt
-                        for i in range(30): # Wartet bis zu 90 Sekunden
+                        for i in range(30):
                             status_res = requests.get(get_url, headers={"Authorization": f"Bearer {VIDEO_API_KEY}"}).json()
                             status = status_res.get("status")
                             
@@ -299,10 +297,10 @@ else:
                                 progress_bar.progress(50)
                                 status_text.text("⏳ Video wird gerendert (Das kann 1-2 Minuten dauern)...")
                             elif status == "failed":
-                                st.error("Die Videogenerierung ist fehlgeschlagen.")
+                                st.error(f"Die Videogenerierung ist fehlgeschlagen: {status_res.get('error', 'Unbekannter Fehler')}")
                                 break
                                 
-                            time.sleep(3) # 3 Sekunden warten bis zur nächsten Prüfung
+                            time.sleep(3)
                             
                 except Exception as e:
                     st.error(f"Verbindungsfehler: {e}")
