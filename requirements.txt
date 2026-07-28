@@ -3,3 +3,4 @@ openai
 python-pptx
 moviepy
 weasyprint 
+reportlab 
