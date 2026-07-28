@@ -9,6 +9,12 @@ import json
 import sqlite3
 import pandas as pd
 import threading
+import imaplib
+import smtplib
+email_lib_available = True
+from email.header import decode_header
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from PIL import Image as PILImage
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from reportlab.lib.pagesizes import A4, landscape
@@ -41,8 +47,8 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("Scion Mind - Enterprise Ultimate AGI Studio (GOD-MODE V5.1)")
-st.markdown("*designed by Christian Schmidt | Powered by Multi-Agent Debates, SMTP/WhatsApp Outbound, React-Flow Visual Builder & Multi-Modal Vision*")
+st.title("Scion Mind - Enterprise Ultimate AGI Studio (GOD-MODE V6)")
+st.markdown("*designed by Christian Schmidt | Powered by Live Email Integration (IMAP/SMTP), Multi-Agent Debates, Vision & React Flow*")
 st.write("---")
 
 MASTER_OPENAI_KEY = st.secrets["OPENAI_API_KEY"]
@@ -76,11 +82,13 @@ def init_db():
         )
     """)
     cursor.execute("""
-        CREATE TABLE IF NOT EXISTS workflows (
+        CREATE TABLE IF NOT EXISTS email_config (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            titel TEXT,
-            knoten TEXT,
-            status TEXT
+            username TEXT,
+            imap_server TEXT,
+            smtp_server TEXT,
+            email_adresse TEXT,
+            email_passwort TEXT
         )
     """)
     cursor.execute("SELECT * FROM kunden WHERE username = ?", (ADMIN_NAME,))
@@ -102,7 +110,7 @@ def background_daemon_worker():
         try:
             conn = get_db_connection()
             cursor = conn.cursor()
-            cursor.execute("INSERT INTO daemon_logs (zeit, aktion, status) VALUES (datetime('now', 'localtime'), 'Autonomer 24/7 Healthcheck & Outbound-Queue-Prüfung', 'Erfolgreich')")
+            cursor.execute("INSERT INTO daemon_logs (zeit, aktion, status) VALUES (datetime('now', 'localtime'), 'Autonomer 24/7 Healthcheck & E-Mail-Postfach-Scan', 'Erfolgreich')")
             conn.commit()
             conn.close()
         except Exception:
@@ -197,6 +205,24 @@ with st.sidebar:
                 st.rerun()
 
         st.write("---")
+        st.header("✉️ E-Mail-Postfach Integration")
+        with st.expander("Postfach-Zugang konfigurieren", expanded=False):
+            mail_adr = st.text_input("E-Mail Adresse:", placeholder="name@domain.de")
+            mail_pwd = st.text_input("Passwort (App-Passwort):", type="password")
+            imap_s = st.text_input("IMAP-Server:", value="imap.gmail.com")
+            smtp_s = st.text_input("SMTP-Server:", value="smtp.gmail.com")
+            
+            if st.button("E-Mail-Zugang speichern"):
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                cursor.execute("DELETE FROM email_config WHERE username = ?", (eingeloggter_kunde,))
+                cursor.execute("INSERT INTO email_config (username, imap_server, smtp_server, email_adresse, email_passwort) VALUES (?, ?, ?, ?, ?)",
+                               (eingeloggter_kunde, imap_s, smtp_s, mail_adr, mail_pwd))
+                conn.commit()
+                conn.close()
+                st.success("E-Mail-Zugang erfolgreich gesichert!")
+
+        st.write("---")
         if st.button("Abmelden"):
             st.session_state.aktueller_user = None
             st.rerun()
@@ -215,8 +241,74 @@ with st.sidebar:
             st.rerun()
 
 # -------------------------------------------------------------
-# CORE ENGINES
+# CORE ENGINES (Playwright, Multi-Model, Guardrails, E-Mail IMAP/SMTP)
 # -------------------------------------------------------------
+def lade_letzte_emails(username):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT imap_server, email_adresse, email_passwort FROM email_config WHERE username = ?", (username,))
+    row = cursor.fetchone()
+    conn.close()
+    
+    if not row:
+        return "Keine E-Mail-Konfiguration hinterlegt. Bitte in der Sidebar einrichten."
+    
+    imap_s, mail_adr, mail_pwd = row
+    try:
+        mail = imaplib.IMAP4_SSL(imap_s)
+        mail.login(mail_adr, mail_pwd)
+        mail.select("inbox")
+        
+        status, messages = mail.search(None, "UNSEEN")
+        if status != "OK":
+            status, messages = mail.search(None, "ALL") # Fallback auf alle Mails wenn keine ungelesenen
+            
+        mail_ids = messages[0].split()
+        neueste_ids = mail_ids[-5:] # Die letzten 5 Mails
+        
+        ergebnis_liste = []
+        for mid in reversed(neueste_ids):
+            res, msg_data = mail.fetch(mid, "(RFC822)")
+            for response_part in msg_data:
+                if isinstance(response_part, tuple):
+                    import email
+                    msg = email.message_from_bytes(response_part[1])
+                    subject, encoding = decode_header(msg["Subject"])[0]
+                    if isinstance(subject, bytes):
+                        subject = subject.decode(encoding or "utf-8", errors="ignore")
+                    from_ = msg.get("From")
+                    ergebnis_liste.append(f"- **Von:** {from_}\n  **Betreff:** {subject}")
+        mail.logout()
+        return "\n\n".join(ergebnis_liste) if ergebnis_liste.strip() else "Keine neuen E-Mails im Postfach gefunden."
+    except Exception as e:
+        return f"Fehler beim Abrufen der E-Mails: {str(e)}"
+
+def sende_email(username, empfaenger, betreff, inhalt):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT smtp_server, email_adresse, email_passwort FROM email_config WHERE username = ?", (username,))
+    row = cursor.fetchone()
+    conn.close()
+    
+    if not row:
+        return "Fehler: Keine E-Mail-Konfiguration hinterlegt."
+    
+    smtp_s, mail_adr, mail_pwd = row
+    try:
+        msg = MIMEMultipart()
+        msg['From'] = mail_adr
+        msg['To'] = empfaenger
+        msg['Subject'] = betreff
+        msg.attach(MIMEText(inhalt, 'plain'))
+        
+        server = smtplib.SMTP_SSL(smtp_s, 465)
+        server.login(mail_adr, mail_pwd)
+        server.sendmail(mail_adr, empfaenger, msg.as_string())
+        server.quit()
+        return "E-Mail erfolgreich versendet!"
+    except Exception as e:
+        return f"Fehler beim E-Mail-Versand: {str(e)}"
+
 def echter_playwright_browser_operator(url, befehl):
     if not PLAYWRIGHT_AVAILABLE:
         return f"Headless-Browser-Simulation: URL `{url}` angesteuert. Befehl: '{befehl}' ausgeführt.", None
@@ -275,32 +367,22 @@ def echte_deep_web_recherche(query):
             pass
     return multi_model_schwarm_antwort("OpenAI GPT-4o", "Du bist ein Research-Agent.", query)
 
-# KORRIGIERTE MULTI-AGENTEN-DEBATTE (Kein doppelter messages-Argumentenkonflikt)
 def multi_agenten_debatte(ziel):
     client = OpenAI(api_key=MASTER_OPENAI_KEY)
-    
     entwurf = client.chat.completions.create(
         model="gpt-4o-mini",
-        messages=[
-            {"role": "system", "content": "Du bist der Vertriebs- und Strategie-Agent."},
-            {"role": "user", "content": f"Erstelle einen ersten strategischen Entwurf für: {ziel}"}
-        ]
+        messages=[{"role": "system", "content": "Du bist der Vertriebs- und Strategie-Agent."}, {"role": "user", "content": f"Erstelle einen ersten strategischen Entwurf für: {ziel}"}]
     ).choices[0].message.content
     
     prufung = client.chat.completions.create(
         model="gpt-4o-mini",
-        messages=[
-            {"role": "system", "content": "Du bist der strenge Rechts- und Compliance-Agent."},
-            {"role": "user", "content": f"Prüfe diesen Entwurf auf Risiken und Lücken:\n{entwurf}"}
-        ]
+        messages=[{"role": "system", "content": "Du bist der strenge Rechts- und Compliance-Agent."}, {"role": "user", "content": f"Prüfe diesen Entwurf auf Risiken und Lücken:\n{entwurf}"}]
     ).choices[0].message.content
     
     final = client.chat.completions.create(
         model="gpt-4o-mini",
-        messages=[
-            {"role": "system", "content": "Du bist der Finanz- und Umsetzungs-Agent. Führe den Entwurf und die Rechtsprüfung zu einem perfekten, finalen Aktionsplan zusammen."},
-            {"role": "user", "content": f"Ziel: {ziel}\nEntwurf: {entwurf}\nRechtsprüfung: {prufung}"}
-        ]
+        messages=[{"role": "system", "content": "Du bist der Finanz- und Umsetzungs-Agent. Führe den Entwurf und die Rechtsprüfung zu einem perfekten, finalen Aktionsplan zusammen."},
+                  {"role": "user", "content": f"Ziel: {ziel}\nEntwurf: {entwurf}\nRechtsprüfung: {prufung}"}]
     ).choices[0].message.content
     
     return wende_guardrails_an(f"### 👥 Multi-Agenten-Debatten-Ergebnis\n\n**1. Strategie-Entwurf:**\n{entwurf}\n\n**2. Compliance-Prüfung:**\n{prufung}\n\n**3. Finaler optimierter Aktionsplan:**\n{final}")
@@ -382,10 +464,10 @@ else:
     spalte_links, spalte_rechts = st.columns([1.1, 0.9])
 
     with spalte_links:
-        st.subheader("🤖 Autonomer KI-Agent (GOD-MODE V5.1)")
+        st.subheader("🤖 Autonomer KI-Agent (GOD-MODE V6)")
         modus = st.selectbox(
             "Agenten-Modus wählen:",
-            ["Intelligenter Chat & Live-Webrecherche", "Multi-Agenten-Debatte (CrewAI)", "Visueller Workflow Builder (React Flow)", "Proaktiver System-Monitor & SMTP/WhatsApp Outbound", "Playwright Headless Browser-Operator", "Excel / CRM Datacenter"]
+            ["Intelligenter Chat & Live-Webrecherche", "E-Mail Postfach Assistent", "Multi-Agenten-Debatte (CrewAI)", "Visueller Workflow Builder (React Flow)", "Proaktiver System-Monitor & Outbound", "Playwright Headless Browser-Operator", "Excel / CRM Datacenter"]
         )
         
         current_chat = st.session_state.aktiver_chat
@@ -399,23 +481,45 @@ else:
             uploaded_screenshot = st.file_uploader("📸 Screenshot per Drag-and-Drop einfügen (optional für Vision-Analyse):", type=["png", "jpg", "jpeg"])
             aufgabe = st.chat_input("Gib dem Agenten eine Aufgabe...")
             
+        elif modus == "E-Mail Postfach Assistent":
+            st.markdown("### ✉️ Live E-Mail Postfach Scanner & Antwort-Generator")
+            if st.button("📥 Ungelesene Mails abrufen & analysieren", use_container_width=True):
+                with st.spinner("Verbinde mit Postfach (IMAP)..."):
+                    mails = lade_letzte_emails(eingeloggter_kunde)
+                    st.success("Postfach ausgelesen:")
+                    st.markdown(mails)
+            
+            st.write("---")
+            ziel_empfaenger = st.text_input("Empfänger-Adresse für Antwort:")
+            mail_betreff = st.text_input("Betreff:")
+            mail_befehl = st.text_area("Schreibe eine Antwort zu folgendem Thema:")
+            
+            if st.button("✉️ E-Mail KI-Entwurf erstellen & senden", use_container_width=True):
+                if not ziel_empfaenger or not mail_befehl:
+                    st.warning("Bitte Empfänger und Inhalt angeben.")
+                else:
+                    with st.spinner("Generiere professionelle Antwort..."):
+                        ki_antwort = agenten_mit_selbstkorrektur("Du bist ein geschäftlicher E-Mail-Assistent.", mail_befehl)
+                        versand_res = sende_email(eingeloggter_kunde, ziel_empfaenger, mail_betreff, ki_antwort)
+                        st.success(versand_res)
+                        st.markdown(f"**Gesendeter Text:**\n{ki_antwort}")
+            aufgabe = None
+
         elif modus == "Multi-Agenten-Debatte (CrewAI)":
             st.markdown("### 👥 Autonomes Multi-Agenten-Rollenspiel")
-            st.markdown("Vertriebs-, Rechts- und Finanz-Agenten verhandeln und korrigieren sich gegenseitig:")
             debatten_ziel = st.text_input("Thema für die Agenten-Debatte:", placeholder="Z.B.: Markteintrittsstrategie für neues KI-Produkt")
             aufgabe = debatten_ziel if st.button("🚀 Multi-Agenten-Debatte starten", use_container_width=True) else None
 
         elif modus == "Visueller Workflow Builder (React Flow)":
             st.markdown("### 🧩 Visueller React Flow Node-Editor")
-            st.markdown("Verknüpfe Agenten auf der interaktiven Arbeitsfläche:")
             col_n1, col_n2 = st.columns(2)
             with col_n1:
-                knoten_1 = st.selectbox("Node A (Source):", ["Deep Web Scout", "Image Vision Extractor", "CSV Loader"])
+                knoten_1 = st.selectbox("Node A (Source):", ["IMAP Email Inbox", "Image Vision Extractor", "CSV Loader"])
                 knoten_2 = st.selectbox("Node B (Processor):", ["Multi-Agent Debatte", "Guardrail Validator", "Code Interpreter"])
             with col_n2:
                 knoten_3 = st.selectbox("Node C (Optimizer):", ["Critic Self-Correction", "Multi-Model Schwarm"])
-                knoten_4 = st.selectbox("Node D (Action):", ["SMTP Email Outbound", "WhatsApp Dispatch", "PDF Export"])
-            workflow_thema = st.text_input("Workflow-Ziel:", placeholder="Z.B.: Analysiere Lead-Daten und sende Report")
+                knoten_4 = st.selectbox("Node D (Action):", ["SMTP Email Dispatch", "PDF Export"])
+            workflow_thema = st.text_input("Workflow-Ziel:", placeholder="Z.B.: Analysiere Postfach und sende Report")
             aufgabe = workflow_thema if st.button("🚀 Visuellen Flow ausführen", use_container_width=True) else None
              
         elif modus == "Playwright Headless Browser-Operator":
@@ -432,7 +536,7 @@ else:
         else:
             aufgabe = None
 
-        if aufgabe and modus not in ["Proaktiver System-Monitor & SMTP/WhatsApp Outbound"]:
+        if aufgabe and modus not in ["Proaktiver System-Monitor & Outbound", "E-Mail Postfach Assistent"]:
             if eingeloggter_kunde != ADMIN_NAME:
                 conn = get_db_connection()
                 cursor = conn.cursor()
@@ -450,7 +554,6 @@ else:
                     
                     with st.spinner("🌐 KI analysiert Aufgabe & Screenshot..."):
                         client_vis = OpenAI(api_key=MASTER_OPENAI_KEY)
-                        
                         vision_text = ""
                         if uploaded_screenshot:
                             import base64
@@ -482,9 +585,9 @@ else:
                         st.markdown(antwort)
 
                 elif modus == "Visueller Workflow Builder (React Flow)":
-                    with st.spinner(f"Führe React-Flow aus ({knoten_1} ➔ {knoten_2} ➔ {knoten_3} ➔ {knoten_4})..."):
+                    with st.spinner(f"Führe React-Flow aus..."):
                         time.sleep(1.0)
-                        workflow_ergebnis = agenten_mit_selbstkorrektur(f"Du bist der Workflow Engine Orchestrator.", aufgabe)
+                        workflow_ergebnis = agenten_mit_selbstkorrektur("Du bist der Workflow Engine Orchestrator.", aufgabe)
                         st.success("Workflow erfolgreich durchlaufen:")
                         st.markdown(workflow_ergebnis)
                         
@@ -503,22 +606,18 @@ else:
             except Exception as e:
                 st.error(f"Fehler: {e}")
 
-        if modus == "Proaktiver System-Monitor & SMTP/WhatsApp Outbound":
-            st.markdown("### 🛡️ 24/7 Daemon, SQLite & Outbound Dispatcher")
-            outbound_typ = st.radio("Outbound-Kanal wählen:", ["SMTP E-Mail", "WhatsApp Business API"])
-            empfaenger = st.text_input("Empfänger (E-Mail Adresse oder Telefonnummer):", placeholder="name@beispiel.de oder +49170...")
-            nachricht_inhalt = st.text_area("Nachricht / Report:", placeholder="Hier steht der autonome Bericht...")
+        if modus == "Proaktiver System-Monitor & Outbound":
+            st.markdown("### 🛡️ 24/7 Daemon, SQLite & E-Mail Dispatcher")
+            empfaenger = st.text_input("Empfänger-E-Mail:")
+            betreff = st.text_input("Betreff:")
+            nachricht_inhalt = st.text_area("Nachricht / Report:")
             
-            if st.button("📤 Outbound-Nachricht sofort senden", use_container_width=True):
+            if st.button("📤 E-Mail sofort senden", use_container_width=True):
                 if not empfaenger or not nachricht_inhalt:
                     st.warning("Bitte Empfänger und Nachricht ausfüllen.")
                 else:
-                    st.success(f"Nachricht erfolgreich über {outbound_typ} an **{empfaenger}** gesendet!")
-                    conn = get_db_connection()
-                    cursor = conn.cursor()
-                    cursor.execute("INSERT INTO daemon_logs (zeit, aktion, status) VALUES (datetime('now', 'localtime'), ?, ?)", (f"Outbound {outbound_typ} gesendet an {empfaenger}", "Erfolgreich"))
-                    conn.commit()
-                    conn.close()
+                    res = sende_email(eingeloggter_kunde, empfaenger, betreff, nachricht_inhalt)
+                    st.success(res)
 
             st.write("---")
             st.markdown("#### Letzte Daemon-Aktivitäten:")
@@ -531,7 +630,6 @@ else:
                 st.info(f"**[{zeit}]** {aktion} — Status: `{status}`")
 
     with spalte_rechts:
-        # 1. EXPANDER: Präsentations- & Dokumenten-Studio
         with st.expander("📊 Präsentations- & Dokumenten-Studio", expanded=False):
             st.markdown("### ⚡ Multi-Model Fließband")
             auto_thema = st.text_input("Thema:", placeholder="Z.B.: KI-Strategie 2026")
@@ -578,7 +676,6 @@ else:
             for idx, tab in enumerate(folien_tabs):
                 with tab:
                     slide = st.session_state.slides_data[idx]
-                    
                     neuer_titel = st.text_input("Folientitel:", value=slide["titel"], key=f"titel_{idx}")
                     neuer_text = st.text_area("Inhalt / Stichpunkte:", value=slide["text"], key=f"text_{idx}", height=80)
                     neuer_prompt = st.text_input("Bild-Prompt (Englisch):", value=slide["prompt"], key=f"prompt_{idx}")
@@ -594,7 +691,6 @@ else:
                                 url = generiere_replicate_bild_mit_selbstcheck(neuer_prompt)
                                 st.session_state.slides_data[idx]["bild_url"] = url
                                 st.rerun()
-                    
                     with col_b2:
                         if len(st.session_state.slides_data) > 1:
                             if st.button(f"🗑️ Folie löschen", key=f"del_slide_{idx}", use_container_width=True):
@@ -611,21 +707,9 @@ else:
             format_wahl = st.radio("Exportformat:", ["PowerPoint (.pptx)", "PDF-Dokument (.pdf)"], horizontal=True)
 
             if "PowerPoint" in format_wahl:
-                st.download_button(
-                    label="📥 Als PowerPoint (.pptx) herunterladen",
-                    data=erstelle_pptx_aus_session(),
-                    file_name="Scion_Mind_Ultimate_Praesentation.pptx",
-                    mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
-                    use_container_width=True
-                )
+                st.download_button(label="📥 Als PowerPoint (.pptx) herunterladen", data=erstelle_pptx_aus_session(), file_name="Scion_Mind_Ultimate_Praesentation.pptx", mime="application/vnd.openxmlformats-officedocument.presentationml.presentation", use_container_width=True)
             else:
-                st.download_button(
-                    label="📥 Als PDF (.pdf) herunterladen",
-                    data=erstelle_pdf_aus_session(),
-                    file_name="Scion_Mind_Ultimate_Praesentation.pdf",
-                    mime="application/pdf",
-                    use_container_width=True
-                )
+                st.download_button(label="📥 Als PDF (.pdf) herunterladen", data=erstelle_pdf_aus_session(), file_name="Scion_Mind_Ultimate_Praesentation.pdf", mime="application/pdf", use_container_width=True)
 
         # 2. EXPANDER: AI Prompt Optimizer
         with st.expander("🪄 AI Prompt Optimizer (Master-Prompt-Generator)", expanded=False):
