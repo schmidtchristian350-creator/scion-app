@@ -282,9 +282,9 @@ else:
                         "Prefer": "respond-async"
                     }
                     
-                    # Nutzung des offiziellen Stable Video Diffusion Pfads ohne fehleranfällige Hashes
+                    # Offizieller und stabiler Versions-Hash für Stable Video Diffusion auf Replicate
                     data = {
-                        "model": "stability-ai/stable-video-diffusion",
+                        "version": "3383276bc11985e50569a03c34af79cc23e4291880949d211245b78ff72074f4",
                         "input": {"prompt": clean_prompt}
                     }
                     
