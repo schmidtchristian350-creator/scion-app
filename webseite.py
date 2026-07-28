@@ -40,8 +40,8 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("Scion Mind - Enterprise Ultimate AGI Studio (GOD-MODE V4.1)")
-st.markdown("*designed by Christian Schmidt | Powered by Visual Workflow Builder, 24/7 Celery/Daemon Worker, WebRTC Voice & Playwright*")
+st.title("Scion Mind - Enterprise Ultimate AGI Studio (GOD-MODE V4.2)")
+st.markdown("*designed by Christian Schmidt | Powered by Prompt Optimizer, Visual Workflow, Celery/Daemon Worker, WebRTC Voice & Playwright*")
 st.write("---")
 
 MASTER_OPENAI_KEY = st.secrets["OPENAI_API_KEY"]
@@ -351,7 +351,7 @@ else:
     spalte_links, spalte_rechts = st.columns([1.1, 0.9])
 
     with spalte_links:
-        st.subheader("🤖 Autonomer KI-Agent (GOD-MODE V4.1)")
+        st.subheader("🤖 Autonomer KI-Agent (GOD-MODE V4.2)")
         modus = st.selectbox(
             "Agenten-Modus wählen:",
             ["Intelligenter Chat & Live-Webrecherche", "Visueller Workflow Builder (Drag & Drop)", "Proaktiver System-Monitor & Celery Daemon", "Playwright Headless Browser-Operator", "Excel / CRM Datacenter"]
@@ -435,7 +435,7 @@ else:
                         daten = pd.read_csv(csv_input).to_string() if csv_input is not None else ""
                         st.success(agenten_mit_selbstkorrektur("Du bist ein Data Analyst.", f"Aufgabe: {aufgabe}\nDaten:\n{daten}"))
             except Exception as e:
-                st.error(f"Fehler: {e}")
+                st.error(f"Ein Fehler ist aufgetreten: {e}")
 
         if modus == "Proaktiver System-Monitor & Celery Daemon":
             st.markdown("### 🛡️ 24/7 Celery Daemon & SQLite Logs")
@@ -448,6 +448,7 @@ else:
                 st.info(f"**[{zeit}]** {aktion} — Status: `{status}`")
 
     with spalte_rechts:
+        # 1. EXPANDER: Präsentations- & Dokumenten-Studio
         with st.expander("📊 Präsentations- & Dokumenten-Studio", expanded=False):
             st.markdown("### ⚡ Multi-Model Fließband")
             auto_thema = st.text_input("Thema:", placeholder="Z.B.: KI-Strategie 2026")
@@ -543,7 +544,61 @@ else:
                     use_container_width=True
                 )
 
-        # WEBRTC LIVE SPRACHMODUL & AUDIO
+        # 2. NEU: EXPANDER: AI Prompt Optimizer (Genau zwischen Präsentationen und Voice)
+        with st.expander("🪄 AI Prompt Optimizer (Master-Prompt-Generator)", expanded=False):
+            st.markdown("### 🎯 Verwandle grobe Ideen in perfekte Master-Prompts")
+            st.markdown("Beschreibe kurz, was du von einer KI möchtest. Wenn etwas unklar ist, fragt der Agent nach, bevor der finale Prompt erstellt wird.")
+            
+            user_idee = st.text_area("Was möchtest du tun? (Deine kurze Beschreibung):", placeholder="Z.B.: Schreib mir eine Mail an einen unpünktlichen Kunden oder erstelle eine Strategie für Vertrieb...")
+            
+            if "prompt_chat_history" not in st.session_state:
+                st.session_state.prompt_chat_history = []
+
+            if st.button("✨ Prompt analysieren & optimieren", use_container_width=True):
+                if not user_idee:
+                    st.warning("Bitte beschreibe kurz dein Vorhaben.")
+                else:
+                    with st.spinner("AI Optimizer prüft die Anforderung..."):
+                        client_opt = OpenAI(api_key=MASTER_OPENAI_KEY)
+                        sys_prompt = (
+                            "Du bist ein Elite Prompt Engineer. Analysiere die Nutzereingabe. "
+                            "Prüfe, ob wichtige Details (Zielgruppe, Tonfall, Format, Kontext) fehlen. "
+                            "Wenn wichtige Details unklar sind, antworte EXAKT mit einer freundlichen Rückfrage, was du noch wissen musst (beginnend mit 'RÜCKFRAGE:'). "
+                            "Wenn die Angaben ausreichen oder du nachfragen musstest und der Nutzer geantwortet hat, erstelle einen professionellen, perfekt strukturierten Master-Prompt "
+                            "für eine High-End-KI (beginnend mit 'MASTER-PROMPT:')."
+                        )
+                        res = client_opt.chat.completions.create(
+                            model="gpt-4o-mini",
+                            messages=[{"role": "system", "content": sys_prompt}, {"role": "user", "content": user_idee}]
+                        ).choices[0].message.content
+                        
+                        st.session_state.prompt_chat_history.append({"idee": user_idee, "antwort": res})
+            
+            # Anzeige der bisherigen Optimierungen
+            if st.session_state.prompt_chat_history:
+                st.write("---")
+                for item in reversed(st.session_state.prompt_chat_history[-3:]):
+                    st.markdown(f"**Deine Idee:** {item['idee']}")
+                    if "RÜCKFRAGE:" in item['antwort']:
+                        st.warning(item['antwort'])
+                        antwort_auf_rueckfrage = st.text_input("Antworte auf die Rückfrage:", key=f"ans_{hash(item['idee'])}")
+                        if st.button("Antwort senden & Prompt finalisieren", key=f"btn_ans_{hash(item['idee'])}"):
+                            with st.spinner("Generiere finalen Master-Prompt..."):
+                                client_fin = OpenAI(api_key=MASTER_OPENAI_KEY)
+                                final_res = client_fin.chat.completions.create(
+                                    model="gpt-4o-mini",
+                                    messages=[
+                                        {"role": "system", "content": "Du bist ein Elite Prompt Engineer. Erstelle nun den finalen, perfekten Master-Prompt basierend auf der Idee und der Antwort."},
+                                        {"role": "user", "content": f"Idee: {item['idee']}\nZusatzinfo: {antwort_auf_rueckfrage}"}
+                                    ]
+                                ).choices[0].message.content
+                                st.success("Dein perfekter Master-Prompt:")
+                                st.code(final_res, language="markdown")
+                    else:
+                        st.success("Dein perfekter Master-Prompt (bereits einsatzbereit):")
+                        st.code(item['antwort'], language="markdown")
+
+        # 3. EXPANDER: Echtzeit-Sprachagent (WebRTC Voice)
         with st.expander("🎙️ Echtzeit-Sprachagent (WebRTC Voice)", expanded=False):
             st.markdown("### ⚡ Live-Sprachchat (Realtime Audio)")
             st.markdown("*Optimiert für nahtloses WebRTC-Audio-Streaming.*")
