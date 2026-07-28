@@ -25,7 +25,6 @@ st.markdown("*designed by Christian Schmidt*")
 st.write("---")
 
 MASTER_OPENAI_KEY = st.secrets["OPENAI_API_KEY"]
-# Falls du einen separaten Video-API Key nutzt, wird er hier geladen
 VIDEO_API_KEY = st.secrets.get("VIDEO_API_KEY", MASTER_OPENAI_KEY)
 
 ADMIN_NAME = "Christian"
@@ -239,38 +238,74 @@ else:
                 st.rerun()
                                 
             except Exception as e:
-                st.error(f"Ein Fehler ist aufgetreten: {e}")
+                st.error(f"Ein Fehler aufgetreten: {e}")
 
     with spalte_rechts:
         st.subheader("🎥 Echter KI-Video Generator")
         video_prompt = st.text_area("Videobeschreibung (Was soll im Video passieren?):", height=120, placeholder="Z.B.: Cinematic drone shot over a modern tech office...")
         
-        if st.button("🎬 Video direkt generieren & abspielen", use_container_width=True):
+        if st.button("🎬 Video generieren & Status prüfen", use_container_width=True):
             if not video_prompt:
                 st.warning("Bitte gib eine Beschreibung für das Video ein.")
             else:
                 if eingeloggter_kunde != ADMIN_NAME:
-                    st.session_state.kunden_daten[eingeloggter_kunde]["guthaben"] -= 0.50 # Höherer Preis für Video
+                    st.session_state.kunden_daten[eingeloggter_kunde]["guthaben"] -= 0.50
                 
-                with st.spinner("Generiere echtes Video (dies kann 1-2 Minuten dauern)..."):
-                    try:
-                        # Beispielhafter API-Aufruf an ein professionelles Video-Modell (z.B. Luma / Runway via Replicate oder direkt)
-                        headers = {
-                            "Authorization": f"Bearer {VIDEO_API_KEY}",
-                            "Content-Type": "application/json"
-                        }
-                        data = {
-                            "version": "latest",
-                            "input": {"prompt": video_prompt}
-                        }
+                # Live Status- und Fortschrittsanzeige in Streamlit
+                status_text = st.empty()
+                progress_bar = st.progress(0)
+                
+                status_text.text("🔄 Video-Auftrag wird an die KI übermittelt...")
+                progress_bar.progress(10)
+                
+                try:
+                    headers = {
+                        "Authorization": f"Bearer {VIDEO_API_KEY}",
+                        "Content-Type": "application/json",
+                        "Prefer": "respond-async"
+                    }
+                    
+                    # Offizieller Endpunkt für moderne Videomodelle (z.B. Luma Ray auf Replicate)
+                    data = {
+                        "version": "57b3261a9f5f0b5a32b236113b2c6df442ab6b345c2f8216cb037cfc23932e65",
+                        "input": {"prompt": video_prompt}
+                    }
+                    
+                    response = requests.post("https://api.replicate.com/v1/predictions", json=data, headers=headers)
+                    res_json = response.json()
+                    
+                    if "error" in res_json:
+                        st.error(f"Fehler: {res_json['error']}")
+                    else:
+                        get_url = res_json["urls"]["get"]
                         
-                        # Hier wird die Video-Generierung angestoßen
-                        # (Hinweis: Sobald du einen echten Video-API Endpunkt nutzt, wird hier das MP4 abgeholt)
-                        st.success("Video-Auftrag erfolgreich übermittelt!")
-                        st.info("💡 Das generierte Video wird nach Fertigstellung direkt hier im Player angezeigt und kann heruntergeladen werden.")
-                        
-                    except Exception as e:
-                        st.error(f"Video-Generierungsfehler: {e}")
+                        # Live-Polling Schleife: Prüft alle paar Sekunden den Fortschritt
+                        for i in range(30): # Wartet bis zu 90 Sekunden
+                            status_res = requests.get(get_url, headers={"Authorization": f"Bearer {VIDEO_API_KEY}"}).json()
+                            status = status_res.get("status")
+                            
+                            if status == "succeeded":
+                                progress_bar.progress(100)
+                                status_text.text("✅ Video erfolgreich generiert!")
+                                
+                                video_url = status_res["output"]
+                                if isinstance(video_url, list):
+                                    video_url = video_url[0]
+                                    
+                                st.video(video_url)
+                                st.success("Dein Video ist fertig und kann oben abgespielt oder heruntergeladen werden!")
+                                break
+                            elif status == "processing":
+                                progress_bar.progress(50)
+                                status_text.text("⏳ Video wird gerendert (Das kann 1-2 Minuten dauern)...")
+                            elif status == "failed":
+                                st.error("Die Videogenerierung ist fehlgeschlagen.")
+                                break
+                                
+                            time.sleep(3) # 3 Sekunden warten bis zur nächsten Prüfung
+                            
+                except Exception as e:
+                    st.error(f"Verbindungsfehler: {e}")
 
         st.write("---")
         st.subheader("🎧 Text vorlesen lassen")
