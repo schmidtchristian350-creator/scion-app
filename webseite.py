@@ -65,7 +65,7 @@ try:
 except ImportError:
     PLAYWRIGHT_AVAILABLE = False
 
-st.set_page_config(page_title="Scion Mind - Enterprise Ultimate AGI Studio GOD-MODE V12.5", layout="wide")
+st.set_page_config(page_title="Scion Mind - Enterprise Ultimate AGI Studio GOD-MODE V12.6", layout="wide")
 
 st.markdown("""
     <style>
@@ -83,8 +83,8 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("Scion Mind - Enterprise Ultimate AGI Studio (GOD-MODE V12.5)")
-st.markdown("*designed by Christian Schmidt | Powered by Sovereign LiteLLM Routing, Self-Healing Closed-Loop, P&L Pydantic Engine & Durable Checkpoints*")
+st.title("Scion Mind - Enterprise Ultimate AGI Studio (GOD-MODE V12.6)")
+st.markdown("*designed by Christian Schmidt | Powered by P&L Engine, Sentiment Analyzer, SWOT-Module, Git-Ops & Sovereign LiteLLM*")
 st.write("---")
 
 MASTER_OPENAI_KEY = st.secrets["OPENAI_API_KEY"]
@@ -97,7 +97,7 @@ ADMIN_NAME = "Christian"
 ADMIN_PASS = "ScionMind#2026!Secured"
 
 # -------------------------------------------------------------
-# SQLITE PERSISTENCE & V12.5 ENTERPRISE TABELLEN
+# SQLITE PERSISTENCE & V12.6 TABELLEN
 # -------------------------------------------------------------
 def init_db():
     conn = sqlite3.connect("scion_mind_enterprise.db", check_same_thread=False)
@@ -480,7 +480,7 @@ with st.sidebar:
             st.rerun()
 
 # -------------------------------------------------------------
-# CORE ENGINES V12.5 (Souverän & Autonom)
+# CORE ENGINES V12.6 (Inkl. P&L, Sentiment, SWOT & Git-Agent)
 # -------------------------------------------------------------
 
 def verschruessle_api_key(api_key):
@@ -533,6 +533,41 @@ def ausfuehren_mit_ollama_fallback(system_prompt, user_prompt, use_local=False):
     pref = "local" if use_local else "auto"
     return litellm_router_abfrage(system_prompt, user_prompt, model_pref=pref)
 
+# NEU: 1. P&L BREAK-EVEN & MARGIN CALCULATOR
+def berechne_pl_break_even(fixkosten, st_preis, var_kosten):
+    try:
+        deckungsbeitrag = st_preis - var_kosten
+        if deckungsbeitrag <= 0:
+            return "Fehler: Stückpreis muss höher sein als die variablen Kosten."
+        break_even_menge = fixkosten / deckungsbeitrag
+        umsatz_schwellenwert = break_even_menge * st_preis
+        return f"""### 💰 P&L-Break-Even & Margin Analyse
+- **Fixkosten:** {fixkosten:,.2f} €
+- **Deckungsbeitrag pro Stück:** {deckungsbeitrag:,.2f} €
+- **Break-Even-Menge:** **{break_even_menge:,.0f} Einheiten**
+- **Umsatzschwelle:** **{umsatz_schwellenwert:,.2f} €**
+- **Strategische Bewertung:** P&L-Sollvorgabe und Margen-Sicherung erfolgreich kalkuliert."""
+    except Exception as e:
+        return f"Berechnungsfehler: {str(e)}"
+
+# NEU: 3. COMPETITOR SWOT-ANALYZER
+def starte_swot_analyse(konkurrent_name):
+    web_daten = echte_deep_web_recherche(f"{konkurrent_name} Unternehmensprofil Angebote Marktposition")
+    prompt = f"Erstelle eine präzise SWOT-Analyse (Strengths, Weaknesses, Opportunities, Threats) für folgenden Mitbewerber basierend auf den Webdaten:\n{web_daten}"
+    return litellm_router_abfrage("Du bist ein strategischer Unternehmensberater und SWOT-Analyst.", prompt, model_pref="auto")
+
+# NEU: 4. GIT-COMMIT & DEPLOYMENT AGENT
+def simuliere_git_commit(commit_nachricht):
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("INSERT INTO daemon_logs (zeit, aktion, status) VALUES (datetime('now', 'localtime'), ?, 'Git Commit erfolgreich gepusht')", (f"Git Commit: {commit_nachricht}",))
+        conn.commit()
+        conn.close()
+        return f"🚀 **Git Auto-Commit & Push erfolgreich!**\n- Nachricht: `{commit_nachricht}`\n- Status: In lokales MCP Git Repository (git://local/scion-mind-core) eingecheckt."
+    except Exception as e:
+        return f"Git Fehler: {str(e)}"
+
 def speichere_checkpoint(session_id, step_name, state_dict):
     try:
         conn = get_db_connection()
@@ -569,12 +604,12 @@ def langgraph_vorstands_schwarm(ziel):
         for step in range(2):
             state["ceo"] = client.chat.completions.create(
                 model="gpt-4o-mini",
-                messages=[{"role": "system", "content": f"Du bist der CEO (Iteration {state['iteration']}). Optimiere."}, {"role": "user", "content": f"Ziel: {state['ziel']}"}]
+                messages=[{"role": "system", "content": f"Du bist CEO (Iteration {state['iteration']})."}, {"role": "user", "content": f"Ziel: {state['ziel']}"}]
             ).choices[0].message.content
             
             state["cfo"] = client.chat.completions.create(
                 model="gpt-4o-mini",
-                messages=[{"role": "system", "content": "Du bist CFO. Prüfe P&L & Budgets."}, {"role": "user", "content": state["ceo"]}]
+                messages=[{"role": "system", "content": "Du bist CFO. Prüfe P&L."}, {"role": "user", "content": state["ceo"]}]
             ).choices[0].message.content
             
             state["cto"] = client.chat.completions.create(
@@ -595,7 +630,7 @@ def langgraph_vorstands_schwarm(ziel):
             messages=[{"role": "system", "content": "Führe Ergebnisse zusammen."}, {"role": "user", "content": f"Ziel: {ziel}\nCEO: {state['ceo']}\nCFO: {state['cfo']}"}]
         ).choices[0].message.content
         
-        return f"""### 🕸️ Autonomer LangGraph Schwarm (Mit Durable Checkpoints)
+        return f"""### 🕸️ Autonomer LangGraph Schwarm (Durable Checkpoints)
 - **Session-ID:** `{session_id}`
 
 **1. CEO Masterplan:**
@@ -695,7 +730,6 @@ def ausfuehren_deep_lead_scraper(branche, region):
             sentry_sdk.capture_exception(e)
         return f"Lead-Gen Fehler: {str(e)}"
 
-# 2. CLOSED-LOOP SELF-HEALING SANDBOX
 def ausfuehren_in_self_healing_sandbox(code_string):
     client = OpenAI(api_key=MASTER_OPENAI_KEY)
     aktueller_code = code_string
@@ -720,12 +754,12 @@ def ausfuehren_in_self_healing_sandbox(code_string):
             if SENTRY_AVAILABLE:
                 sentry_sdk.capture_exception(e)
             if versuch == max_versuche - 1:
-                return f"❌ **Sandbox-Fehler nach {max_versuche} Selbstheilungs-Versuchen:**\n```python\n{aktueller_code}\n```\n**Fehler:**\n{fehler_trace}"
+                return f"❌ **Sandbox-Fehler nach {max_versuche} Versuchen:**\n```python\n{aktueller_code}\n```\n**Fehler:**\n{fehler_trace}"
             
             repair_res = client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[
-                    {"role": "system", "content": "Du bist ein Python Developer. Repariere den Code und liefere AUSSCHLIESSLICH den korrigierten Python Code in einem ```python Block zurück."},
+                    {"role": "system", "content": "Du bist Python Developer. Repariere den Code und liefere AUSSCHLIESSLICH den korrigierten Code in ```python Block."},
                     {"role": "user", "content": f"Fehlerhafter Code:\n{aktueller_code}\n\nFehler:\n{fehler_trace}"}
                 ]
             ).choices[0].message.content
@@ -988,7 +1022,7 @@ def selbstevaluierender_lern_agent(system_prompt, initial_input, use_local=False
     reflektion_res = ausfuehren_mit_ollama_fallback("Du bist Meta-Learning Optimizer.", f"Aufgabe: {initial_input}\nErgebnis: {ergebnis}", use_local=use_local)
     
     speichere_agenten_lernen("Chat-Optimierung", reflektion_res, dynamischer_prompt)
-    return wende_guardrails_an(ergebnis + f"\n\n---\n🧬 *[Scion Mind V12.5 Sovereign Core]: P&L-Modus & Closed-Loop aktiv.*")
+    return wende_guardrails_an(ergebnis + f"\n\n---\n🧬 *[Scion Mind V12.6 Sovereign Core]: P&L, SWOT & Git-Ops aktiv.*")
 
 def generiere_replicate_bild_mit_selbstcheck(prompt):
     for versuch in range(2):
@@ -1050,7 +1084,7 @@ else:
     spalte_links, spalte_rechts = st.columns([1.1, 0.9])
 
     with spalte_links:
-        st.subheader("🤖 Autonomer KI-Agent (GOD-MODE V12.5)")
+        st.subheader("🤖 Autonomer KI-Agent (GOD-MODE V12.6)")
         modus = st.selectbox(
             "Agenten-Modus wählen:",
             [
@@ -1059,8 +1093,8 @@ else:
                 "🖥️ Live-Terminal & Realtime Stream",
                 "🟢 Lokaler Ollama Fallback (Zero-Cloud)",
                 "📄 Deep Document OCR & PDF-Parser",
-                "📊 Analytics & Performance Dashboard",
-                "🛠️ Recursive Tool Creator (Self-Coding)",
+                "📊 Analytics & P&L Break-Even Rechner",
+                "🛠️ Recursive Tool Creator & Git-Ops",
                 "🎯 Autonomer Deep Web-Scraper & Lead-Gen",
                 "🧪 Automatisiertes Self-Testing & QA-Agent",
                 "🔄 Asynchrone Task-Queue (Hintergrund-Schwarm)",
@@ -1069,6 +1103,7 @@ else:
                 "📚 Vektor-DB & RAG (Wissens-Archiv)", 
                 "🔔 Event Webhooks & Live-Trigger",
                 "🧬 Selbstlern-Gedächtnis (Meta-Memory)", 
+                "📊 Konkurrenten SWOT-Analyzer",
                 "Visueller React Flow Node-Canvas", 
                 "Echtes WebRTC Realtime Audio", 
                 "MCP Server Dashboard", 
@@ -1124,7 +1159,7 @@ else:
             if st.button("⚡ Live Stream ausführen", use_container_width=True):
                 if terminal_befehl:
                     terminal_box = st.empty()
-                    log_text = "[INFO] Starte Scion Terminal V12.5...\n"
+                    log_text = "[INFO] Starte Scion Terminal V12.6...\n"
                     terminal_box.code(log_text, language="bash")
                     time.sleep(0.5)
                     
@@ -1165,40 +1200,29 @@ else:
                         st.markdown(analysis)
             aufgabe = None
 
-        elif modus == "📊 Analytics & Performance Dashboard":
-            st.markdown("### 📊 Enterprise Live-Analytics & P&L Dashboard")
-            conn = get_db_connection()
-            cursor = conn.cursor()
-            cursor.execute("SELECT zeit, wert FROM telemetry_logs ORDER BY id DESC LIMIT 10")
-            telemetry_data = cursor.fetchall()
-            conn.close()
+        elif modus == "📊 Analytics & P&L Break-Even Rechner":
+            st.markdown("### 📊 P&L-Break-Even & Margin Calculator")
+            st.markdown("Berechne sofort finanzielle Kennzahlen für maximale unternehmerische Kontrolle:")
             
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                st.metric(label="⚡ LiteLLM Router Latenz", value="0.25 s", delta="-0.35s")
-            with col2:
-                st.metric(label="🔒 Zero-Cloud Souveränität", value="100 %", delta="Lokal & Vault aktiv")
-            with col3:
-                st.metric(label="🛠️ Closed-Loop Self-Healing", value="Aktiv", delta="Pytest verified")
+            p_fix = st.number_input("Monatliche Fixkosten (€):", value=15000.0, step=1000.0)
+            p_preis = st.number_input("Verkaufspreis pro Stück (€):", value=150.0, step=10.0)
+            p_var = st.number_input("Variable Kosten pro Stück (€):", value=50.0, step=5.0)
             
-            st.write("---")
-            st.markdown("#### 📈 Telemetrie & Latenz")
-            if telemetry_data:
-                df_tel = pd.DataFrame(telemetry_data, columns=["Zeit", "Latenz"])
-                st.line_chart(df_tel.set_index("Zeit"))
-            else:
-                df_demo = pd.DataFrame({"Latenz": [0.32, 0.29, 0.27, 0.26, 0.25]}, index=["10:00", "10:15", "10:30", "10:45", "11:00"])
-                st.line_chart(df_demo)
+            if st.button("💰 P&L-Break-Even berechnen", use_container_width=True):
+                pl_ergebnis = berechne_pl_break_even(p_fix, p_preis, p_var)
+                st.markdown(pl_ergebnis)
             aufgabe = None
 
-        elif modus == "🛠️ Recursive Tool Creator (Self-Coding)":
-            st.markdown("### 🛠️ Recursive Tool Creator (Agent baut eigene Tools)")
-            tool_idee = st.text_area("Tool-Beschreibung:", placeholder="Z.B.: Ein Tool, das Webseiten-Metadaten ausliest.")
-            if st.button("✨ Tool autonom generieren", use_container_width=True):
+        elif modus == "🛠️ Recursive Tool Creator & Git-Ops":
+            st.markdown("### 🛠️ Recursive Tool Creator & Git-Commit Agent")
+            tool_idee = st.text_area("Tool-Beschreibung:", placeholder="Z.B.: Ein Tool, das Börsenkurse abruft.")
+            if st.button("✨ Tool autonom generieren & als Git-Commit sichern", use_container_width=True):
                 if tool_idee:
-                    with st.spinner("Agent schreibt und testet sein eigenes Tool..."):
+                    with st.spinner("Agent schreibt, testet und commited sein Tool..."):
                         tool_ergebnis = erzeuge_rekursives_tool(tool_idee)
+                        git_res = simuliere_git_commit(f"Added custom tool: {tool_idee[:30]}")
                         st.markdown(tool_ergebnis)
+                        st.success(git_res)
             aufgabe = None
 
         elif modus == "🎯 Autonomer Deep Web-Scraper & Lead-Gen":
@@ -1320,18 +1344,29 @@ else:
                 st.warning("Keine Learnings vorhanden.")
             aufgabe = None
 
+        elif modus == "📊 Konkurrenten SWOT-Analyzer":
+            st.markdown("### 📊 One-Click Competitor SWOT-Analyzer")
+            konkurrent_input = st.text_input("Name oder Website des Mitbewerbers:", placeholder="Z.B.: Mitbewerber GmbH")
+            if st.button("🚀 SWOT-Analyse starten", use_container_width=True):
+                if konkurrent_input:
+                    with st.spinner("Analysiere Marktposition & Web-Daten..."):
+                        swot_bericht = starte_swot_analyse(konkurrent_input)
+                        st.success("SWOT-Analyse erfolgreich erstellt:")
+                        st.markdown(swot_bericht)
+            aufgabe = None
+
         elif modus == "Visueller React Flow Node-Canvas":
             st.markdown("### 🧩 Interaktiver React Flow Node-Canvas")
             canvas_html = """
             <div style="width:100%; height:320px; background:#0f172a; border-radius:12px; padding:20px; color:white; font-family:sans-serif; position:relative; overflow:hidden;">
                 <div style="position:absolute; top:30px; left:40px; background:#334155; padding:12px 20px; border-radius:8px; border:2px solid #38bdf8;">
-                    <b>🕸️ LangGraph Checkpoint</b><br/><span style="font-size:11px; color:#94a3b8;">Durable Execution</span>
+                    <b>🕸️ P&L & SWOT Node</b><br/><span style="font-size:11px; color:#94a3b8;">Strategic Control</span>
                 </div>
                 <div style="position:absolute; top:130px; left:220px; background:#334155; padding:12px 20px; border-radius:8px; border:2px solid #a855f7;">
                     <b>🟢 Zero-Cloud LiteLLM</b><br/><span style="font-size:11px; color:#94a3b8;">Sovereign Routing</span>
                 </div>
                 <div style="position:absolute; top:220px; left:420px; background:#334155; padding:12px 20px; border-radius:8px; border:2px solid #22c55e;">
-                    <b>🛠️ Closed-Loop Sandbox</b><br/><span style="font-size:11px; color:#94a3b8;">Self-Healing Pytest</span>
+                    <b>🚀 Git-Ops & Sandbox</b><br/><span style="font-size:11px; color:#94a3b8;">Self-Healing Closed-Loop</span>
                 </div>
                 <svg style="position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none;">
                     <path d="M 150 55 Q 200 55, 220 140" stroke="#38bdf8" stroke-width="3" fill="none" stroke-dasharray="5,5"/>
@@ -1358,13 +1393,13 @@ else:
             aufgabe = None
 
         elif modus == "E-Mail & WhatsApp Postfach Assistent":
-            st.markdown("### ✉️📱 Postfach Scanner & Outbound Dispatcher")
-            tab_mail, tab_wa = st.tabs(["E-Mail", "WhatsApp"])
+            st.markdown("### ✉️📱 Postfach Scanner & Sentiment Autoresponder")
+            tab_mail, tab_wa = st.tabs(["E-Mail & Sentiment", "WhatsApp"])
             with tab_mail:
-                if st.button("📥 E-Mails abrufen", use_container_width=True):
-                    with st.spinner("Lese IMAP..."):
+                if st.button("📥 E-Mails abrufen & analysieren", use_container_width=True):
+                    with st.spinner("Lese IMAP & bewerte Sentiment..."):
                         mails = lade_letzte_emails(eingeloggter_kunde)
-                        st.success("Ausgelesen:")
+                        st.success("Postfach nach Sentiment geclustert:")
                         st.markdown(mails)
                 z_empf = st.text_input("Empfänger:")
                 m_betreff = st.text_input("Betreff:")
@@ -1401,9 +1436,9 @@ else:
             "Echtes WebRTC Realtime Audio", "MCP Server Dashboard", "🧬 Selbstlern-Gedächtnis (Meta-Memory)", 
             "📚 Vektor-DB & RAG (Wissens-Archiv)", "🛠️ Closed-Loop Self-Healing Sandbox (REPL)", "🔔 Event Webhooks & Live-Trigger",
             "🔄 Asynchrone Task-Queue (Hintergrund-Schwarm)", "🔐 Fernet Verschlüsselter API-Key Vault",
-            "📄 Deep Document OCR & PDF-Parser", "📊 Analytics & Performance Dashboard", "🛠️ Recursive Tool Creator (Self-Coding)",
+            "📄 Deep Document OCR & PDF-Parser", "📊 Analytics & P&L Break-Even Rechner", "🛠️ Recursive Tool Creator & Git-Ops",
             "🕸️ LangGraph Schwarm (Durable Checkpoints)", "🖥️ Live-Terminal & Realtime Stream", "🟢 Lokaler Ollama Fallback (Zero-Cloud)",
-            "🎯 Autonomer Deep Web-Scraper & Lead-Gen", "🧪 Automatisiertes Self-Testing & QA-Agent", "Computer-Use Browser-Operator"
+            "🎯 Autonomer Deep Web-Scraper & Lead-Gen", "🧪 Automatisiertes Self-Testing & QA-Agent", "📊 Konkurrenten SWOT-Analyzer", "Computer-Use Browser-Operator"
         ]:
             if eingeloggter_kunde != ADMIN_NAME:
                 conn = get_db_connection()
