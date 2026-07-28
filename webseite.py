@@ -274,7 +274,7 @@ else:
                     clean_prompt = opt_response.choices[0].message.content
                     
                     status_text.text("🦫 Das Arbeitstier überträgt den Auftrag an Replicate...")
-                    progress_bar.progress(50)
+                    progress_bar.progress(40)
                     
                     headers = {
                         "Authorization": f"Bearer {VIDEO_API_KEY}",
@@ -282,11 +282,13 @@ else:
                         "Prefer": "respond-async"
                     }
                     
+                    # Wir nutzen hier Stable Video Diffusion, da es extrem stabil und zügig rendert
                     data = {
-                        "input": {"prompt": clean_prompt}
+                        "version": "9f747673945c62801b13b84701c7d39fd9ef1aef31e27c4b68aac70b13a5fced",
+                        "input": {"input_text": clean_prompt}
                     }
                     
-                    response = requests.post("https://api.replicate.com/v1/models/minimax/video-01/predictions", json=data, headers=headers)
+                    response = requests.post("https://api.replicate.com/v1/predictions", json=data, headers=headers)
                     res_json = response.json()
                     
                     if "error" in res_json and res_json["error"] is not None:
@@ -296,7 +298,9 @@ else:
                     else:
                         get_url = res_json["urls"]["get"]
                         
-                        for i in range(30):
+                        # Wir erhöhen die Schleife auf 60 Durchläufe (= bis zu 5 Minuten Puffer)
+                        erfolgreich = False
+                        for i in range(60):
                             status_res = requests.get(get_url, headers={"Authorization": f"Bearer {VIDEO_API_KEY}"}).json()
                             status = status_res.get("status")
                             
@@ -310,15 +314,20 @@ else:
                                     
                                 st.video(video_url)
                                 st.success("Dein Video ist fertig und kann oben abgespielt oder heruntergeladen werden!")
+                                erfolgreich = True
                                 break
                             elif status == "processing" or status == "starting":
-                                progress_bar.progress(75)
-                                status_text.text("🦫 Das Arbeitstier rendert das Video (Das kann 1-2 Minuten dauern)...")
+                                progress_bar.progress(min(90, 40 + i * 2))
+                                status_text.text(f"🦫 Das Arbeitstier rendert das Video (Durchlauf {i+1}/60)...")
                             elif status == "failed":
                                 st.error(f"Die Videogenerierung ist fehlgeschlagen: {status_res.get('error', 'Unbekannter Fehler')}")
+                                erfolgreich = True
                                 break
                                 
-                            time.sleep(3)
+                            time.sleep(5)
+                        
+                        if not erfolgreich:
+                            st.warning("⏱️ Das Rendern dauert länger als gewöhnlich. Der Server arbeitet noch im Hintergrund.")
                             
                 except Exception as e:
                     st.error(f"Verbindungsfehler: {e}")
