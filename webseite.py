@@ -22,7 +22,7 @@ try:
 except ImportError:
     PLAYWRIGHT_AVAILABLE = False
 
-st.set_page_config(page_title="Scion Mind - Enterprise Ultimate AGI Studio V4", layout="wide")
+st.set_page_config(page_title="Scion Mind - Enterprise Ultimate AGI Studio GOD-MODE", layout="wide")
 
 st.markdown("""
     <style>
@@ -40,7 +40,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("Scion Mind - Enterprise Ultimate AGI Studio (GOD-MODE V4)")
+st.title("Scion Mind - Enterprise Ultimate AGI Studio (GOD-MODE V4.1)")
 st.markdown("*designed by Christian Schmidt | Powered by Visual Workflow Builder, 24/7 Celery/Daemon Worker, WebRTC Voice & Playwright*")
 st.write("---")
 
@@ -351,7 +351,7 @@ else:
     spalte_links, spalte_rechts = st.columns([1.1, 0.9])
 
     with spalte_links:
-        st.subheader("🤖 Autonomer KI-Agent (GOD-MODE V4)")
+        st.subheader("🤖 Autonomer KI-Agent (GOD-MODE V4.1)")
         modus = st.selectbox(
             "Agenten-Modus wählen:",
             ["Intelligenter Chat & Live-Webrecherche", "Visueller Workflow Builder (Drag & Drop)", "Proaktiver System-Monitor & Celery Daemon", "Playwright Headless Browser-Operator", "Excel / CRM Datacenter"]
@@ -477,11 +477,71 @@ else:
                         st.rerun()
 
             st.write("---")
-            format_wahl = st.radio("Export:", ["PowerPoint (.pptx)", "PDF (.pdf)"], horizontal=True)
+            st.markdown("### 🎨 Manuelle Kontrolle & Feinjustierung")
+
+            if st.button("➕ Neue Folie hinzufügen", use_container_width=True):
+                st.session_state.slides_data.append({
+                    "titel": f"Folie {len(st.session_state.slides_data) + 1}: Neuer Titel",
+                    "text": "Stichpunkt 1\nStichpunkt 2",
+                    "prompt": "Professional modern slide background",
+                    "bild_url": None
+                })
+                st.rerun()
+
+            st.write("")
+            folien_tabs = st.tabs([f"Folie {i+1}" for i in range(len(st.session_state.slides_data))])
+
+            for idx, tab in enumerate(folien_tabs):
+                with tab:
+                    slide = st.session_state.slides_data[idx]
+                    
+                    neuer_titel = st.text_input("Folientitel:", value=slide["titel"], key=f"titel_{idx}")
+                    neuer_text = st.text_area("Inhalt / Stichpunkte:", value=slide["text"], key=f"text_{idx}", height=80)
+                    neuer_prompt = st.text_input("Bild-Prompt (Englisch):", value=slide["prompt"], key=f"prompt_{idx}")
+                    
+                    st.session_state.slides_data[idx]["titel"] = neuer_titel
+                    st.session_state.slides_data[idx]["text"] = neuer_text
+                    st.session_state.slides_data[idx]["prompt"] = neuer_prompt
+
+                    col_b1, col_b2 = st.columns(2)
+                    with col_b1:
+                        if st.button(f"🖼️ Bild neu generieren", key=f"gen_img_{idx}", use_container_width=True):
+                            with st.spinner("Agent generiert Bild neu..."):
+                                url = generiere_replicate_bild_mit_selbstcheck(neuer_prompt)
+                                st.session_state.slides_data[idx]["bild_url"] = url
+                                st.rerun()
+                    
+                    with col_b2:
+                        if len(st.session_state.slides_data) > 1:
+                            if st.button(f"🗑️ Folie löschen", key=f"del_slide_{idx}", use_container_width=True):
+                                st.session_state.slides_data.pop(idx)
+                                st.rerun()
+
+                    if slide["bild_url"]:
+                        st.markdown("**Vorschau:**")
+                        st.image(slide["bild_url"], use_container_width=True)
+                    else:
+                        st.info("Kein Bild vorhanden.")
+
+            st.write("---")
+            format_wahl = st.radio("Exportformat:", ["PowerPoint (.pptx)", "PDF-Dokument (.pdf)"], horizontal=True)
+
             if "PowerPoint" in format_wahl:
-                st.download_button("📥 .pptx herunterladen", data=erstelle_pptx_aus_session(), file_name="praesentation.pptx", mime="application/vnd.openxmlformats-officedocument.presentationml.presentation", use_container_width=True)
+                st.download_button(
+                    label="📥 Als PowerPoint (.pptx) herunterladen",
+                    data=erstelle_pptx_aus_session(),
+                    file_name="Scion_Mind_Ultimate_Praesentation.pptx",
+                    mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                    use_container_width=True
+                )
             else:
-                st.download_button("📥 .pdf herunterladen", data=erstelle_pdf_aus_session(), file_name="praesentation.pdf", mime="application/pdf", use_container_width=True)
+                st.download_button(
+                    label="📥 Als PDF (.pdf) herunterladen",
+                    data=erstelle_pdf_aus_session(),
+                    file_name="Scion_Mind_Ultimate_Praesentation.pdf",
+                    mime="application/pdf",
+                    use_container_width=True
+                )
 
         # WEBRTC LIVE SPRACHMODUL & AUDIO
         with st.expander("🎙️ Echtzeit-Sprachagent (WebRTC Voice)", expanded=False):
