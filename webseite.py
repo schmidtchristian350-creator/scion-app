@@ -1293,7 +1293,6 @@ else:
         with spalte_links:
             st.subheader("🤖 Autonomer KI-Agent (GOD-MODE V12.17)")
             
-            # NEU: Autonomer Modus als Standard-Option ganz oben eingefügt
             agenten_modus = st.radio(
                 "Steuerungs-Modus:",
                 ["🚀 Autonomer Agent (Auto-Tool & Live-Fortschritt)", "🔧 Manueller Modus (Direktwahl)"],
@@ -1319,12 +1318,10 @@ else:
                         if uploaded_screenshot:
                             st.image(uploaded_screenshot, width=300)
 
-                    # Die Live-Statusbox für den autonomen Fortschritt und Tool-Wechsel
                     with st.status("🧠 Autonomer Agent plant und arbeitet...", expanded=True) as status_box:
                         st.write("🔍 **Schritt 1/3:** Analysiere Absicht und wähle passendes Werkzeug...")
                         time.sleep(0.6)
                         
-                        # KI entscheidet selbstständig über das Tool basierend auf dem Prompt
                         client_router = OpenAI(api_key=MASTER_OPENAI_KEY)
                         router_entscheidung = client_router.chat.completions.create(
                             model="gpt-4o-mini",
@@ -1344,7 +1341,6 @@ else:
                         st.write(f"⚙️ **Schritt 2/3:** Werkzeug ausgewählt: `{router_entscheidung}` – Führe Ausführung aus...")
                         time.sleep(0.5)
 
-                        # Ausführung je nach gewähltem Tool des Agenten
                         if "PL_RECHNER" in router_entscheidung or "break-even" in aufgabe.lower():
                             tool_genutzt = "📊 Analytics & P&L Break-Even Rechner"
                             ergebnis_tool = berechne_pl_break_even(15000.0, 150.0, 50.0)
@@ -1365,7 +1361,6 @@ else:
                         st.write("✅ **Schritt 3/3:** Aufgabe vollständig abgeschlossen!")
                         status_box.update(label=f"✨ Autonomer Prozess erfolgreich beendet! (Genutztes Tool: {tool_genutzt})", state="complete", expanded=False)
 
-                    # Ausgabe im Chat
                     finaler_text = f"🤖 **Autonomer Ausführungsbericht:**\n- **Gewähltes Tool:** `{tool_genutzt}`\n\n{ergebnis_tool}"
                     st.session_state.chats[current_chat].append({"role": "assistant", "content": finaler_text})
                     with st.chat_message("assistant"):
@@ -1815,29 +1810,29 @@ else:
                             sentry_sdk.capture_exception(e)
                         st.error(f"Fehler: {e}")
 
-            if modus == "Proaktiver System-Monitor & Outbound":
-                st.markdown("### 🛡️ 24/7 Daemon, SQLite & FastAPI Gateway")
-                kanal = st.radio("Kanal:", ["E-Mail (SMTP)", "WhatsApp"])
-                empf = st.text_input("Empfänger:")
-                txt = st.text_area("Nachricht:")
-                if st.button("📤 Senden", use_container_width=True):
-                    berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005, grund="System Monitor Outbound")
-                    if kanal.startswith("E-Mail"):
-                        res = sende_email(eingeloggter_kunde, empf, "Autonomer Report", txt)
-                        st.success(res)
-                    else:
-                        res = sende_whatsapp(eingeloggter_kunde, empf, txt)
-                        st.success(res)
+                if modus == "Proaktiver System-Monitor & Outbound":
+                    st.markdown("### 🛡️ 24/7 Daemon, SQLite & FastAPI Gateway")
+                    kanal = st.radio("Kanal:", ["E-Mail (SMTP)", "WhatsApp"])
+                    empf = st.text_input("Empfänger:")
+                    txt = st.text_area("Nachricht:")
+                    if st.button("📤 Senden", use_container_width=True):
+                        berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005, grund="System Monitor Outbound")
+                        if kanal.startswith("E-Mail"):
+                            res = sende_email(eingeloggter_kunde, empf, "Autonomer Report", txt)
+                            st.success(res)
+                        else:
+                            res = sende_whatsapp(eingeloggter_kunde, empf, txt)
+                            st.success(res)
 
-                st.write("---")
-                st.markdown("#### Letzte Daemon-Logs:")
-                conn = get_db_connection()
-                cursor = conn.cursor()
-                cursor.execute("SELECT zeit, aktion, status FROM daemon_logs ORDER BY id DESC LIMIT 5")
-                logs = cursor.fetchall()
-                conn.close()
-                for zeit, aktion, status in logs:
-                    st.info(f"**[{zeit}]** {aktion} — Status: `{status}`")
+                    st.write("---")
+                    st.markdown("#### Letzte Daemon-Logs:")
+                    conn = get_db_connection()
+                    cursor = conn.cursor()
+                    cursor.execute("SELECT zeit, aktion, status FROM daemon_logs ORDER BY id DESC LIMIT 5")
+                    logs = cursor.fetchall()
+                    conn.close()
+                    for zeit, aktion, status in logs:
+                        st.info(f"**[{zeit}]** {aktion} — Status: `{status}`")
 
         with spalte_rechts:
             with st.expander("📊 Präsentations- & Dokumenten-Studio", expanded=False):
