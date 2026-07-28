@@ -5,6 +5,8 @@ from io import BytesIO
 import re
 import requests
 import time
+import os
+from moviepy.editor import VideoFileClip, AudioFileClip, concatenate_videoclips
 
 st.set_page_config(page_title="Scion Mind", layout="wide")
 
@@ -209,7 +211,7 @@ else:
                 aufgabe = None
         else:
             if modus == "Text-Recherche & Chat" or modus == "Video-Skript & Storyboard":
-                aufgabe = st.chat_input("Stelle deine Frage oder lass dir ein 60-Sekunden-Skript erstellen...")
+                aufgabe = st.chat_input("Stelle deine Frage oder lass dir ein 60-Sekunden-Skript in 4 Szenen erstellen...")
             else:
                 aufgabe_input = st.text_area("Deine Beschreibung oder Aufgabe dafür:", height=120)
                 Absenden = st.button("🚀 Aufgabe jetzt ausführen", use_container_width=True)
@@ -229,7 +231,7 @@ else:
                 system_prompts = {
                     "Text-Recherche & Chat": "Du bist ein präziser, professioneller KI-Assistent. Antworte immer auf Deutsch.",
                     "Präsentations-Struktur & Folien": "Du bist ein Experte für Business-Präsentationen. Erstelle eine saubere Präsentation, bei der jede Folie mit 'Folie X: [Titel]' beginnt, gefolgt von prägnanten Stichpunkten. Antworte auf Deutsch.",
-                    "Video-Skript & Storyboard": "Du bist ein professioneller Videoproduzent. Erstelle ein ausführliches Video-Skript für exakt bis zu 60 Sekunden Sprechzeit. Gib exakt zwei Blöcke auf Deutsch aus: 1. Einen präzisen, bildhaften englischen Video-Prompt für die KI-Erstellung. 2. Den dazugehörigen, langen deutschen Sprechtext (ca. 60 Sekunden)."
+                    "Video-Skript & Storyboard": "Du bist ein professioneller Videoproduzent. Erstelle ein detailliertes Video-Skript für ein 60-Sekunden-Video, aufgeteilt in genau 4 verschiedene Szenen. Gib für jede Szene folgendes auf Deutsch aus: Szene X - Bild-Prompt (auf Englisch für die KI) und Sprechtext."
                 }
                 
                 messages_payload = [{"role": "system", "content": system_prompts.get(modus, "Du bist ein hilfreicher Assistent. Antworte immer auf Deutsch.")}]
@@ -262,92 +264,121 @@ else:
                 st.error(f"Ein Fehler ist aufgetreten: {e}")
 
     with spalte_rechts:
-        st.subheader("🎥 60-Sekunden Video & Audio Studio")
+        st.subheader("🎬 60-Sekunden Multi-Szenen Studio")
         
-        video_prompt = st.text_area("1. Videobeschreibung (Englischer Prompt):", height=80, placeholder="Z.B.: Cinematic continuous drone shot over modern architecture...")
-        sprechender_text = st.text_area("2. Sprechtext (Ausführlich für bis zu 60 Sek.):", height=120, placeholder="Füge hier deinen langen Text für die Tonspur ein...")
+        st.markdown("Gib bis zu 4 verschiedene Szenen-Prompts ein, die nacheinander abgespielt werden sollen:")
+        scene1 = st.text_area("Szene 1 (Englischer Prompt):", height=60, placeholder="Z.B.: Cinematic intro shot...")
+        scene2 = st.text_area("Szene 2 (Englischer Prompt):", height=60, placeholder="Z.B.: Close-up action shot...")
+        scene3 = st.text_area("Szene 3 (Englischer Prompt):", height=60, placeholder="Z.B.: Product feature view...")
+        scene4 = st.text_area("Szene 4 (Englischer Prompt):", height=60, placeholder="Z.B.: Final outro call to action...")
+        
+        sprechender_text = st.text_area("Gesamter Sprechtext für die 60-Sekunden-Tonspur:", height=100, placeholder="Füge hier deinen vollständigen Text ein...")
         stimme = st.selectbox("Sprecher-Stimme:", ["alloy", "echo", "fable", "onyx", "nova", "shimmer"])
         
-        if st.button("🚀 Video & Audio in einem Schritt vorbereiten", use_container_width=True):
-            if not video_prompt or not sprechender_text:
-                st.warning("Bitte fülle sowohl die Videobeschreibung als auch den Sprechtext aus.")
+        if st.button("🚀 60-Sekunden Film komplett generieren & verschmelzen", use_container_width=True):
+            prompts = [s for s in [scene1, scene2, scene3, scene4] if s.strip()]
+            if not prompts or not sprechender_text:
+                st.warning("Bitte fülle mindestens eine Szene und den Sprechtext aus.")
             else:
                 if eingeloggter_kunde != ADMIN_NAME:
-                    st.session_state.kunden_daten[eingeloggter_kunde]["guthaben"] -= 0.90
+                    st.session_state.kunden_daten[eingeloggter_kunde]["guthaben"] -= 2.00
                 
                 status_text = st.empty()
                 progress_bar = st.progress(0)
                 
                 try:
-                    # 1. Audiospur generieren
-                    status_text.text("🦫 Erstelle 60-Sekunden Sprachspur...")
-                    progress_bar.progress(20)
                     client_openai = OpenAI(api_key=MASTER_OPENAI_KEY)
                     
+                    # 1. Audiospur erstellen
+                    status_text.text("🦫 Erstelle die 60-Sekunden Tonspur...")
+                    progress_bar.progress(10)
                     audio_response = client_openai.audio.speech.create(
                         model="tts-1",
                         voice=stimme,
                         input=sprechender_text
                     )
-                    audio_bytes = audio_response.content
-
-                    # 2. Video generieren
-                    status_text.text("🦫 Generiere Videosequenz...")
-                    progress_bar.progress(60)
+                    audio_path = "final_audio.mp3"
+                    with open(audio_path, "wb") as f:
+                        f.write(audio_response.content)
                     
+                    audio_clip = AudioFileClip(audio_path)
+                    total_audio_duration = audio_clip.duration
+                    
+                    # Berechne, wie lang jede Videoszene sein muss, damit sie sich perfekt aufteilen
+                    scene_duration = total_audio_duration / len(prompts)
+                    
+                    video_clip_paths = []
                     headers = {
                         "Authorization": f"Bearer {VIDEO_API_KEY}",
                         "Content-Type": "application/json",
                         "Prefer": "respond-async"
                     }
-                    data = {"input": {"prompt": video_prompt}}
                     
-                    response = requests.post("https://api.replicate.com/v1/models/minimax/video-01/predictions", json=data, headers=headers)
-                    res_json = response.json()
-                    
-                    if "error" in res_json and res_json["error"] is not None:
-                        st.error(f"API-Fehler: {res_json['error']}")
-                    else:
-                        get_url = res_json["urls"]["get"]
-                        video_url = None
+                    # 2. Jede Szene einzeln bei Replicate generieren
+                    for idx, prompt in enumerate(prompts):
+                        status_text.text(f"🦫 Generiere Szene {idx+1} von {len(prompts)}...")
+                        progress_bar.progress(20 + int(idx * 15))
                         
-                        for i in range(60):
-                            status_res = requests.get(get_url, headers={"Authorization": f"Bearer {VIDEO_API_KEY}"}).json()
-                            status = status_res.get("status")
+                        data = {"input": {"prompt": prompt}}
+                        response = requests.post("https://api.replicate.com/v1/models/minimax/video-01/predictions", json=data, headers=headers)
+                        res_json = response.json()
+                        
+                        if "urls" not in res_json:
+                            continue
                             
-                            if status == "succeeded":
-                                video_output = status_res["output"]
-                                video_url = video_output[0] if isinstance(video_output, list) else video_output
+                        get_url = res_json["urls"]["get"]
+                        v_url = None
+                        
+                        for _ in range(60):
+                            s_res = requests.get(get_url, headers={"Authorization": f"Bearer {VIDEO_API_KEY}"}).json()
+                            if s_res.get("status") == "succeeded":
+                                out = s_res["output"]
+                                v_url = out[0] if isinstance(out, list) else out
                                 break
-                            elif status == "failed":
-                                st.error("Videogenerierung fehlgeschlagen.")
+                            elif s_res.get("status") == "failed":
                                 break
                             time.sleep(5)
+                            
+                        if v_url:
+                            # Videodatei herunterladen
+                            v_data = requests.get(v_url).content
+                            v_path = f"scene_{idx}.mp4"
+                            with open(v_path, "wb") as vf:
+                                vf.write(v_data)
+                            video_clip_paths.append(v_path)
+                    
+                    if video_clip_paths:
+                        status_text.text("🦫 Verschmelze Szenen & passe Länge an...")
+                        progress_bar.progress(85)
                         
-                        if video_url:
-                            progress_bar.progress(100)
-                            status_text.text("✅ Fertig! Video und Audio bereit:")
+                        # 3. Mit MoviePy die Clips auf die richtige Länge bringen und aneinanderhängen
+                        loaded_clips = []
+                        for path in video_clip_paths:
+                            clip = VideoFileClip(path)
+                            # Schleife oder Anpassung, damit es zur Szenenlänge passt
+                            looped_clip = clip.loop(duration=scene_duration)
+                            loaded_clips.append(looped_clip)
                             
-                            st.success("Hier ist dein synchrones Ergebnis (Video läuft im Loop, Ton läuft über die Gesamtlänge):")
-                            
-                            # Kombinierter HTML5-Player, bei dem das Video stumm im Loop läuft und der Ton separat abgespielt wird oder beide perfekt harmonieren
-                            st.markdown(f'''
-                                <div style="background:#1e293b; padding:15px; border-radius:12px;">
-                                    <p style="color:white; font-weight:bold; margin-bottom:8px;">🎬 Visuelle Videoloop-Schleife:</p>
-                                    <video width="100%" autoplay loop muted controls style="border-radius:8px;">
-                                        <source src="{video_url}" type="video/mp4">
-                                    </video>
-                                    <p style="color:white; font-weight:bold; margin-top:15px; margin-bottom:8px;">🔊 Synchroner 60-Sekunden-Ton:</p>
-                                </div>
-                            ''', unsafe_allow_html=True)
-                            
-                            st.audio(audio_bytes, format="audio/mp3")
-                            
-                        else:
-                            st.warning("⏱️ Zeitüberschreitung beim Rendern.")
-                            
+                        final_video = concatenate_videoclips(loaded_clips)
+                        # Tonspur drunterlegen
+                        final_video = final_video.set_audio(audio_clip)
+                        
+                        final_output_path = "final_output_video.mp4"
+                        final_video.write_videofile(final_output_path, codec="libx264", audio_codec="aac", fps=24, logger=None)
+                        
+                        progress_bar.progress(100)
+                        status_text.text("✅ Dein 60-Sekunden-Film ist fertig!")
+                        
+                        st.success("Hier ist dein fertiges, zusammengefügtes Video mit synchronem Ton:")
+                        st.video(final_output_path)
+                        
+                        with open(final_output_path, "rb") as f:
+                            st.download_button("📥 Film herunterladen (.mp4)", f, file_name="Scion_Mind_Film.mp4", mime="video/mp4", use_container_width=True)
+                    else:
+                        st.error("Fehler beim Generieren der Videoszenen.")
+                        
                 except Exception as e:
-                    st.error(f"Fehler: {e}")
+                    st.error(f"Fehler im Studio: {e}")
 
         st.write("---")
         st.subheader("🎧 Einzelner Text vorlesen lassen")
