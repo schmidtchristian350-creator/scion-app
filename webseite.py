@@ -79,7 +79,7 @@ try:
 except ImportError:
     PLAYWRIGHT_AVAILABLE = False
 
-st.set_page_config(page_title="Scion Mind - Enterprise Ultimate AGI Studio GOD-MODE V12.16", layout="wide")
+st.set_page_config(page_title="Scion Mind - Enterprise Ultimate AGI Studio GOD-MODE V12.17", layout="wide")
 
 # ROBUSTES DARK/LIGHT-MODE CSS (GARANTIERT LESBARE SCHRIFTEN)
 st.markdown("""
@@ -97,8 +97,8 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("Scion Mind - Enterprise Ultimate AGI Studio (GOD-MODE V12.16)")
-st.markdown("*designed by Christian Schmidt | Powered by Admin Guthaben-Visualisierung & Multi-Format Export*")
+st.title("Scion Mind - Enterprise Ultimate AGI Studio (GOD-MODE V12.17)")
+st.markdown("*designed by Christian Schmidt | Powered by Audit-Trail, Workspace Vault & Session Cost Meter*")
 st.write("---")
 
 MASTER_OPENAI_KEY = st.secrets["OPENAI_API_KEY"]
@@ -111,7 +111,7 @@ ADMIN_NAME = "Christian"
 ADMIN_PASS = "ScionMind#2026!Secured"
 
 # -------------------------------------------------------------
-# SQLITE PERSISTENCE & V12.16 TABELLEN
+# SQLITE PERSISTENCE & V12.17 TABELLEN
 # -------------------------------------------------------------
 def init_db():
     conn = sqlite3.connect("scion_mind_enterprise.db", check_same_thread=False)
@@ -140,6 +140,26 @@ def init_db():
             status TEXT DEFAULT 'Unbenutzt',
             erstellt_am TEXT,
             eingeloest_von TEXT
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS guthaben_historie (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            zeit TEXT,
+            username TEXT,
+            typ TEXT,
+            betrag REAL,
+            grund TEXT
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS workspace_dateien (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            workspace TEXT,
+            titel TEXT,
+            dateityp TEXT,
+            binär_daten BLOB,
+            erstellt_am TEXT
         )
     """)
     cursor.execute("""
@@ -275,18 +295,53 @@ def get_db_connection():
     return sqlite3.connect("scion_mind_enterprise.db", check_same_thread=False)
 
 # -------------------------------------------------------------
-# WERTBASIERTE CREDIT-ABBUCHUNG & EXPORT-HILFSFUNKTIONEN
+# WERTBASIERTE CREDIT-ABBUCHUNG & AUDIT-TRAIL
 # -------------------------------------------------------------
-def berechne_und_ziehe_credits_ab(username, kosten):
-    if username == ADMIN_NAME:
-        return
+if "session_verrauchter_betrag" not in st.session_state:
+    st.session_state.session_verrauchter_betrag = 0.0
+
+def berechne_und_ziehe_credits_ab(username, kosten, grund="Agenten-Nutzung"):
+    if username != ADMIN_NAME:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("UPDATE kunden SET guthaben = MAX(0.0, guthaben - ?) WHERE username = ?", (kosten, username))
+        cursor.execute("INSERT INTO guthaben_historie (zeit, username, typ, betrag, grund) VALUES (datetime('now', 'localtime'), ?, 'Abzug', ?, ?)",
+                       (username, kosten, grund))
+        conn.commit()
+        conn.close()
+    st.session_state.session_verrauchter_betrag += kosten
+
+def guthaben_gutschreiben(username, betrag, grund="Admin-Gutschrift"):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("UPDATE kunden SET guthaben = MAX(0.0, guthaben - ?) WHERE username = ?", (kosten, username))
+    cursor.execute("UPDATE kunden SET guthaben = guthaben + ? WHERE username = ?", (betrag, username))
+    cursor.execute("INSERT INTO guthaben_historie (zeit, username, typ, betrag, grund) VALUES (datetime('now', 'localtime'), ?, 'Gutschrift', ?, ?)",
+                   (username, betrag, grund))
     conn.commit()
     conn.close()
 
-def exportiere_zu_docx(titel, text_inhalt):
+def guthaben_einziehen(username, betrag, grund="Admin-Einzug"):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("UPDATE kunden SET guthaben = MAX(0.0, guthaben - ?) WHERE username = ?", (betrag, username))
+    cursor.execute("INSERT INTO guthaben_historie (zeit, username, typ, betrag, grund) VALUES (datetime('now', 'localtime'), ?, 'Abzug', ?, ?)",
+                   (username, betrag, grund))
+    conn.commit()
+    conn.close()
+
+def speichere_datei_im_workspace_vault(workspace, titel, dateityp, binaer_daten):
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("INSERT INTO workspace_dateien (workspace, titel, dateityp, binär_daten, erstellt_am) VALUES (?, ?, ?, ?, datetime('now', 'localtime'))",
+                       (workspace, titel, dateityp, sqlite3.Binary(binaer_daten)))
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        if SENTRY_AVAILABLE:
+            sentry_sdk.capture_exception(e)
+
+def exportiere_zu_docx(titel, text_inhalt, workspace):
     if not DOCX_AVAILABLE:
         return None
     doc = Document()
@@ -295,9 +350,11 @@ def exportiere_zu_docx(titel, text_inhalt):
     io_buf = BytesIO()
     doc.save(io_buf)
     io_buf.seek(0)
+    binaer = io_buf.getvalue()
+    speichere_datei_im_workspace_vault(workspace, titel, "docx", binaer)
     return io_buf
 
-def exportiere_zu_xlsx(titel, text_inhalt):
+def exportiere_zu_xlsx(titel, text_inhalt, workspace):
     if not OPENPYXL_AVAILABLE:
         return None
     wb = openpyxl.Workbook()
@@ -308,9 +365,11 @@ def exportiere_zu_xlsx(titel, text_inhalt):
     io_buf = BytesIO()
     wb.save(io_buf)
     io_buf.seek(0)
+    binaer = io_buf.getvalue()
+    speichere_datei_im_workspace_vault(workspace, titel, "xlsx", binaer)
     return io_buf
 
-def exportiere_zu_pdf(titel, text_inhalt):
+def exportiere_zu_pdf(titel, text_inhalt, workspace):
     pdf_io = BytesIO()
     doc = SimpleDocTemplate(pdf_io, pagesize=A4, rightMargin=40, leftMargin=40, topMargin=40, bottomMargin=40)
     styles = getSampleStyleSheet()
@@ -320,6 +379,8 @@ def exportiere_zu_pdf(titel, text_inhalt):
     ]
     doc.build(story)
     pdf_io.seek(0)
+    binaer = pdf_io.getvalue()
+    speichere_datei_im_workspace_vault(workspace, titel, "pdf", binaer)
     return pdf_io
 
 # -------------------------------------------------------------
@@ -481,6 +542,7 @@ with st.sidebar:
         st.markdown(f"### 👤 {eingeloggter_kunde}")
         st.caption(f"🛡️ Rolle: **{rolle}**\n\n🏢 Workspace: `{workspace}`")
         st.caption(f"💰 Guthaben: **{guthaben:.2f} €**")
+        st.caption(f"⚡ Session-Verbrauch: **{st.session_state.session_verrauchter_betrag:.3f} €**")
         
         # Einmal-Lizenzschlüssel einlösen für normale User
         with st.expander("💳 Guthaben mit Einmal-Key aufladen", expanded=False):
@@ -496,9 +558,9 @@ with st.sidebar:
                         kid, kbetrag, kstatus = key_row
                         if kstatus == "Unbenutzt":
                             cursor.execute("UPDATE lizenz_schluessel SET status = 'Eingelöst', eingeloest_von = ? WHERE id = ?", (eingeloggter_kunde, kid))
-                            cursor.execute("UPDATE kunden SET guthaben = guthaben + ? WHERE username = ?", (kbetrag, eingeloggter_kunde))
                             conn.commit()
                             conn.close()
+                            guthaben_gutschreiben(eingeloggter_kunde, kbetrag, grund=f"Lizenzschlüssel eingelöst ({key_input})")
                             st.success(f"Erfolgreich! {kbetrag:.2f} € wurden deinem Konto gutgeschrieben.")
                             st.rerun()
                         else:
@@ -508,9 +570,9 @@ with st.sidebar:
                         conn.close()
                         st.error("Unbekannter Lizenzschlüssel.")
 
-        # ADMIN-PANEL: GUTHABEN VERGEBEN & EINZIEHEN (MIT GUTHABEN DIREKT HINTER DEM NAMEN)
+        # ADMIN-PANEL: GUTHABEN VERGEBEN & AUDIT TRAIL
         if eingeloggter_kunde == ADMIN_NAME:
-            with st.expander("👑 Admin-Zentrale (Guthaben Verwalten)", expanded=True):
+            with st.expander("👑 Admin-Zentrale (Guthaben & Audit)", expanded=True):
                 st.markdown("#### Nutzer auswählen:")
                 
                 conn = get_db_connection()
@@ -519,7 +581,6 @@ with st.sidebar:
                 user_Rows = cursor.fetchall()
                 conn.close()
                 
-                # Mapping von formatiertem Anzeigenamen zu echtem Benutzernamen
                 user_dict = {f"{u[0]} (Guthaben: {u[1]:.2f} €)": u[0] for u in user_Rows} if user_Rows else {}
                 anzeige_liste = list(user_dict.keys())
                 
@@ -533,27 +594,27 @@ with st.sidebar:
                     with col_a1:
                         if st.button("➕ Gutschreiben", key="btn_admin_plus"):
                             if ausgewaehlter_user:
-                                conn = get_db_connection()
-                                cursor = conn.cursor()
-                                cursor.execute("UPDATE kunden SET guthaben = guthaben + ? WHERE username = ?", (betrag_input, ausgewaehlter_user))
-                                conn.commit()
-                                conn.close()
+                                guthaben_gutschreiben(ausgewaehlter_user, betrag_input, grund="Admin-Zentrale Gutschrift")
                                 st.success(f"Sofort gutgeschrieben: +{betrag_input:.2f} € für '{ausgewaehlter_user}'!")
                                 time.sleep(0.3)
                                 st.rerun()
                     with col_a2:
                         if st.button("➖ Einziehen", key="btn_admin_minus"):
                             if ausgewaehlter_user:
-                                conn = get_db_connection()
-                                cursor = conn.cursor()
-                                cursor.execute("UPDATE kunden SET guthaben = MAX(0.0, guthaben - ?) WHERE username = ?", (betrag_input, ausgewaehlter_user))
-                                conn.commit()
-                                conn.close()
+                                guthaben_einziehen(ausgewaehlter_user, betrag_input, grund="Admin-Zentrale Einzug")
                                 st.warning(f"Sofort eingezogen: -{betrag_input:.2f} € von '{ausgewaehlter_user}'!")
                                 time.sleep(0.3)
                                 st.rerun()
                 else:
                     st.warning("Keine Nutzer in der Datenbank gefunden.")
+
+                st.write("---")
+                st.markdown("#### 📜 Transaktions-Audit-Trail")
+                if st.button("Audit-Historie anzeigen"):
+                    conn = get_db_connection()
+                    df_audit = pd.read_sql_query("SELECT * FROM guthaben_historie ORDER BY id DESC LIMIT 10", conn)
+                    conn.close()
+                    st.dataframe(df_audit)
 
                 st.write("---")
                 st.markdown("#### 🔑 Lizenzschlüssel Generator")
@@ -620,7 +681,7 @@ with st.sidebar:
             st.rerun()
 
 # -------------------------------------------------------------
-# CORE ENGINES V12.16
+# CORE ENGINES V12.17
 # -------------------------------------------------------------
 
 def verschruessle_api_key(api_key):
@@ -1156,7 +1217,7 @@ def selbstevaluierender_lern_agent(system_prompt, initial_input, use_local=False
     reflektion_res = ausfuehren_mit_ollama_fallback("Du bist Meta-Learning Optimizer.", f"Aufgabe: {initial_input}\nErgebnis: {ergebnis}", use_local=use_local)
     
     speichere_agenten_lernen("Chat-Optimierung", reflektion_res, dynamischer_prompt)
-    return wende_guardrails_an(ergebnis + f"\n\n---\n🧬 *[Scion Mind V12.16 Sovereign Core]: Admin-Ansicht mit Guthaben-Suffix aktiv.*")
+    return wende_guardrails_an(ergebnis + f"\n\n---\n🧬 *[Scion Mind V12.17 Sovereign Core]: Audit Trail & Workspace Vault aktiv.*")
 
 def generiere_replicate_bild_mit_selbstcheck(prompt):
     for versuch in range(2):
@@ -1229,7 +1290,7 @@ else:
         spalte_links, spalte_rechts = st.columns([1.1, 0.9])
 
         with spalte_links:
-            st.subheader("🤖 Autonomer KI-Agent (GOD-MODE V12.16)")
+            st.subheader("🤖 Autonomer KI-Agent (GOD-MODE V12.17)")
             modus = st.selectbox(
                 "Agenten-Modus wählen:",
                 [
@@ -1293,7 +1354,7 @@ else:
                 
                 if aufgabe:
                     berechne_nid = eingeloggter_kunde
-                    berechne_und_ziehe_credits_ab(berechne_nid, 0.05)
+                    berechne_und_ziehe_credits_ab(berechne_nid, 0.05, grund="LangGraph Schwarm")
                     with st.spinner("LangGraph Schwarm iteriert und sichert Checkpoints (0.05 € berechnet)..."):
                         schwarm_ergebnis = langgraph_vorstands_schwarm(aufgabe)
                         st.success("Konsens erfolgreich gesichert!")
@@ -1305,9 +1366,9 @@ else:
                 terminal_befehl = st.text_input("Terminal Befehl / Aufgabe:", placeholder="Z.B.: Führe System-Check durch")
                 if st.button("⚡ Live Stream ausführen", use_container_width=True):
                     if terminal_befehl:
-                        berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005)
+                        berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005, grund="Live-Terminal")
                         terminal_box = st.empty()
-                        log_text = "[INFO] Starte Scion Terminal V12.16 (0.005 € abgezogen)...\n"
+                        log_text = "[INFO] Starte Scion Terminal V12.17 (0.005 € abgezogen)...\n"
                         terminal_box.code(log_text, language="bash")
                         time.sleep(0.5)
                         
@@ -1325,7 +1386,7 @@ else:
                 lokaler_prompt = st.text_area("Anfrage für lokales Modell (Llama 3):", placeholder="Z.B.: Analysiere sensible Vertragsdaten...")
                 if st.button("🚀 Lokal ausführen (Zero Cloud Data Leak)", use_container_width=True):
                     if lokaler_prompt:
-                        berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005)
+                        berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005, grund="Ollama Fallback")
                         with st.spinner("Frage lokales Ollama ab (0.005 € abgezogen)..."):
                             lokal_res = ausfuehren_mit_ollama_fallback("Du bist ein sicherer Offline-Assistent.", lokaler_prompt, use_local=True)
                             st.markdown(lokal_res)
@@ -1337,7 +1398,7 @@ else:
                 doc_ziel = st.text_input("Aufgabe für Dokument:", placeholder="Z.B.: Extrahiere Rechnungsbeträge und prüfe Haftung")
                 if st.button("🚀 Analysieren & in FAISS-RAG speichern", use_container_width=True):
                     if uploaded_doc and doc_ziel:
-                        berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.05)
+                        berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.05, grund="OCR Dokumentenanalyse")
                         with st.spinner("OCR-Agent analysiert (0.05 € berechnet)..."):
                             analysis = litellm_router_abfrage("Document OCR Expert", f"Aufgabe: {doc_ziel}\nDatei: {uploaded_doc.name}")
                             conn = get_db_connection()
@@ -1359,7 +1420,7 @@ else:
                 p_var = st.number_input("Variable Kosten pro Stück (€):", value=50.0, step=5.0)
                 
                 if st.button("💰 P&L-Break-Even berechnen", use_container_width=True):
-                    berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005)
+                    berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005, grund="P&L Rechner")
                     pl_ergebnis = berechne_pl_break_even(p_fix, p_preis, p_var)
                     st.markdown(pl_ergebnis)
                 aufgabe = None
@@ -1369,7 +1430,7 @@ else:
                 tool_idee = st.text_area("Tool-Beschreibung:", placeholder="Z.B.: Ein Tool, das Börsenkurse abruft.")
                 if st.button("✨ Tool autonom generieren & als Git-Commit sichern", use_container_width=True):
                     if tool_idee:
-                        berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.05)
+                        berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.05, grund="Recursive Tool Creator")
                         with st.spinner("Agent schreibt, testet und commited sein Tool (0.05 € berechnet)..."):
                             tool_ergebnis = erzeuge_rekursives_tool(tool_idee)
                             git_res = simuliere_git_commit(f"Added custom tool: {tool_idee[:30]}")
@@ -1384,7 +1445,7 @@ else:
                 
                 if st.button("🚀 Pydantic Scraper starten", use_container_width=True):
                     if c_branche and c_region:
-                        berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.05)
+                        berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.05, grund="Lead Scraper")
                         with st.spinner("Scraper crawlt Leads und validiert Schemata (0.05 € berechnet)..."):
                             res_leads = ausfuehren_deep_lead_scraper(c_branche, c_region)
                             st.success(res_leads)
@@ -1401,10 +1462,10 @@ else:
 
             elif modus == "🧪 Automatisiertes Self-Testing & QA-Agent":
                 st.markdown("### 🧪 Automatisiertes Self-Testing & QA-Agent (Pytest) *(Schwer: 0.05 €)*")
-                qa_ziel = st.text_area("Funktions-Ziel:", placeholder="Z.B.: Schreibe Funktion zur Validierung von IBAN-Nummern")
+                qa_ziel = st.text_input("Funktions-Ziel:", placeholder="Z.B.: Schreibe Funktion zur Validierung von IBAN-Nummern")
                 if st.button("🚀 QA-Testsuite ausführen", use_container_width=True):
                     if qa_ziel:
-                        berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.05)
+                        berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.05, grund="QA Agent")
                         with st.spinner("QA-Agent generiert Code, Unit-Tests und testet in Sandbox (0.05 € berechnet)..."):
                             qa_bericht = generiere_und_teste_code_mit_qa(qa_ziel)
                             st.markdown(qa_bericht)
@@ -1416,7 +1477,7 @@ else:
                 t_ziel = st.text_area("Aufgabe für den Hintergrund-Agenten:")
                 if st.button("🚀 In Task-Queue einreihen", use_container_width=True):
                     if t_ziel:
-                        berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005)
+                        berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005, grund="Task Queue")
                         conn = get_db_connection()
                         cursor = conn.cursor()
                         cursor.execute("INSERT INTO async_task_queue (zeit, agent_typ, task_ziel, status, ergebnis) VALUES (datetime('now', 'localtime'), ?, ?, 'Offen', 'Wartet...')",
@@ -1430,7 +1491,7 @@ else:
                 st.markdown("### 🛠️ Closed-Loop Self-Healing Code-Interpreter *(Standard: 0.005 €)*")
                 user_code = st.text_area("Python Code:", value="import pandas as pd\ndf = pd.DataFrame({'A': [10, 20]})\nprint(df['A'].mean())", height=150)
                 if st.button("🚀 Closed-Loop Ausführung starten", use_container_width=True):
-                    berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005)
+                    berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005, grund="Sandbox REPL")
                     with st.spinner("Führe aus & heile Fehler automatisch (0.005 € berechnet)..."):
                         ergebnis = ausfuehren_in_self_healing_sandbox(user_code)
                         st.markdown(ergebnis)
@@ -1458,7 +1519,7 @@ else:
                 rag_inhalt = st.text_area("Inhalt:")
                 if st.button("📥 In FAISS DB indizieren", use_container_width=True):
                     if rag_titel and rag_inhalt:
-                        berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005)
+                        berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005, grund="RAG Indexing")
                         conn = get_db_connection()
                         cursor = conn.cursor()
                         cursor.execute("INSERT INTO rag_documents (titel, inhalt, vektor_metadaten) VALUES (?, ?, ?)", 
@@ -1475,7 +1536,7 @@ else:
                 event_text = st.text_area("Payload:")
                 if st.button("⚡ Verarbeiten", use_container_width=True):
                     if event_text:
-                        berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005)
+                        berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005, grund="Event Webhook")
                         with st.spinner("Verarbeite (0.005 € berechnet)..."):
                             ki_antwort = selbstevaluierender_lern_agent("Event Bot", f"Event auf {event_kanal}: {event_text}")
                             conn = get_db_connection()
@@ -1507,7 +1568,7 @@ else:
                 konkurrent_input = st.text_input("Name oder Website des Mitbewerbers:", placeholder="Z.B.: Mitbewerber GmbH")
                 if st.button("🚀 SWOT-Analyse starten", use_container_width=True):
                     if konkurrent_input:
-                        berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.05)
+                        berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.05, grund="SWOT Analyzer")
                         with st.spinner("Analysiere Marktposition & Web-Daten (0.05 € berechnet)..."):
                             swot_bericht = starte_swot_analyse(konkurrent_input)
                             st.success("SWOT-Analyse erfolgreich erstellt:")
@@ -1536,7 +1597,7 @@ else:
                 st.components.v1.html(canvas_html, height=340)
                 flow_befehl = st.text_input("Workflow:", placeholder="Z.B.: Starte Pipeline...")
                 if st.button("🚀 Canvas ausführen", use_container_width=True):
-                    berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005)
+                    berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005, grund="Node-Canvas")
                     aufgabe = flow_befehl
                 else:
                     aufgabe = None
@@ -1544,7 +1605,7 @@ else:
             elif modus == "Echtes WebRTC Realtime Audio":
                 st.markdown("### 🎙️ Bidirektionales WebRTC Audio-Streaming *(Standard: 0.005 €)*")
                 if st.button("🔴 WebRTC Session verbinden", use_container_width=True):
-                    berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005)
+                    berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005, grund="WebRTC Audio")
                     st.success("WebRTC Audio aktiv (0.005 € berechnet)!")
                     st.audio("https://actions.google.com/sounds/v1/ambiences/office_ambience.ogg", format="audio/mp3", autoplay=True)
                 aufgabe = None
@@ -1561,7 +1622,7 @@ else:
                 tab_mail, tab_wa = st.tabs(["E-Mail & Sentiment", "WhatsApp"])
                 with tab_mail:
                     if st.button("📥 E-Mails abrufen & analysieren", use_container_width=True):
-                        berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005)
+                        berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005, grund="Postfach Scanner")
                         with st.spinner("Lese IMAP & bewerte Sentiment (0.005 € berechnet)..."):
                             mails = lade_letzte_emails(eingeloggter_kunde)
                             st.success("Postfach nach Sentiment geclustert:")
@@ -1571,7 +1632,7 @@ else:
                     m_befehl = st.text_area("Thema:")
                     if st.button("✉️ E-Mail senden", use_container_width=True):
                         if z_empf and m_befehl:
-                            berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005)
+                            berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005, grund="E-Mail Versand")
                             ki_ant = selbstevaluierender_lern_agent("Mail Assistent", m_befehl)
                             res = sende_email(eingeloggter_kunde, z_empf, m_betreff, ki_ant)
                             st.success(res)
@@ -1580,7 +1641,7 @@ else:
                     wa_text = st.text_area("Nachricht:")
                     if st.button("💬 WhatsApp senden", use_container_width=True):
                         if wa_nr and wa_text:
-                            berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005)
+                            berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005, grund="WhatsApp Versand")
                             wa_res = sende_whatsapp(eingeloggter_kunde, wa_nr, wa_text)
                             st.success(wa_res)
                 aufgabe = None
@@ -1589,7 +1650,7 @@ else:
                 st.markdown("### 👥 LangGraph Multi-Agenten-Rollenspiel *(Schwer: 0.05 €)*")
                 debatten_ziel = st.text_input("Thema:", placeholder="Z.B.: Strategische Expansion")
                 if st.button("🚀 Debatte starten", use_container_width=True):
-                    berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.05)
+                    berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.05, grund="Multi-Agenten Debatte")
                     aufgabe = debatten_ziel
                 else:
                     aufgabe = None
@@ -1599,7 +1660,7 @@ else:
                 url_ziel = st.text_input("Ziel-URL:", placeholder="https://example.com")
                 rpa_aktion = st.text_area("RPA-Aktion:", placeholder="Z.B.: Klicke Login, fülle Formular aus")
                 if st.button("🚀 Computer-Use starten", use_container_width=True):
-                    berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.05)
+                    berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.05, grund="Computer-Use")
                     aufgabe = rpa_aktion
                 else:
                     aufgabe = None
@@ -1615,7 +1676,7 @@ else:
                 "🕸️ LangGraph Schwarm (Durable Checkpoints)", "🖥️ Live-Terminal & Realtime Stream", "🟢 Lokaler Ollama Fallback (Zero-Cloud)",
                 "🎯 Autonomer Deep Web-Scraper & Lead-Gen", "🧪 Automatisiertes Self-Testing & QA-Agent", "📊 Konkurrenten SWOT-Analyzer", "Computer-Use Browser-Operator"
             ]:
-                berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005)
+                berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005, grund="Chat & Webrecherche")
                 
                 try:
                     if modus == "Intelligenter Chat & Live-Webrecherche":
@@ -1682,7 +1743,7 @@ else:
                 empf = st.text_input("Empfänger:")
                 txt = st.text_area("Nachricht:")
                 if st.button("📤 Senden", use_container_width=True):
-                    berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005)
+                    berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005, grund="System Monitor Outbound")
                     if kanal.startswith("E-Mail"):
                         res = sende_email(eingeloggter_kunde, empf, "Autonomer Report", txt)
                         st.success(res)
@@ -1709,7 +1770,7 @@ else:
 
                 if st.button("🚀 Präsentation generieren", use_container_width=True):
                     if auto_thema:
-                        berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.05)
+                        berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.05, grund="Präsentations-Studio")
                         recherche = selbstevaluierender_lern_agent("Research", echte_deep_web_recherche(auto_thema))
                         story = multi_model_schwarm_antwort(schwarm_anbieter, f"Erstelle {anzahl_folien} Folien.", recherche)
                         roh = selbstevaluierender_lern_agent(f"Format as {anzahl_folien} slides as 'TITLE: [T]|||TEXT: [B]|||PROMPT: [P]' separated by '###'.", story)
@@ -1760,7 +1821,7 @@ else:
                         col_b1, col_b2 = st.columns(2)
                         with col_b1:
                             if st.button(f"🖼️ Bild neu (0.05 €)", key=f"gen_img_{idx}", use_container_width=True):
-                                berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.05)
+                                berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.05, grund="Bild neu generieren")
                                 with st.spinner("Generiere Bild via Replicate/Flux (0.05 € berechnet)..."):
                                     url = generiere_replicate_bild_mit_selbstcheck(neuer_prompt)
                                     st.session_state.slides_data[idx]["bild_url"] = url
@@ -1782,7 +1843,7 @@ else:
                 else:
                     st.download_button(label="📥 PDF-Präsentation (.pdf)", data=erstelle_pdf_aus_session(), file_name="Scion_Mind_Praesentation.pdf", mime="application/pdf", use_container_width=True)
 
-            with st.expander("📥 Universal Multi-Format Text-Export", expanded=True):
+            with st.expander("📥 Universal Multi-Format Text-Export & Workspace Vault", expanded=True):
                 st.markdown("### 📄 Ausarbeitung exportieren")
                 export_titel = st.text_input("Dokumenten-Titel:", value="Scion_Mind_Ausarbeitung")
                 
@@ -1797,22 +1858,42 @@ else:
                 
                 ex_col1, ex_col2 = st.columns(2)
                 with ex_col1:
-                    pdf_data = exportiere_zu_pdf(export_titel, export_text_input)
+                    pdf_data = exportiere_zu_pdf(export_titel, export_text_input, workspace)
                     st.download_button(label="📥 Als PDF", data=pdf_data, file_name=f"{export_titel}.pdf", mime="application/pdf", use_container_width=True)
                     
                     st.download_button(label="📥 Als TXT", data=export_text_input.encode('utf-8'), file_name=f"{export_titel}.txt", mime="text/plain", use_container_width=True)
                 with ex_col2:
-                    docx_data = exportiere_zu_docx(export_titel, export_text_input)
+                    docx_data = exportiere_zu_docx(export_titel, export_text_input, workspace)
                     if docx_data:
                         st.download_button(label="📥 Als Word (.docx)", data=docx_data, file_name=f"{export_titel}.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document", use_container_width=True)
                     else:
                         st.caption("Word (python-docx fehlt)")
 
-                    xlsx_data = exportiere_zu_xlsx(export_titel, export_text_input)
+                    xlsx_data = exportiere_zu_xlsx(export_titel, export_text_input, workspace)
                     if xlsx_data:
                         st.download_button(label="📥 Als Excel (.xlsx)", data=xlsx_data, file_name=f"{export_titel}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
                     else:
                         st.caption("Excel (openpyxl fehlt)")
+
+                st.write("---")
+                st.markdown("#### 📂 Workspace Cloud-Vault (Archivierte Dateien)")
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                cursor.execute("SELECT id, titel, dateityp, erstellt_am, binär_daten FROM workspace_dateien WHERE workspace = ? ORDER BY id DESC", (workspace,))
+                vault_dateien = cursor.fetchall()
+                conn.close()
+
+                if vault_dateien:
+                    for fid, ftitel, ftyp, fzeit, fdata in vault_dateien:
+                        st.download_button(
+                            label=f"📥 [{ftyp.upper()}] {ftitel} ({fzeit})",
+                            data=fdata,
+                            file_name=f"{ftitel}.{ftyp}",
+                            key=f"vault_dl_{fid}",
+                            use_container_width=True
+                        )
+                else:
+                    st.caption("Bisher keine Dateien im Workspace-Vault gespeichert.")
 
             with st.expander("🪄 AI Prompt Optimizer", expanded=False):
                 st.markdown("### 🎯 Master-Prompt-Generator *(Standard: 0.005 €)*")
@@ -1823,7 +1904,7 @@ else:
 
                 if st.button("✨ Prompt optimieren", use_container_width=True):
                     if user_idee:
-                        berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005)
+                        berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005, grund="Prompt Optimizer")
                         res = litellm_router_abfrage("Elite Prompt Engineer", user_idee, model_pref="auto")
                         st.session_state.prompt_chat_history.append({"idee": user_idee, "antwort": res})
                 
@@ -1837,7 +1918,7 @@ else:
                 st.markdown("### ⚡ Live-Sprachchat (Headset) *(Standard: 0.005 €)*")
                 live_audio = st.audio_input("Sprich mit deinem Agenten:")
                 if live_audio is not None:
-                    berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005)
+                    berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005, grund="Voice Loop")
                     with st.spinner("Verarbeite Audio (0.005 € berechnet)..."):
                         try:
                             client_v = OpenAI(api_key=MASTER_OPENAI_KEY)
