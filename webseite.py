@@ -192,12 +192,28 @@ else:
                 with st.chat_message(message["role"]):
                     st.markdown(message["content"])
 
-        if modus == "Text-Recherche & Chat" or modus == "Video-Skript & Storyboard":
-            aufgabe = st.chat_input("Stelle deine Frage oder lass dir ein knackiges 30-Sekunden-Skript erstellen...")
+        # Spracheingabe für den Chat
+        st.markdown("🎤 **Oder per Spracheingabe steuern:**")
+         Sprach_eingabe_chat = st.audio_input("Sprchnachricht aufnehmen", key="audio_chat")
+        if Sprach_eingabe_chat is not None:
+            try:
+                client_stt = OpenAI(api_key=MASTER_OPENAI_KEY)
+                transcript = client_stt.audio.transcriptions.create(
+                    model="whisper-1",
+                    file=("audio.wav", Sprach_eingabe_chat.read())
+                )
+                aufgabe = transcript.text
+                st.info(Erkannter Text: "{aufgabe}")
+            except Exception as e:
+                st.error(f"Spracherkennungsfehler: {e}")
+                aufgabe = None
         else:
-            aufgabe_input = st.text_area("Deine Beschreibung oder Aufgabe dafür:", height=120)
-            Absenden = st.button("🚀 Aufgabe jetzt ausführen", use_container_width=True)
-            aufgabe = aufgabe_input if Absenden else None
+            if modus == "Text-Recherche & Chat" or modus == "Video-Skript & Storyboard":
+                aufgabe = st.chat_input("Stelle deine Frage oder lass dir ein Skript erstellen...")
+            else:
+                aufgabe_input = st.text_area("Deine Beschreibung oder Aufgabe dafür:", height=120)
+                Absenden = st.button("🚀 Aufgabe jetzt ausführen", use_container_width=True)
+                aufgabe = aufgabe_input if Absenden else None
 
         if aufgabe:
             if eingeloggter_kunde != ADMIN_NAME:
@@ -212,8 +228,8 @@ else:
 
                 system_prompts = {
                     "Text-Recherche & Chat": "Du bist ein präziser, professioneller KI-Assistent. Antworte immer auf Deutsch.",
-                    "Präsentations-Struktur & Folien": "Du bist ein Experte für Business-Präsentationen. Erstelle eine saubere Präsentation, bei der jede Folie mit 'Folie X: [Titel]' beginnt, gefolgt von prägnanten Stichpunkten.",
-                    "Video-Skript & Storyboard": "Du bist ein professioneller Videoproduzent. Erstelle ein kurzes, knackiges Video-Skript (perfekt für 30 bis maximal 45 Sekunden). Gib exakt zwei Blöcke aus: 1. Einen präzisen, bildhaften englischen Video-Prompt. 2. Den dazugehörigen, kurzen deutschen Sprechtext."
+                    "Präsentations-Struktur & Folien": "Du bist ein Experte für Business-Präsentationen. Erstelle eine saubere Präsentation, bei der jede Folie mit 'Folie X: [Titel]' beginnt, gefolgt von prägnanten Stichpunkten. Antworte auf Deutsch.",
+                    "Video-Skript & Storyboard": "Du bist ein professioneller Videoproduzent. Erstelle ein knackiges Video-Skript. Gib exakt zwei Blöcke auf Deutsch aus: 1. Einen präzisen, bildhaften englischen Video-Prompt für die KI-Erstellung. 2. Den dazugehörigen, ausführlichen Sprechtext auf Deutsch."
                 }
                 
                 messages_payload = [{"role": "system", "content": system_prompts.get(modus, "Du bist ein hilfreicher Assistent. Antworte immer auf Deutsch.")}]
@@ -246,40 +262,32 @@ else:
                 st.error(f"Ein Fehler ist aufgetreten: {e}")
 
     with spalte_rechts:
-        st.subheader("🎥 Echter KI-Video Generator")
-        video_prompt = st.text_area("Videobeschreibung (Englischer Prompt):", height=100, placeholder="Z.B.: Cinematic close-up of a modern tech product on a desk...")
-        sprechender_text = st.text_area("Sprechtext (ideal für 30-45 Sekunden):", height=100, placeholder="Füge hier den kurzen Sprechtext ein...")
+        st.subheader("🎥 Getrennte Steuerung: Video & Audio")
+        
+        video_prompt = st.text_area("1. Videobeschreibung (Englischer Prompt):", height=80, placeholder="Z.B.: Cinematic close-up of a modern tech product...")
+        sprechender_text = st.text_area("2. Sprechtext (Für die Tonspur):", height=80, placeholder="Füge hier deinen Text für den Ton ein...")
         stimme = st.selectbox("Sprecher-Stimme:", ["alloy", "echo", "fable", "onyx", "nova", "shimmer"])
         
-        if st.button("🎬 Video & Audio generieren", use_container_width=True):
-            if not video_prompt or not sprechender_text:
-                st.warning("Bitte fülle sowohl die Videobeschreibung als auch den Sprechtext aus.")
+        col_btn1, col_btn2 = st.columns(2)
+        
+        with col_btn1:
+            start_video = st.button("🎬 Nur Video starten", use_container_width=True)
+        with col_btn2:
+            start_audio = st.button("🔊 Nur Audio starten", use_container_width=True)
+            
+        if start_video:
+            if not video_prompt:
+                st.warning("Bitte gib eine Videobeschreibung ein.")
             else:
                 if eingeloggter_kunde != ADMIN_NAME:
-                    st.session_state.kunden_daten[eingeloggter_kunde]["guthaben"] -= 0.80
+                    st.session_state.kunden_daten[eingeloggter_kunde]["guthaben"] -= 0.50
                 
                 status_text = st.empty()
                 progress_bar = st.progress(0)
+                status_text.text("🦫 Das Arbeitstier generiert das Video...")
+                progress_bar.progress(40)
                 
                 try:
-                    # 1. Sprachdatei generieren
-                    status_text.text("🦫 Erstelle professionelle Sprachspur...")
-                    progress_bar.progress(20)
-                    client_openai = OpenAI(api_key=MASTER_OPENAI_KEY)
-                    
-                    audio_response = client_openai.audio.speech.create(
-                        model="tts-1",
-                        voice=stimme,
-                        input=sprechender_text
-                    )
-                    audio_path = "temp_audio.mp3"
-                    with open(audio_path, "wb") as f:
-                        f.write(audio_response.content)
-
-                    # 2. Video bei Replicate anfordern
-                    status_text.text("🦫 Generiere Videosequenz...")
-                    progress_bar.progress(50)
-                    
                     headers = {
                         "Authorization": f"Bearer {VIDEO_API_KEY}",
                         "Content-Type": "application/json",
@@ -311,19 +319,37 @@ else:
                         
                         if video_url:
                             progress_bar.progress(100)
-                            status_text.text("✅ Video mit Ton erfolgreich erstellt!")
-                            st.video(video_url)
-                            st.audio(audio_path)
-                            st.success("Dein fertiges Video und die Audiospur stehen bereit!")
+                            status_text.text("✅ Video erfolgreich generiert (läuft als Endlos-Loop für den Ton):")
+                            # HTML Video-Tag mit Loop, damit das kurze Video nahtlos wiederholt wird
+                            st.markdown(f'<video width="100%" autoplay loop muted controls><source src="{video_url}" type="video/mp4"></video>', unsafe_allow_html=True)
                         else:
-                            st.warning("⏱️ Zeitüberschreitung beim Rendern.")
-                            
+                            st.warning("⏱️ Zeitüberschreitung beim Rendern des Videos.")
                 except Exception as e:
                     st.error(f"Fehler: {e}")
 
+        if start_audio:
+            if not sprechender_text:
+                st.warning("Bitte gib einen Sprechtext ein.")
+            else:
+                if eingeloggter_kunde != ADMIN_NAME:
+                    st.session_state.kunden_daten[eingeloggter_kunde]["guthaben"] -= 0.10
+                
+                with st.spinner("🦫 Das Arbeitstier erstellt die Audiospur..."):
+                    try:
+                        client_openai = OpenAI(api_key=MASTER_OPENAI_KEY)
+                        audio_response = client_openai.audio.speech.create(
+                            model="tts-1",
+                            voice=stimme,
+                            input=sprechender_text
+                        )
+                        st.success("Audiospur erfolgreich erstellt!")
+                        st.audio(audio_response.content, format="audio/mp3")
+                    except Exception as e:
+                        st.error(f"Fehler bei der Audiospur: {e}")
+
         st.write("---")
-        st.subheader("🎧 Text vorlesen lassen")
-        vorlese_text = st.text_area("Text zum Vorlesen:", height=100, placeholder="Füge hier deinen Text ein...")
+        st.subheader("🎧 Einzelner Text vorlesen lassen")
+        vorlese_text = st.text_area("Text zum Vorlesen:", height=80, placeholder="Füge hier deinen Text ein...")
         einzel_stimme = st.selectbox("Wähle eine Stimme:", ["alloy", "echo", "fable", "onyx", "nova", "shimmer"], key="einzel_stimme")
         
         if st.button("🔊 Audio generieren", use_container_width=True):
@@ -338,6 +364,5 @@ else:
                         response = client.audio.speech.create(model="tts-1", voice=einzel_stimme, input=vorlese_text)
                         st.success("Audio erfolgreich generiert!")
                         st.audio(response.content, format="audio/mp3")
-                        st.rerun()
                     except Exception as e:
                         st.error(f"Fehler: {e}")
