@@ -22,7 +22,8 @@ st.title("Scion Mind")
 st.markdown("*designed by Christian Schmidt*")
 st.write("---")
 
-MASTER_OPENAI_KEY = "sk-DEIN-ECHTER-OPENAI-API-SCHLUESSEL-HIER"
+# Der Schlüssel wird sicher aus den Streamlit Secrets geladen (kein harter Text im Code!)
+MASTER_OPENAI_KEY = st.secrets["OPENAI_API_KEY"]
 
 ADMIN_NAME = "Christian"
 ADMIN_PASS = "ScionMind#2026!Secured"
