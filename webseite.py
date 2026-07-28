@@ -17,7 +17,6 @@ st.markdown("""
     .stButton button:hover { background-color: #334155; color: white; }
     input, textarea, [data-baseweb="input"] div, [data-baseweb="base-input"] { background-color: #ffffff !important; border-radius: 8px !important; border: 1px solid #cbd5e1 !important; }
     input:focus, textarea:focus, [data-baseweb="input"] input:focus { border-color: #0f172a !important; box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.1) !important; }
-    /* Vergrößert das Lade-Symbol */
     [data-testid="stStatusWidget"] svg, [data-testid="stSpinner"] svg {
         width: 40px !important;
         height: 40px !important;
@@ -246,24 +245,39 @@ else:
                 st.error(f"Ein Fehler ist aufgetreten: {e}")
 
     with spalte_rechts:
-        st.subheader("🎥 Echter KI-Video Generator")
-        video_prompt = st.text_area("Videobeschreibung (Was soll im Video passieren?):", height=120, placeholder="Z.B.: Cinematic drone shot over a modern tech office...")
+        st.subheader("🎥 Echter KI-Video Generator mit Ton & Länge")
+        video_prompt = st.text_area("Videobeschreibung:", height=100, placeholder="Z.B.: Cinematic drone shot over a modern tech office...")
+        sprechender_text = st.text_area("Sprechtext für das Video (für Ton & Länge 30-60 Sek.):", height=100, placeholder="Füge hier den Text ein, den der Sprecher im Video über 30-60 Sekunden erzählen soll...")
+        stimme = st.selectbox("Sprecher-Stimme:", ["alloy", "echo", "fable", "onyx", "nova", "shimmer"])
         
-        if st.button("🎬 Video generieren & Status prüfen", use_container_width=True):
-            if not video_prompt:
-                st.warning("Bitte gib eine Beschreibung für das Video ein.")
+        if st.button("🎬 Video mit Ton & Länge generieren", use_container_width=True):
+            if not video_prompt or not sprechender_text:
+                st.warning("Bitte gib sowohl eine Videobeschreibung als auch den Sprechtext an.")
             else:
                 if eingeloggter_kunde != ADMIN_NAME:
-                    st.session_state.kunden_daten[eingeloggter_kunde]["guthaben"] -= 0.50
+                    st.session_state.kunden_daten[eingeloggter_kunde]["guthaben"] -= 0.80
                 
                 status_text = st.empty()
                 progress_bar = st.progress(0)
                 
-                status_text.text("🦫 Das Arbeitstier optimiert den Text für die Video-KI...")
-                progress_bar.progress(20)
-                
                 try:
+                    # 1. Sprachdatei generieren (bestimmt die Länge des Videos)
+                    status_text.text("🦫 Erstelle professionelle Sprachspur...")
+                    progress_bar.progress(20)
                     client_openai = OpenAI(api_key=MASTER_OPENAI_KEY)
+                    
+                    audio_response = client_openai.audio.speech.create(
+                        model="tts-1",
+                        voice=stimme,
+                        input=sprechender_text
+                    )
+                    audio_path = "temp_audio.mp3"
+                    with open(audio_path, "wb") as f:
+                        f.write(audio_response.content)
+
+                    # 2. Videoprompt optimieren
+                    status_text.text("🦫 Optimiere Videoprompt...")
+                    progress_bar.progress(40)
                     opt_response = client_openai.chat.completions.create(
                         model="gpt-4o-mini",
                         messages=[
@@ -273,67 +287,55 @@ else:
                     )
                     clean_prompt = opt_response.choices[0].message.content
                     
-                    status_text.text("🦫 Das Arbeitstier überträgt den Auftrag an Replicate...")
-                    progress_bar.progress(40)
+                    # 3. Video bei Replicate anfordern
+                    status_text.text("🦫 Generiere Videosequenz...")
+                    progress_bar.progress(60)
                     
                     headers = {
                         "Authorization": f"Bearer {VIDEO_API_KEY}",
                         "Content-Type": "application/json",
                         "Prefer": "respond-async"
                     }
-                    
-                    # Modernster direkter Endpunkt für MiniMax Video über das offizielle Modell-Deployment
-                    data = {
-                        "input": {"prompt": clean_prompt}
-                    }
+                    data = {"input": {"prompt": clean_prompt}}
                     
                     response = requests.post("https://api.replicate.com/v1/models/minimax/video-01/predictions", json=data, headers=headers)
                     res_json = response.json()
                     
                     if "error" in res_json and res_json["error"] is not None:
-                        st.error(f"API-Fehler von Replicate: {res_json['error']}")
-                    elif "urls" not in res_json:
-                        st.error(f"Unerwartete Antwort: {res_json}")
+                        st.error(f"API-Fehler: {res_json['error']}")
                     else:
                         get_url = res_json["urls"]["get"]
+                        video_url = None
                         
-                        erfolgreich = False
                         for i in range(60):
                             status_res = requests.get(get_url, headers={"Authorization": f"Bearer {VIDEO_API_KEY}"}).json()
                             status = status_res.get("status")
                             
                             if status == "succeeded":
-                                progress_bar.progress(100)
-                                status_text.text("✅ Video erfolgreich generiert!")
-                                
-                                video_url = status_res["output"]
-                                if isinstance(video_url, list):
-                                    video_url = video_url[0]
-                                    
-                                st.video(video_url)
-                                st.success("Dein Video ist fertig und kann oben abgespielt oder heruntergeladen werden!")
-                                erfolgreich = True
+                                video_output = status_res["output"]
+                                video_url = video_output[0] if isinstance(video_output, list) else video_output
                                 break
-                            elif status == "processing" or status == "starting":
-                                progress_bar.progress(min(90, 40 + i * 2))
-                                status_text.text(f"🦫 Das Arbeitstier rendert das Video (Durchlauf {i+1}/60)...")
                             elif status == "failed":
-                                st.error(f"Die Videogenerierung ist fehlgeschlagen: {status_res.get('error', 'Unbekannter Fehler')}")
-                                erfolgreich = True
+                                st.error("Videogenerierung fehlgeschlagen.")
                                 break
-                                
                             time.sleep(5)
                         
-                        if not erfolgreich:
-                            st.warning("⏱️ Das Rendern dauert länger als gewöhnlich. Der Server arbeitet noch im Hintergrund.")
+                        if video_url:
+                            progress_bar.progress(100)
+                            status_text.text("✅ Video mit Ton erfolgreich erstellt!")
+                            st.video(video_url)
+                            st.audio(audio_path)
+                            st.success("Dein fertiges Video und die Audiospur stehen bereit!")
+                        else:
+                            st.warning("⏱️ Zeitüberschreitung beim Rendern.")
                             
                 except Exception as e:
-                    st.error(f"Verbindungsfehler: {e}")
+                    st.error(f"Fehler: {e}")
 
         st.write("---")
         st.subheader("🎧 Text vorlesen lassen")
         vorlese_text = st.text_area("Text zum Vorlesen:", height=100, placeholder="Füge hier deinen Text ein...")
-        stimme = st.selectbox("Wähle eine Stimme:", ["alloy", "echo", "fable", "onyx", "nova", "shimmer"])
+        einzel_stimme = st.selectbox("Wähle eine Stimme:", ["alloy", "echo", "fable", "onyx", "nova", "shimmer"], key="einzel_stimme")
         
         if st.button("🔊 Audio generieren", use_container_width=True):
             if not vorlese_text:
@@ -344,15 +346,9 @@ else:
                 with st.spinner("🦫 Das Arbeitstier erstellt die Sprachdatei..."):
                     try:
                         client = OpenAI(api_key=MASTER_OPENAI_KEY)
-                        chunks = [vorlese_text[i:i + 4000] for i in range(0, len(vorlese_text), 4000)]
-                        audio_bytes_gesammt = bytearray()
-                        
-                        for chunk in chunks:
-                            response = client.audio.speech.create(model="tts-1", voice=stimme, input=chunk)
-                            audio_bytes_gesammt.extend(response.content)
-                        
+                        response = client.audio.speech.create(model="tts-1", voice=einzel_stimme, input=vorlese_text)
                         st.success("Audio erfolgreich generiert!")
-                        st.audio(bytes(audio_bytes_gesammt), format="audio/mp3")
+                        st.audio(response.content, format="audio/mp3")
                         st.rerun()
                     except Exception as e:
                         st.error(f"Fehler: {e}")
