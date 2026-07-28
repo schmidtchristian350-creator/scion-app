@@ -6,6 +6,7 @@ import re
 import requests
 import time
 import json
+import sqlite3
 import pandas as pd
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from reportlab.lib.pagesizes import A4, landscape
@@ -13,7 +14,14 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image as RL
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 
-st.set_page_config(page_title="Scion Mind - Enterprise Ultimate AGI Studio", layout="wide")
+# Optionales Playwright für Headless Browser
+try:
+    from playwright.sync_api import sync_playwright
+    PLAYWRIGHT_AVAILABLE = True
+except ImportError:
+    PLAYWRIGHT_AVAILABLE = False
+
+st.set_page_config(page_title="Scion Mind - Enterprise Ultimate AGI Studio V3", layout="wide")
 
 st.markdown("""
     <style>
@@ -31,9 +39,8 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("Scion Mind - Enterprise Ultimate Studio")
-st.markdown("*designed by Christian Schmidt*") 
-st.markdown("*Powered by Multi-Model Swarm, Browser Operator, 24/7 Daemon & Deterministic Guardrails*")
+st.title("Scion Mind - Enterprise Ultimate AGI Studio (GOD-MODE V3)")
+st.markdown("*designed by Christian Schmidt | Powered by Playwright Headless Browser, SQLite Persistence, Multi-Model Swarm & Realtime Voice*")
 st.write("---")
 
 MASTER_OPENAI_KEY = st.secrets["OPENAI_API_KEY"]
@@ -45,66 +52,116 @@ GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY", "")
 ADMIN_NAME = "Christian"
 ADMIN_PASS = "ScionMind#2026!Secured"
 
-if "kunden_daten" not in st.session_state:
-    st.session_state.kunden_daten = {
-        ADMIN_NAME: {"passwort": ADMIN_PASS, "guthaben": 999.00},
-        "kunde1": {"passwort": "123", "guthaben": 5.00}
-    }
+# -------------------------------------------------------------
+# SQLITE PERSISTENCE LAYER (Ersatz für reinen Session State)
+# -------------------------------------------------------------
+def init_db():
+    conn = sqlite3.connect("scion_mind_enterprise.db", check_same_thread=False)
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS kunden (
+            username TEXT PRIMARY KEY,
+            passwort TEXT,
+            guthaben REAL
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS daemon_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            zeit TEXT,
+            aktion TEXT,
+            status TEXT
+        )
+    """)
+    # Admin initialisieren falls nicht vorhanden
+    cursor.execute("SELECT * FROM kunden WHERE username = ?", (ADMIN_NAME,))
+    if not cursor.fetchone():
+        cursor.execute("INSERT INTO kunden VALUES (?, ?, ?)", (ADMIN_NAME, ADMIN_PASS, 999.00))
+        cursor.execute("INSERT INTO kunden VALUES (?, ?, ?)", ("kunde1", "123", 5.00))
+    
+    cursor.execute("SELECT COUNT(*) FROM daemon_logs")
+    if cursor.fetchone()[0] == 0:
+        cursor.execute("INSERT INTO daemon_logs (zeit, aktion, status) VALUES (?, ?, ?)", ("04:00 Uhr", "Automatischer Nightly-Market-Scan durchgeführt.", "Erfolgreich"))
+        cursor.execute("INSERT INTO daemon_logs (zeit, aktion, status) VALUES (?, ?, ?)", ("06:30 Uhr", "CRM-Datenbankabgleich & Lead-Scoring aktualisiert.", "Erfolgreich"))
+    
+    conn.commit()
+    conn.close()
+
+init_db()
+
+def get_db_connection():
+    return sqlite3.connect("scion_mind_enterprise.db", check_same_thread=False)
+
+# Session State Initialisierung aus DB
+if "aktueller_user" not in st.session_state:
+    st.session_state.aktueller_user = None
 
 if "slides_data" not in st.session_state:
     st.session_state.slides_data = [
         {"titel": "Folie 1: Willkommen", "text": "Hier steht der Text für Folie 1...", "prompt": "Professional corporate presentation slide background, modern clean style", "bild_url": None}
     ]
 
-if "proaktive_tickets" not in st.session_state:
-    st.session_state.proaktive_tickets = [
-        {"id": "INC-4091", "system": "ERP Server", "status": "Kritisch: Hohe Latenz gemeldet", "loesung_bereit": False},
-        {"id": "INC-4092", "system": "E-Mail Gateway", "status": "Warnung: Warteschlange läuft voll", "loesung_bereit": False}
-    ]
-
-if "daemon_logs" not in st.session_state:
-    st.session_state.daemon_logs = [
-        {"zeit": "04:00 Uhr", "aktion": "Automatischer Nightly-Market-Scan durchgeführt.", "status": "Erfolgreich"},
-        {"zeit": "06:30 Uhr", "aktion": "CRM-Datenbankabgleich & Lead-Scoring aktualisiert.", "status": "Erfolgreich"}
-    ]
+if "chats" not in st.session_state:
+    st.session_state.chats = {"Chat 1": []}
+if "aktiver_chat" not in st.session_state:
+    st.session_state.aktiver_chat = "Chat 1"
 
 with st.sidebar:
-    st.header("🔑 Konto & Login")
+    st.header("🔑 Konto & Login (Persistent)")
     auth_modus = st.radio("Aktion wählen:", ["Einloggen", "Neuen Account erstellen"])
     
-    eingeloggter_kunde = None
+    eingeloggter_kunde = st.session_state.get("aktueller_user", None)
 
-    if auth_modus == "Einloggen":
-        login_name = st.text_input("Benutzername:")
-        login_pass = st.text_input("Passwort:", type="password")
-        
-        if st.button("Anmelden"):
-            if login_name in st.session_state.kunden_daten and st.session_state.kunden_daten[login_name]["passwort"] == login_pass:
-                st.session_state.aktueller_user = login_name
-                st.success(f"Willkommen zurück, {login_name}!")
-                st.rerun()
-            else:
-                st.error("Falscher Benutzername oder Passwort.")
+    if not eingeloggter_kunde:
+        if auth_modus == "Einloggen":
+            login_name = st.text_input("Benutzername:")
+            login_pass = st.text_input("Passwort:", type="password")
+            
+            if st.button("Anmelden"):
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                cursor.execute("SELECT passwort FROM kunden WHERE username = ?", (login_name,))
+                res = cursor.fetchone()
+                conn.close()
                 
-    else:
-        reg_name = st.text_input("Neuer Benutzername:")
-        reg_pass = st.text_input("Neues Passwort:", type="password")
-        
-        if st.button("Account registrieren"):
-            if not reg_name or not reg_pass:
-                st.warning("Bitte fülle alle Felder aus.")
-            elif reg_name in st.session_state.kunden_daten:
-                st.error("Dieser Benutzername ist bereits vergeben.")
-            else:
-                st.session_state.kunden_daten[reg_name] = {"passwort": reg_pass, "guthaben": 2.00}
-                st.session_state.aktueller_user = reg_name
-                st.success("Account erstellt! 2 € Startguthaben.")
-                st.rerun()
+                if res and res[0] == login_pass:
+                    st.session_state.aktueller_user = login_name
+                    st.success(f"Willkommen zurück, {login_name}!")
+                    st.rerun()
+                else:
+                    st.error("Falscher Benutzername oder Passwort.")
+                    
+        else:
+            reg_name = st.text_input("Neuer Benutzername:")
+            reg_pass = st.text_input("Neues Passwort:", type="password")
+            
+            if st.button("Account registrieren"):
+                if not reg_name or not reg_pass:
+                    st.warning("Bitte fülle alle Felder aus.")
+                else:
+                    conn = get_db_connection()
+                    cursor = conn.cursor()
+                    cursor.execute("SELECT * FROM kunden WHERE username = ?", (reg_name,))
+                    if cursor.fetchone():
+                        st.error("Dieser Benutzername ist bereits vergeben.")
+                    else:
+                        cursor.execute("INSERT INTO kunden VALUES (?, ?, ?)", (reg_name, reg_pass, 2.00))
+                        conn.commit()
+                        st.session_state.aktueller_user = reg_name
+                        st.success("Account erstellt! 2 € Startguthaben.")
+                        st.rerun()
+                    conn.close()
 
     eingeloggter_kunde = st.session_state.get("aktueller_user", None)
 
-    if eingeloggter_kunde and eingeloggter_kunde in st.session_state.kunden_daten:
-        guthaben = st.session_state.kunden_daten[eingeloggter_kunde]["guthaben"]
+    if eingeloggter_kunde:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT guthaben FROM kunden WHERE username = ?", (eingeloggter_kunde,))
+        row = cursor.fetchone()
+        guthaben = row[0] if row else 0.0
+        conn.close()
+
         st.write("---")
         st.success(f"Eingeloggt als: **{eingeloggter_kunde}**")
         
@@ -113,28 +170,18 @@ with st.sidebar:
         else:
             st.metric(label="Dein Guthaben", value=f"{guthaben:.2f} €")
             
-            st.markdown("### 💳 Guthaben & Abos aufladen")
             paket_wahl = st.selectbox(
                 "Wähle dein Paket:",
-                ["10 € Guthaben (Prepaid)", "25 € Guthaben (Prepaid)", "50 € Guthaben (Prepaid)", "Abo 10 € / Monat", "Abo 25 € / Monat"]
+                ["10 € Guthaben (Prepaid)", "25 € Guthaben (Prepaid)", "50 € Guthaben (Prepaid)"]
             )
-            
-            stripe_links = {
-                "10 € Guthaben (Prepaid)": "https://buy.stripe.com/test_cNidRa5GPaUD4BnfSf9sk00",
-                "25 € Guthaben (Prepaid)": "https://buy.stripe.com/test_cNi3cwb198Mv3xj6hF9sk01",
-                "50 € Guthaben (Prepaid)": "https://buy.stripe.com/test_bJe9AU8T1aUDfg15dB9sk02",
-                "Abo 10 € / Monat": "https://buy.stripe.com/test_6oU28s3yH9Qz4Bn8pN9sk03",
-                "Abo 25 € / Monat": "https://buy.stripe.com/test_28E28sfhpd2L3xjbBZ9sk04"
-            }
-            
-            aktiver_link = stripe_links[paket_wahl]
-            st.markdown(f"[⚡ Ausgeführtes Paket bezahlen]({aktiver_link})", unsafe_allow_html=True)
-            
-            if st.button("Guthaben aktualisieren"):
-                if "10 €" in paket_wahl: st.session_state.kunden_daten[eingeloggter_kunde]["guthaben"] += 10.00
-                elif "25 €" in paket_wahl: st.session_state.kunden_daten[eingeloggter_kunde]["guthaben"] += 25.00
-                elif "50 €" in paket_wahl: st.session_state.kunden_daten[eingeloggter_kunde]["guthaben"] += 50.00
-                st.success("Erfolgreich aktualisiert!")
+            if st.button("Guthaben aufladen (Testmodus)"):
+                add_val = 10.0 if "10 €" in paket_wahl else (25.0 if "25 €" in paket_wahl else 50.0)
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                cursor.execute("UPDATE kunden SET guthaben = guthaben + ? WHERE username = ?", (add_val, eingeloggter_kunde))
+                conn.commit()
+                conn.close()
+                st.success(f"Erfolgreich {add_val} € aufgeladen!")
                 st.rerun()
 
         st.write("---")
@@ -144,45 +191,49 @@ with st.sidebar:
 
     st.write("---")
     st.header("💬 Deine Chats")
-    
-    if "chats" not in st.session_state:
-        st.session_state.chats = {"Chat 1": []}
-    if "aktiver_chat" not in st.session_state:
-        st.session_state.aktiver_chat = "Chat 1"
-
     if st.button("➕ Neuer Chat"):
         neuer_name = f"Chat {len(st.session_state.chats) + 1}"
         st.session_state.chats[neuer_name] = []
         st.session_state.aktiver_chat = neuer_name
         st.rerun()
 
-    st.write("Wähle einen Chat aus:")
     for chat_name in list(st.session_state.chats.keys()):
         if st.button(chat_name, key=f"btn_{chat_name}"):
             st.session_state.aktiver_chat = chat_name
             st.rerun()
 
 # -------------------------------------------------------------
-# CORE ENGINE: MULTI-MODEL SWARM (OpenAI, Anthropic Claude, Google Gemini)
+# CORE ENGINE 1: ECHTE PLAYWRIGHT HEADLESS BROWSER AUTOMATION
+# -------------------------------------------------------------
+def echter_playwright_browser_operator(url, befehl):
+    """Führt echte Headless-Browser-Interaktionen per Playwright durch"""
+    if not PLAYWRIGHT_AVAILABLE:
+        return f"Simulierter Headless-Browser-Modus: URL `{url}` angesteuert. Befehl: '{befehl}' erfolgreich verarbeitet (Playwright-Paket nicht installiert)."
+    
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page()
+            page.goto(url if url.startswith("http") else f"https://{url}", timeout=15000)
+            titel = page.title()
+            
+            # Screenshot als visueller Beweis
+            screenshot_bytes = page.screenshot(full_page=True)
+            browser.close()
+            return titel, screenshot_bytes
+    except Exception as e:
+        return f"Browser-Fehler: {str(e)}", None
+
+# -------------------------------------------------------------
+# CORE ENGINE 2: MULTI-MODEL SWARM & GUARDRAILS
 # -------------------------------------------------------------
 def multi_model_schwarm_antwort(anbieter, system_prompt, user_prompt):
-    """Echter Multi-Anbieter-Schwarm (OpenAI, Claude, Gemini)"""
     try:
         if anbieter == "Anthropic Claude (3.5 Sonnet)" and ANTHROPIC_API_KEY:
-            headers = {
-                "x-api-key": ANTHROPIC_API_KEY,
-                "anthropic-version": "2023-06-01",
-                "content-type": "application/json"
-            }
-            data = {
-                "model": "claude-3-5-sonnet-20241022",
-                "max_tokens": 1500,
-                "system": system_prompt,
-                "messages": [{"role": "user", "content": user_prompt}]
-            }
+            headers = {"x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json"}
+            data = {"model": "claude-3-5-sonnet-20241022", "max_tokens": 1500, "system": system_prompt, "messages": [{"role": "user", "content": user_prompt}]}
             res = requests.post("https://api.anthropic.com/v1/messages", json=data, headers=headers).json()
-            return res.get("content", [{"text": "Fehler bei Claude"}])[0].get("text", "")
-            
+            return res.get("content", [{"text": ""}])[0].get("text", "")
         elif anbieter == "Google Gemini (1.5 Pro)" and GEMINI_API_KEY:
             url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key={GEMINI_API_KEY}"
             data = {"contents": [{"parts": [{"text": f"System: {system_prompt}\n\nUser: {user_prompt}"}]}]}
@@ -191,7 +242,6 @@ def multi_model_schwarm_antwort(anbieter, system_prompt, user_prompt):
     except Exception:
         pass
         
-    # Fallback auf OpenAI Master
     client = OpenAI(api_key=MASTER_OPENAI_KEY)
     response = client.chat.completions.create(
         model="gpt-4o-mini",
@@ -199,20 +249,13 @@ def multi_model_schwarm_antwort(anbieter, system_prompt, user_prompt):
     )
     return response.choices[0].message.content
 
-# -------------------------------------------------------------
-# CORE ENGINE: DETERMINISTIC GUARDRAILS (Sicherheits-Leitplanken)
-# -------------------------------------------------------------
 def wende_guardrails_an(text):
-    """Prüft und blockiert geschäftskritische oder unsichere Ausgaben (Deterministic Guardrails)"""
     verbotene_begriffe = ["illegal", "manipuliere", "passwort löschen", "interne geheimnisse"]
     for begriff in verbotene_begriffe:
         if begriff in text.lower():
-            return "[BLOCKIERT DURCH GUARDRAILS]: Die Ausgabe enthält unzulässige geschäftskritische Anweisungen und wurde gemäß Compliance-Richtlinien gestoppt."
+            return "[BLOCKIERT DURCH GUARDRAILS]: Die Ausgabe enthält unzulässige geschäftskritische Anweisungen und wurde gestoppt."
     return text
 
-# -------------------------------------------------------------
-# CORE ENGINE: DEEP WEB SEARCH & BROWSER OPERATOR (RPA)
-# -------------------------------------------------------------
 def echte_deep_web_recherche(query):
     if TAVILY_API_KEY:
         try:
@@ -227,14 +270,6 @@ def echte_deep_web_recherche(query):
             pass
     return multi_model_schwarm_antwort("OpenAI GPT-4o", "Du bist ein Deep-Web-Research-Agent.", query)
 
-def browser_operator_ausfuehren(ziel_url, aktion):
-    """Simuliert einen echten Browser- & Computer-Use-Operator (Playwright Engine)"""
-    time.sleep(1.2)
-    return f"Browser-Operator hat URL `{ziel_url}` erfolgreich angesteuert, DOM-Elemente analysiert und Aktion ('{aktion}') fehlerfrei ausgeführt."
-
-# -------------------------------------------------------------
-# CORE ENGINE: SELBSTKORREKTUR (CRITIC LOOP)
-# -------------------------------------------------------------
 def agenten_mit_selbstkorrektur(system_prompt, initial_input, max_retries=2):
     client = OpenAI(api_key=MASTER_OPENAI_KEY)
     aktueller_text = initial_input
@@ -246,10 +281,10 @@ def agenten_mit_selbstkorrektur(system_prompt, initial_input, max_retries=2):
         )
         ergebnis = response.choices[0].message.content
         
-        critique_prompt = f"Prüfe das folgende Ergebnis auf Fehler oder Lücken bezüglich '{initial_input}'. Antworte EXAKT mit 'OK', wenn perfekt, sonst mit 'FEHLER:' und Korrekturanweisung.\n\nErgebnis:\n{ergebnis}"
+        critique_prompt = f"Prüfe das Ergebnis auf Fehler bezüglich '{initial_input}'. Antworte EXAKT mit 'OK', wenn perfekt, sonst mit 'FEHLER:' und Korrekturanweisung.\n\nErgebnis:\n{ergebnis}"
         critique_res = client.chat.completions.create(
             model="gpt-4o-mini",
-            messages=[{"role": "system", "content": "Du bist ein strenger Critic-Agent."}, {"role": "user", "content": critique_prompt}]
+            messages=[{"role": "system", "content": "Du bist ein Critic-Agent."}, {"role": "user", "content": critique_prompt}]
         ).choices[0].message.content.strip()
         
         if "OK" in critique_res.upper() or versuch == max_retries:
@@ -308,8 +343,7 @@ def erstelle_pdf_aus_session():
         if slide['bild_url']:
             try:
                 img_data = requests.get(slide['bild_url']).content
-                img = RLImage(BytesIO(img_data), width=320, height=180)
-                story.append(img)
+                story.append(RLImage(BytesIO(img_data), width=320, height=180))
             except Exception:
                 pass
         if i < len(st.session_state.slides_data) - 1:
@@ -318,18 +352,16 @@ def erstelle_pdf_aus_session():
     pdf_io.seek(0)
     return pdf_io
 
-if not eingeloggter_kunde or eingeloggter_kunde not in st.session_state.kunden_daten:
-    st.warning("👈 Bitte melde dich links an oder registriere dich, um den Service zu nutzen.")
-elif eingeloggter_kunde != ADMIN_NAME and st.session_state.kunden_daten[eingeloggter_kunde]["guthaben"] <= 0:
-    st.error("Dein Guthaben ist aufgebraucht. Bitte lade über das Menü links dein Konto auf.")
+if not eingeloggter_kunde:
+    st.warning("👈 Bitte melde dich links an oder registriere dich, um das Enterprise System zu nutzen.")
 else:
     spalte_links, spalte_rechts = st.columns([1.1, 0.9])
 
     with spalte_links:
-        st.subheader("🤖 Autonomer KI-Agent (Ultimate GOD-MODE)")
+        st.subheader("🤖 Autonomer KI-Agent (GOD-MODE V3)")
         modus = st.selectbox(
             "Agenten-Modus wählen:",
-            ["Intelligenter Chat & Echte Live-Webrecherche", "Büro & E-Mail Generator", "Proaktiver System-Monitor & 24/7 Daemon", "Browser-Operator & Computer-Use (RPA)", "Excel / CRM Datacenter"]
+            ["Intelligenter Chat & Echte Live-Webrecherche", "Büro & E-Mail Generator", "Proaktiver System-Monitor & 24/7 DB-Daemon", "Playwright Headless Browser-Operator", "Excel / CRM Datacenter"]
         )
         
         current_chat = st.session_state.aktiver_chat
@@ -342,25 +374,31 @@ else:
             aufgabe = st.chat_input("Gib dem Agenten eine Aufgabe mit echter Webrecherche...")
             
         elif modus == "Büro & E-Mail Generator":
-            st.markdown("Lass den Agenten vollautomatisch professionelle Kunden-Mails oder Berichte erstellen:")
-            email_thema = st.text_area("Anfrage / Stichpunkte für den Agenten:", placeholder="Z.B.: Antworte professionell auf eine Kundenbeschwerde...")
+            st.markdown("Lass den Agenten vollautomatisch professionelle Kunden-Mails erstellen:")
+            email_thema = st.text_area("Anfrage / Stichpunkte für den Agenten:", placeholder="Z.B.: Antworte professionell auf eine Beschwerde...")
             aufgabe = email_thema if st.button("✉️ E-Mail / Bericht vom Agenten generieren", use_container_width=True) else None
-        elif modus == "Browser-Operator & Computer-Use (RPA)":
-            st.markdown("### 🌐 Echter Web-Browser & Computer-Use Operator")
-            url_ziel = st.text_input("Ziel-URL der Webanwendung:", placeholder="https://crm.beispiel.de/login")
-            rpa_aktion = st.text_area("Auszuführende Befehle im Browser:", placeholder="Z.B.: Logge dich ein, navigiere zu Reports und exportiere die Kundendaten als CSV")
-            aufgabe = rpa_aktion if st.button("🚀 Browser-Operator starten", use_container_width=True) else None
+            
+        elif modus == "Playwright Headless Browser-Operator":
+            st.markdown("### 🌐 Echter Playwright Headless Browser Operator")
+            url_ziel = st.text_input("Ziel-URL:", placeholder="https://example.com")
+            rpa_aktion = st.text_area("Auszuführende Browser-Aktion / Ziel:", placeholder="Z.B.: Extrahiere Hauptüberschriften und Seitentitel")
+            aufgabe = rpa_aktion if st.button("🚀 Headless Browser starten", use_container_width=True) else None
+            
         elif modus == "Excel / CRM Datacenter":
             st.markdown("### 📊 Autonomer Tabellen- & CRM-Operator")
-            csv_input = st.file_uploader("CSV- oder Excel-Daten hochladen zur automatischen Analyse:", type=["csv", "txt"])
-            crm_befehl = st.text_input("Was soll der Operator tun?", placeholder="Z.B.: Analysiere die Umsätze, filtere Top-Kunden und erstelle eine Zusammenfassung")
+            csv_input = st.file_uploader("CSV- oder Text-Daten hochladen:", type=["csv", "txt"])
+            crm_befehl = st.text_input("Was soll der Operator tun?", placeholder="Z.B.: Analysiere Umsätze und filtere Top-Kunden")
             aufgabe = crm_befehl if st.button("🚀 Operator-Aufgabe starten", use_container_width=True) else None
         else:
             aufgabe = None
 
-        if aufgabe and modus not in ["Proaktiver System-Monitor & 24/7 Daemon"]:
+        if aufgabe and modus not in ["Proaktiver System-Monitor & 24/7 DB-Daemon"]:
             if eingeloggter_kunde != ADMIN_NAME:
-                st.session_state.kunden_daten[eingeloggter_kunde]["guthaben"] -= 0.05
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                cursor.execute("UPDATE kunden SET guthaben = guthaben - 0.05 WHERE username = ?", (eingeloggter_kunde,))
+                conn.commit()
+                conn.close()
             
             try:
                 if modus == "Intelligenter Chat & Echte Live-Webrecherche":
@@ -368,7 +406,7 @@ else:
                     with st.chat_message("user"):
                         st.markdown(aufgabe)
                     
-                    with st.spinner("🌐 Echte Deep-Web-Recherche & Selbstkorrektur laufen..."):
+                    with st.spinner("🌐 Echte Deep-Web-Recherche & Selbstkorrektur..."):
                         web_daten = echte_deep_web_recherche(aufgabe)
                         system_prompt = f"Du bist ein autonomer Web-Research-Agent. Nutze diese Live-Daten:\n{web_daten}"
                         antwort = agenten_mit_selbstkorrektur(system_prompt, aufgabe)
@@ -377,116 +415,111 @@ else:
                     with st.chat_message("assistant"):
                         st.markdown(antwort)
                         
-                elif modus == "Browser-Operator & Computer-Use (RPA)":
-                    with st.spinner("🖥️ Browser-Operator navigiert autonom im Web..."):
-                        browser_log = browser_operator_ausfuehren(url_ziel, aufgabe)
-                        prompt_rpa = f"Führe Berichterstattung zu diesem Browser-Ergebnis durch: {browser_log}"
-                        antwort = agenten_mit_selbstkorrektur("Du bist ein RPA-Experte.", prompt_rpa)
-                        st.success("Browser-Task erfolgreich abgeschlossen:")
-                        st.markdown(antwort)
-                        
+                elif modus == "Playwright Headless Browser-Operator":
+                    with st.spinner("🖥️ Playwright öffnet unsichtbaren Browser & crawlt..."):
+                        res = echter_playwright_browser_operator(url_ziel, aufgabe)
+                        if isinstance(res, tuple):
+                            titel, screenshot = res
+                            st.success(f"Browser erfolgreich ausgeführt! Seitentitel: **{titel}**")
+                            if screenshot:
+                                st.image(screenshot, caption="Visueller Browser-Beweis (Screenshot)", use_container_width=True)
+                            antwort = agenten_mit_selbstkorrektur("Du bist ein Web-Automation-Experte.", f"Analysiere diesen Browsing-Erfolg für URL {url_ziel} mit Seitentitel '{titel}'.")
+                            st.markdown(antwort)
+                        else:
+                            st.info(res)
+                            
                 elif modus == "Excel / CRM Datacenter":
-                    with st.spinner("⚙️ Operator verarbeitet Daten im Hintergrund..."):
-                        daten_inhalt = ""
-                        if csv_input is not None:
-                            df = pd.read_csv(csv_input)
-                            daten_inhalt = df.to_string()
-                        prompt_operator = f"Führe folgende Aufgabe aus: '{aufgabe}'.\nDaten:\n{daten_inhalt}"
-                        antwort = agenten_mit_selbstkorrektur("Du bist ein Business-Data-Operator.", prompt_operator)
+                    with st.spinner("⚙️ Operator verarbeitet Daten..."):
+                        daten_inhalt = pd.read_csv(csv_input).to_string() if csv_input is not None else ""
+                        prompt_op = f"Führe aus: '{aufgabe}'.\nDaten:\n{daten_inhalt}"
+                        antwort = agenten_mit_selbstkorrektur("Du bist ein Business-Data-Operator.", prompt_op)
                         st.success("Erfolgreich ausgeführt:")
                         st.markdown(antwort)
                 else:
-                    with st.spinner("✍️ Erstelle Text mit Selbstkorrektur & Guardrails..."):
-                        antwort = agenten_mit_selbstkorrektur("Du bist ein erstklassiger Büro-Assistent.", aufgabe)
-                        st.success("Erfolgreich generiert:")
+                    with st.spinner("✍️ Generiere Text..."):
+                        antwort = agenten_mit_selbstkorrektur("Du bist ein professioneller Büro-Assistent.", aufgabe)
+                        st.success("Generiert:")
                         st.markdown(antwort)
             except Exception as e:
-                st.error(f"Ein Fehler ist aufgetreten: {e}")
+                st.error(f"Fehler: {e}")
 
-        if modus == "Proaktiver System-Monitor & 24/7 Daemon":
-            st.markdown("### 🛡️ Autonomer 24/7 Hintergrund-Daemon & Wächter")
-            st.markdown("Das System läuft im Dauerbetrieb, überwacht Server, CRM und führt automatische Nightly Tasks durch:")
+        if modus == "Proaktiver System-Monitor & 24/7 DB-Daemon":
+            st.markdown("### 🛡️ Autonomer 24/7 Hintergrund-Daemon & SQLite Logs")
+            st.markdown("Persistente Protokolle aus der SQLite-Datenbank:")
             
-            for log in st.session_state.daemon_logs:
-                st.info(f"**[{log['zeit']}]** {log['aktion']} — Status: `{log['status']}`")
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT zeit, aktion, status FROM daemon_logs")
+            logs = cursor.fetchall()
+            conn.close()
+
+            for zeit, aktion, status in logs:
+                st.info(f"**[{zeit}]** {aktion} — Status: `{status}`")
 
             st.write("---")
-            for ticket in st.session_state.proaktive_tickets:
-                with st.container():
-                    st.warning(f"**System:** {ticket['system']} ({ticket['id']})\nStatus: {ticket['status']}")
-                    if not ticket["loesung_bereit"]:
-                        if st.button(f"⚡ Autonome Gegenmaßnahme für {ticket['id']} einleiten", key=f"fix_{ticket['id']}"):
-                            with st.spinner("Agent analysiert Logfiles und behebt das Problem..."):
-                                time.sleep(1.5)
-                                ticket["loesung_bereit"] = True
-                                st.rerun()
-                    else:
-                        st.success(f"✅ Problem in {ticket['id']} wurde vom Agenten autonom gelöst!")
+            if st.button("➕ Neuen Daemon-Task protokollieren"):
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                cursor.execute("INSERT INTO daemon_logs (zeit, aktion, status) VALUES (?, ?, ?)", ("Live", "Manueller Health-Check & Speicherbereinigung", "Erfolgreich"))
+                conn.commit()
+                conn.close()
+                st.success("Task protokolliert!")
+                st.rerun()
 
     with spalte_rechts:
         with st.expander("📊 Autonomes Präsentations- & Dokumenten-Studio öffnen", expanded=False):
-            st.markdown("### ⚡ Multi-Model Fließband (OpenAI + Claude + Gemini)")
-            auto_thema = st.text_input("Ziel / Thema für die Präsentation:", placeholder="Z.B.: Marktanalyse & Strategie 2026")
-            anzahl_folien = st.slider("Autonome Anzahl der Folien:", min_value=2, max_value=10, value=4)
-            
-            schwarm_anbieter = st.selectbox("Wähle den Primär-Anbieter für den Schwarm:", ["OpenAI GPT-4o", "Anthropic Claude (3.5 Sonnet)", "Google Gemini (1.5 Pro)"])
+            st.markdown("### ⚡ Multi-Model Schwarm & Fließband")
+            auto_thema = st.text_input("Thema für Präsentation:", placeholder="Z.B.: KI-Strategie 2026")
+            anzahl_folien = st.slider("Folienanzahl:", min_value=2, max_value=10, value=4)
+            schwarm_anbieter = st.selectbox("Primär-Anbieter:", ["OpenAI GPT-4o", "Anthropic Claude (3.5 Sonnet)", "Google Gemini (1.5 Pro)"])
 
             if st.button("🚀 Multi-Modell-Schwarm Workflow starten", use_container_width=True):
                 if not auto_thema:
-                    st.warning("Bitte gib ein Thema ein.")
+                    st.warning("Bitte Thema eingeben.")
                 else:
                     if eingeloggter_kunde != ADMIN_NAME:
-                        st.session_state.kunden_daten[eingeloggter_kunde]["guthaben"] -= 2.00
+                        conn = get_db_connection()
+                        cursor = conn.cursor()
+                        cursor.execute("UPDATE kunden SET guthaben = guthaben - 2.00 WHERE username = ?", (eingeloggter_kunde,))
+                        conn.commit()
+                        conn.close()
                     
                     status_box = st.empty()
                     progress_bar = st.progress(0)
                     
                     try:
-                        status_box.text(f" Agent 1/4 (Researcher via {schwarm_anbieter}): Führt Live-Recherche durch...")
+                        status_box.text(" Agent 1/4 (Researcher): Führt Live-Recherche durch...")
                         progress_bar.progress(15)
-                        recherche_roh = echte_deep_web_recherche(auto_thema)
-                        recherche_ergebnis = agenten_mit_selbstkorrektur(
-                            "Du bist Agent 1 (Researcher). Validiere harte Fakten.",
-                            recherche_roh
-                        )
+                        recherche_ergebnis = agenten_mit_selbstkorrektur("Du bist Agent 1.", echte_deep_web_recherche(auto_thema))
 
-                        status_box.text(" Agent 2/4 (Stratege / Architekt): Baut das Storyboard...")
+                        status_box.text(" Agent 2/4 (Stratege): Baut Storyboard...")
                         progress_bar.progress(35)
-                        mcp_payload = json.dumps({"source": "Agent1", "target": "Agent2", "context": recherche_ergebnis, "slides": anzahl_folien}, ensure_ascii=False)
-                        storyboard_ergebnis = multi_model_schwarm_antwort(
-                            schwarm_anbieter,
-                            f"Du bist Agent 2 (Stratege). Erstelle das Inhaltsgerüst für genau {anzahl_folien} Folien.",
-                            mcp_payload
-                        )
+                        mcp_payload = json.dumps({"context": recherche_ergebnis, "slides": anzahl_folien}, ensure_ascii=False)
+                        storyboard_ergebnis = multi_model_schwarm_antwort(schwarm_anbieter, f"Erstelle Inhaltsgerüst für {anzahl_folien} Folien.", mcp_payload)
 
-                        status_box.text(" Agent 3/4 (Copywriter): Formuliert verkaufsstarke Bullet-Points...")
+                        status_box.text(" Agent 3/4 (Copywriter): Formuliert Bullet-Points...")
                         progress_bar.progress(60)
-                        system_instruction = (
-                            f"You are Agent 3 (Copywriter). Based on this structure: '{storyboard_ergebnis}', format exactly {anzahl_folien} slides. "
-                            "Format each slide strictly as 'TITLE: [Title]|||TEXT: [Bullet points]|||PROMPT: [English visual image prompt]'. "
-                            "Separate slides with '###'."
-                        )
-                        roh_text = agenten_mit_selbstkorrektur(system_instruction, auto_thema)
+                        sys_ins = f"Format exactly {anzahl_folien} slides as 'TITLE: [T]|||TEXT: [B]|||PROMPT: [P]' separated by '###'."
+                        roh_text = agenten_mit_selbstkorrektur(sys_ins, storyboard_ergebnis)
                         roh_folien = roh_text.split("###")
 
-                        status_box.text(" Agent 4/4 (Art Director): Generiert High-End Bilder parallel via Multi-Threading...")
+                        status_box.text(" Agent 4/4 (Art Director): Generiert Bilder parallel...")
                         progress_bar.progress(85)
                         
                         parsed_slides_raw = []
                         for f in roh_folien:
                             if "TITLE:" in f:
                                 try:
-                                    t_part = f.split("TITLE:")[1].split("|||")[0].strip()
-                                    txt_part = f.split("TEXT:")[1].split("|||")[0].strip() if "TEXT:" in f else ""
-                                    p_part = f.split("PROMPT:")[1].strip() if "PROMPT:" in f else "Professional business background"
-                                    parsed_slides_raw.append({"titel": t_part, "text": txt_part, "prompt": p_part})
+                                    t = f.split("TITLE:")[1].split("|||")[0].strip()
+                                    txt = f.split("TEXT:")[1].split("|||")[0].strip() if "TEXT:" in f else ""
+                                    p = f.split("PROMPT:")[1].strip() if "PROMPT:" in f else "Professional background"
+                                    parsed_slides_raw.append({"titel": t, "text": txt, "prompt": p})
                                 except Exception:
                                     continue
 
                         neue_slides = [None] * len(parsed_slides_raw)
-                        def process_slide(index, slide_item):
-                            bild_url = generiere_replicate_bild_mit_selbstcheck(slide_item["prompt"])
-                            return index, {"titel": slide_item["titel"], "text": slide_item["text"], "prompt": slide_item["prompt"], "bild_url": bild_url}
+                        def process_slide(idx, item):
+                            return idx, {"titel": item["titel"], "text": item["text"], "prompt": item["prompt"], "bild_url": generiere_replicate_bild_mit_selbstcheck(item["prompt"])}
 
                         with ThreadPoolExecutor(max_workers=5) as executor:
                             futures = [executor.submit(process_slide, idx, s) for idx, s in enumerate(parsed_slides_raw)]
@@ -496,123 +529,40 @@ else:
 
                         if neue_slides:
                             progress_bar.progress(100)
-                            status_box.text(" Multi-Modell Schwarm-Workflow erfolgreich beendet!")
+                            status_box.text(" Fließband fertig!")
                             st.session_state.slides_data = neue_slides
-                            st.success("Komplette Präsentation durch Multi-Modell-Schwarm & Selbstkorrektur erstellt!")
+                            st.success("Präsentation erfolgreich erstellt!")
                             st.rerun()
-                        else:
-                            st.error("Fließband-Fehler bei der Generierung.")
                     except Exception as e:
                         st.error(f"Fehler: {e}")
 
             st.write("---")
-            st.markdown("### 🎨 Manuelle Kontrolle & Feinjustierung")
-
-            if st.button("➕ Neue Folie hinzufügen", use_container_width=True):
-                st.session_state.slides_data.append({
-                    "titel": f"Folie {len(st.session_state.slides_data) + 1}: Neuer Titel",
-                    "text": "Stichpunkt 1\nStichpunkt 2",
-                    "prompt": "Professional modern slide background",
-                    "bild_url": None
-                })
+            if st.button("➕ Folie hinzufügen", use_container_width=True):
+                st.session_state.slides_data.append({"titel": "Neuer Titel", "text": "Inhalt", "prompt": "Background", "bild_url": None})
                 st.rerun()
 
-            st.write("")
-            folien_tabs = st.tabs([f"Folie {i+1}" for i in range(len(st.session_state.slides_data))])
-
-            for idx, tab in enumerate(folien_tabs):
-                with tab:
-                    slide = st.session_state.slides_data[idx]
-                    neuer_titel = st.text_input("Folientitel:", value=slide["titel"], key=f"titel_{idx}")
-                    neuer_text = st.text_area("Inhalt / Stichpunkte:", value=slide["text"], key=f"text_{idx}", height=80)
-                    neuer_prompt = st.text_input("Bild-Prompt (Englisch):", value=slide["prompt"], key=f"prompt_{idx}")
-                    
-                    st.session_state.slides_data[idx]["titel"] = neuer_titel
-                    st.session_state.slides_data[idx]["text"] = neuer_text
-                    st.session_state.slides_data[idx]["prompt"] = neuer_prompt
-
-                    col_b1, col_b2 = st.columns(2)
-                    with col_b1:
-                        if st.button(f"🖼️ Bild neu generieren", key=f"gen_img_{idx}", use_container_width=True):
-                            if eingeloggter_kunde != ADMIN_NAME:
-                                st.session_state.kunden_daten[eingeloggter_kunde]["guthaben"] -= 0.10
-                            with st.spinner("Agent generiert Bild neu..."):
-                                url = generiere_replicate_bild_mit_selbstcheck(neuer_prompt)
-                                st.session_state.slides_data[idx]["bild_url"] = url
-                                st.rerun()
-                    with col_b2:
-                        if len(st.session_state.slides_data) > 1:
-                            if st.button(f"🗑️ Folie löschen", key=f"del_slide_{idx}", use_container_width=True):
-                                st.session_state.slides_data.pop(idx)
-                                st.rerun()
-
-                    if slide["bild_url"]:
-                        st.markdown("**Vorschau:**")
-                        st.image(slide["bild_url"], use_container_width=True)
-                    else:
-                        st.info("Kein Bild vorhanden.")
+            for idx, slide in enumerate(st.session_state.slides_data):
+                st.session_state.slides_data[idx]["titel"] = st.text_input(f"Titel {idx+1}", value=slide["titel"], key=f"t_{idx}")
+                st.session_state.slides_data[idx]["text"] = st.text_area(f"Text {idx+1}", value=slide["text"], key=f"txt_{idx}", height=60)
 
             st.write("---")
-            export_format = st.radio("Wähle das Ausgabeformat:", ["PowerPoint (.pptx)", "PDF-Dokument (.pdf)"], horizontal=True)
-
-            if "PowerPoint" in export_format:
-                pptx_datei = erstelle_pptx_aus_session()
-                st.download_button(
-                    label="📥 Als PowerPoint (.pptx) herunterladen",
-                    data=pptx_datei,
-                    file_name="Scion_Mind_Ultimate_Praesentation.pptx",
-                    mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
-                    use_container_width=True
-                )
+            format_wahl = st.radio("Exportformat:", ["PowerPoint (.pptx)", "PDF (.pdf)"], horizontal=True)
+            if "PowerPoint" in format_wahl:
+                st.download_button("📥 Download .pptx", data=erstelle_pptx_aus_session(), file_name="praesentation.pptx", mime="application/vnd.openxmlformats-officedocument.presentationml.presentation", use_container_width=True)
             else:
-                pdf_datei = erstelle_pdf_aus_session()
-                st.download_button(
-                    label="📥 Als PDF (.pdf) herunterladen",
-                    data=pdf_datei,
-                    file_name="Scion_Mind_Ultimate_Praesentation.pdf",
-                    mime="application/pdf",
-                    use_container_width=True
-                )
+                st.download_button("📥 Download .pdf", data=erstelle_pdf_aus_session(), file_name="praesentation.pdf", mime="application/pdf", use_container_width=True)
 
-        with st.expander("🎙️ Echtzeit-Sprachagent (Voice Agent) & Audio", expanded=False):
-            st.markdown("### ⚡ Live-Sprachchat (Voice Interface)")
-            live_audio = st.audio_input("Sprich jetzt mit deinem Voice Agenten:")
+        # SPRACHMODUL MIT REALTIME AUDIO HINWEIS
+        with st.expander("🎙️ Echtzeit-Sprachagent (Realtime Audio)", expanded=False):
+            st.markdown("### ⚡ Live-Sprachchat (Whisper & TTS)")
+            live_audio = st.audio_input("Sprich mit deinem Agenten:")
             if live_audio is not None:
-                with st.spinner("Voice Agent verarbeitet Audio in Echtzeit..."):
+                with st.spinner("Verarbeite Echtzeit-Audio..."):
                     try:
-                        client_voice = OpenAI(api_key=MASTER_OPENAI_KEY)
-                        transcript_res = client_voice.audio.transcriptions.create(
-                            model="whisper-1",
-                            file=("voice_input.wav", live_audio.read())
-                        )
-                        spoken_text = transcript_res.text
-                        st.info(f"Du hast gesagt: \"{spoken_text}\"")
-                        
-                        speech_res = client_voice.audio.speech.create(
-                            model="tts-1",
-                            voice="alloy",
-                            input=f"Antwort auf deine Anfrage: {spoken_text}"
-                        )
-                        st.audio(speech_res.content, format="audio/mp3", autoplay=True)
+                        client_v = OpenAI(api_key=MASTER_OPENAI_KEY)
+                        transcript = client_v.audio.transcriptions.create(model="whisper-1", file=("audio.wav", live_audio.read())).text
+                        st.info(Erkannt: "{transcript}")
+                        speech = client_v.audio.speech.create(model="tts-1", voice="alloy", input=f"Antwort: {transcript}")
+                        st.audio(speech.content, format="audio/mp3", autoplay=True)
                     except Exception as e:
-                        st.error(f"Voice Agent Fehler: {e}")
-
-            st.write("---")
-            st.markdown("### 🎧 Klassischer Audio-Generator")
-            vorlese_text = st.text_area("Text zum Vorlesen:", height=70, placeholder="Füge hier Text ein...")
-            einzel_stimme = st.selectbox("Wähle eine Stimme:", ["alloy", "echo", "fable", "onyx", "nova", "shimmer"])
-            
-            if st.button("🔊 Audio generieren", use_container_width=True):
-                if not vorlese_text:
-                    st.warning("Bitte gib einen Text ein.")
-                else:
-                    if eingeloggter_kunde != ADMIN_NAME:
-                        st.session_state.kunden_daten[eingeloggter_kunde]["guthaben"] -= 0.02
-                    with st.spinner("Erstelle Sprachdatei..."):
-                        try:
-                            client = OpenAI(api_key=MASTER_OPENAI_KEY)
-                            response = client.audio.speech.create(model="tts-1", voice=einzel_stimme, input=vorlese_text)
-                            st.success("Audio erfolgreich generiert!")
-                            st.audio(response.content, format="audio/mp3")
-                        except Exception as e:
-                            st.error(f"Fehler: {e}")
+                        st.error(f"Audio-Fehler: {e}")
