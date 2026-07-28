@@ -41,7 +41,7 @@ if "kunden_daten" not in st.session_state:
     }
 
 with st.sidebar:
-    st.header("🔑 Account & Login")
+    st.header("🔑 Konto & Login")
     auth_modus = st.radio("Aktion wählen:", ["Einloggen", "Neuen Account erstellen"])
     
     eingeloggter_kunde = None
@@ -64,7 +64,7 @@ with st.sidebar:
         
         if st.button("Account registrieren"):
             if not reg_name or not reg_pass:
-                st.warning("Bitte alle Felder ausfüllen.")
+                st.warning("Bitte fülle alle Felder aus.")
             elif reg_name in st.session_state.kunden_daten:
                 st.error("Dieser Benutzername ist bereits vergeben.")
             else:
@@ -178,7 +178,7 @@ else:
     spalte_links, spalte_rechts = st.columns([1.2, 0.8])
 
     with spalte_links:
-        st.subheader("🤖 KI-Arbeitsbereich (Prompts & Skripte generieren)")
+        st.subheader("🤖 KI-Arbeitsbereich (Skripte & Prompts)")
         modus = st.selectbox(
             "Was möchtest du erstellen lassen?",
             ["Text-Recherche & Chat", "Präsentations-Struktur & Folien", "Video-Skript & Storyboard"]
@@ -193,7 +193,7 @@ else:
                     st.markdown(message["content"])
 
         if modus == "Text-Recherche & Chat" or modus == "Video-Skript & Storyboard":
-            aufgabe = st.chat_input("Stelle deine Frage oder lass dir einen Videoprompt erstellen...")
+            aufgabe = st.chat_input("Stelle deine Frage oder lass dir ein knackiges 30-Sekunden-Skript erstellen...")
         else:
             aufgabe_input = st.text_area("Deine Beschreibung oder Aufgabe dafür:", height=120)
             Absenden = st.button("🚀 Aufgabe jetzt ausführen", use_container_width=True)
@@ -213,10 +213,10 @@ else:
                 system_prompts = {
                     "Text-Recherche & Chat": "Du bist ein präziser, professioneller KI-Assistent. Antworte immer auf Deutsch.",
                     "Präsentations-Struktur & Folien": "Du bist ein Experte für Business-Präsentationen. Erstelle eine saubere Präsentation, bei der jede Folie mit 'Folie X: [Titel]' beginnt, gefolgt von prägnanten Stichpunkten.",
-                    "Video-Skript & Storyboard": "Du bist ein professioneller Videoproduzent. Gib dem Nutzer exakt zwei getrennte Blöcke aus: 1. Einen präzisen, bildhaften englischen Video-Prompt für die KI-Generierung. 2. Einen professionellen Sprechtext auf Deutsch (30-60 Sekunden)."
+                    "Video-Skript & Storyboard": "Du bist ein professioneller Videoproduzent. Erstelle ein kurzes, knackiges Video-Skript (perfekt für 30 bis maximal 45 Sekunden). Gib exakt zwei Blöcke aus: 1. Einen präzisen, bildhaften englischen Video-Prompt. 2. Den dazugehörigen, kurzen deutschen Sprechtext."
                 }
                 
-                messages_payload = [{"role": "system", "content": system_prompts.get(modus, "Du bist ein hilfreicher Assistent.")}]
+                messages_payload = [{"role": "system", "content": system_prompts.get(modus, "Du bist ein hilfreicher Assistent. Antworte immer auf Deutsch.")}]
                 messages_payload.extend(st.session_state.chats[current_chat])
 
                 with st.spinner("🦫 Das Arbeitstier schuftet im Hintergrund..."):
@@ -247,8 +247,8 @@ else:
 
     with spalte_rechts:
         st.subheader("🎥 Echter KI-Video Generator")
-        video_prompt = st.text_area("Videobeschreibung (kopiere deinen Prompt hierher):", height=100, placeholder="Z.B.: Cinematic drone shot over a modern tech office...")
-        sprechender_text = st.text_area("Sprechtext (kopiere deinen Skript-Text hierher):", height=100, placeholder="Füge hier den Text für die Sprachspur ein...")
+        video_prompt = st.text_area("Videobeschreibung (Englischer Prompt):", height=100, placeholder="Z.B.: Cinematic close-up of a modern tech product on a desk...")
+        sprechender_text = st.text_area("Sprechtext (ideal für 30-45 Sekunden):", height=100, placeholder="Füge hier den kurzen Sprechtext ein...")
         stimme = st.selectbox("Sprecher-Stimme:", ["alloy", "echo", "fable", "onyx", "nova", "shimmer"])
         
         if st.button("🎬 Video & Audio generieren", use_container_width=True):
