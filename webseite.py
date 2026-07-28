@@ -72,7 +72,7 @@ try:
 except ImportError:
     FASTAPI_AVAILABLE = False
 
-st.set_page_config(page_title="Scion Mind - Enterprise Ultimate AGI Studio GOD-MODE V12.21", layout="wide")
+st.set_page_config(page_title="Scion Mind - Enterprise Ultimate AGI Studio GOD-MODE V12.22", layout="wide")
 
 # ROBUSTES DARK/LIGHT-MODE CSS
 st.markdown("""
@@ -88,7 +88,7 @@ st.markdown("""
 
 st.title("Scion-Mind - Ultimate Studio (Vollständige Enterprise Edition)")
 st.markdown("*designed by Christian Schmidt*") 
-st.markdown("*Powered by Autonomer Auto-Router, Episodischem Memory, P&L-Engine & Multi-Format Export*")
+st.markdown("*Powered by Autonomer Auto-Router, Admin-Zentrale, Episodischem Memory & Multi-Format Export*")
 st.write("---")
 
 MASTER_OPENAI_KEY = st.secrets["OPENAI_API_KEY"]
@@ -207,6 +207,8 @@ def init_db():
     cursor.execute("SELECT * FROM kunden WHERE username = ?", (ADMIN_NAME,))
     if not cursor.fetchone():
         cursor.execute("INSERT INTO kunden VALUES (?, ?, ?, ?, ?)", (ADMIN_NAME, ADMIN_PASS, 999.00, "Administrator", "Global-Executive"))
+    else:
+        cursor.execute("UPDATE kunden SET rolle = ?, workspace = ? WHERE username = ?", ("Administrator", "Global-Executive", ADMIN_NAME))
     conn.commit()
     conn.close()
 
@@ -234,6 +236,15 @@ def guthaben_gutschreiben(username, betrag, grund="Admin-Gutschrift"):
     cursor = conn.cursor()
     cursor.execute("UPDATE kunden SET guthaben = guthaben + ? WHERE username = ?", (betrag, username))
     cursor.execute("INSERT INTO guthaben_historie (zeit, username, typ, betrag, grund) VALUES (datetime('now', 'localtime'), ?, 'Gutschrift', ?, ?)",
+                   (username, betrag, grund))
+    conn.commit()
+    conn.close()
+
+def guthaben_einziehen(username, betrag, grund="Admin-Einzug"):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("UPDATE kunden SET guthaben = MAX(0.0, guthaben - ?) WHERE username = ?", (betrag, username))
+    cursor.execute("INSERT INTO guthaben_historie (zeit, username, typ, betrag, grund) VALUES (datetime('now', 'localtime'), ?, 'Abzug', ?, ?)",
                    (username, betrag, grund))
     conn.commit()
     conn.close()
@@ -340,15 +351,64 @@ with st.sidebar:
         guthaben, rolle, workspace = row if row else (0.0, "Standard", "Default")
 
         st.markdown(f"### 👤 {eingeloggter_kunde}")
+        st.caption(f"🛡️ Rolle: **{rolle}** | Workspace: `{workspace}`")
         st.caption(f"💰 Guthaben: **{guthaben:.2f} €**")
         
+        # VOLLSTÄNDIG WIEDERHERGESTELLTE ADMIN-ZENTRALE IN DER SEITENLEISTE
         if eingeloggter_kunde == ADMIN_NAME:
-            with st.expander("👑 Admin-Zentrale", expanded=False):
-                admin_betrag = st.number_input("Guthaben Betrag:", value=10.0)
-                if st.button("➕ Guthaben aufladen"):
-                    guthaben_gutschreiben(ADMIN_NAME, admin_betrag)
-                    st.success("Gutschrift erfolgt!")
-                    st.rerun()
+            with st.expander("👑 Admin-Zentrale (Guthaben & Audit)", expanded=True):
+                st.markdown("#### Nutzer verwalten:")
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                cursor.execute("SELECT username, guthaben FROM kunden")
+                user_Rows = cursor.fetchall()
+                conn.close()
+                
+                user_dict = {f"{u[0]} (Guthaben: {u[1]:.2f} €)": u[0] for u in user_Rows} if user_Rows else {}
+                anzeige_liste = list(user_dict.keys())
+                
+                if anzeige_liste:
+                    ausgewaehlte_anzeige = st.selectbox("Account wählen:", anzeige_liste, key="admin_user_select")
+                    ausgewaehlter_user = user_dict[ausgewaehlte_anzeige]
+                    betrag_input = st.number_input("Betrag in €:", value=1.00, step=0.50, key="admin_betrag_input")
+                    
+                    col_a1, col_a2 = st.columns(2)
+                    with col_a1:
+                        if st.button("➕ Gutschreiben", key="btn_admin_plus"):
+                            if ausgewaehlter_user:
+                                guthaben_gutschreiben(ausgewaehlter_user, betrag_input, grund="Admin-Zentrale Gutschrift")
+                                st.success(f"+{betrag_input:.2f} € für '{ausgewaehlter_user}'!")
+                                time.sleep(0.3)
+                                st.rerun()
+                    with col_a2:
+                        if st.button("➖ Einziehen", key="btn_admin_minus"):
+                            if ausgewaehlter_user:
+                                guthaben_einziehen(ausgewaehlter_user, betrag_input, grund="Admin-Zentrale Einzug")
+                                st.warning(f"-{betrag_input:.2f} € von '{ausgewaehlter_user}'!")
+                                time.sleep(0.3)
+                                st.rerun()
+
+                st.write("---")
+                st.markdown("#### 📜 Transaktions-Audit-Trail")
+                if st.button("Audit-Historie anzeigen"):
+                    conn = get_db_connection()
+                    df_audit = pd.read_sql_query("SELECT * FROM guthaben_historie ORDER BY id DESC LIMIT 10", conn)
+                    conn.close()
+                    st.dataframe(df_audit)
+
+                st.write("---")
+                st.markdown("#### 🔑 Lizenzschlüssel Generator")
+                key_betrag = st.number_input("Schlüssel-Wert in €:", value=5.00, step=1.00, key="gen_val")
+                if st.button("Einmal-Key generieren", key="btn_gen_key"):
+                    neuer_schluessel = f"SCION-{secrets.token_hex(4).upper()}-{secrets.token_hex(4).upper()}"
+                    conn = get_db_connection()
+                    cursor = conn.cursor()
+                    cursor.execute("INSERT INTO lizenz_schluessel (schluessel, betrag, status, erstellt_am) VALUES (?, ?, 'Unbenutzt', datetime('now', 'localtime'))",
+                                   (neuer_schluessel, key_betrag))
+                    conn.commit()
+                    conn.close()
+                    st.success("Generierter Schlüssel:")
+                    st.code(neuer_schluessel)
 
         st.write("---")
         st.markdown("### 💬 Deine Chats")
