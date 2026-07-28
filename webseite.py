@@ -276,15 +276,15 @@ else:
                 with st.spinner("🦫 Der Agent erstellt die Präsentations-Struktur und High-End Bilder..."):
                     try:
                         client = OpenAI(api_key=MASTER_OPENAI_KEY)
-                        # Generiere 3 professionelle Folien im JSON-artigen Textstil
                         completion = client.chat.completions.create(
                             model="gpt-4o-mini",
                             messages=[
-                                {"role": "system", "content": "You are a professional presentation designer. Create exactly 3 slides. Format each slide as 'TITLE: [Title]|||TEXT: [Bullet points]|||PROMPT: [English visual image prompt]'. Separate slides with '###'."},
+                                {"role": "system", "content": "You are a professional presentation designer. Create exactly 3 slides. Format each slide strictly as 'TITLE: [Title]|||TEXT: [Bullet points]|||PROMPT: [English visual image prompt]'. Separate slides with '###'."},
                                 {"role": "user", "content": auto_thema}
                             ]
                         )
-                        roh_text = completion.choices.message.content if hasattr(completion.choices[0], 'message') else completion.choices[0].message.content
+                        # Korrigierter, robuster Zugriff auf den Antwort-Text
+                        roh_text = completion.choices[0].message.content
                         roh_folien = roh_text.split("###")
                         
                         neue_slides = []
@@ -294,7 +294,6 @@ else:
                                 txt_part = f.split("TEXT:")[1].split("|||")[0].strip() if "TEXT:" in f else ""
                                 p_part = f.split("PROMPT:")[1].strip() if "PROMPT:" in f else "Professional business background"
                                 
-                                # Bild direkt über Replicate generieren
                                 bild_url = generiere_replicate_bild(p_part)
                                 neue_slides.append({"titel": t_part, "text": txt_part, "prompt": p_part, "bild_url": bild_url})
                         
@@ -311,7 +310,6 @@ else:
         st.markdown("### 🎨 2. Folien-Studio & Vorschau (Manuell & Erweitert)")
         st.markdown("Füge neue Folien hinzu, bearbeite Titel/Text und sieh dir die generierten Profi-Bilder im Voraus an:")
 
-        # Button zum Hinzufügen einer neuen Folie
         if st.button("➕ Neue Folie hinzufügen"):
             st.session_state.slides_data.append({
                 "titel": f"Folie {len(st.session_state.slides_data) + 1}: Neuer Titel",
@@ -321,14 +319,12 @@ else:
             })
             st.rerun()
 
-        # Tabs für jede einzelne Folie
         folien_tabs = st.tabs([f"Folie {i+1}" for i in range(len(st.session_state.slides_data))])
 
         for idx, tab in enumerate(folien_tabs):
             with tab:
                 slide = st.session_state.slides_data[idx]
                 
-                # Manuelle Bearbeitung
                 neuer_titel = st.text_input("Folientitel:", value=slide["titel"], key=f"titel_{idx}")
                 neuer_text = st.text_area("Inhalt / Stichpunkte:", value=slide["text"], key=f"text_{idx}", height=80)
                 neuer_prompt = st.text_input("Bild-Prompt (Englisch für Replicate):", value=slide["prompt"], key=f"prompt_{idx}")
@@ -353,7 +349,6 @@ else:
                             st.session_state.slides_data.pop(idx)
                             st.rerun()
 
-                # Vorschau des Bildes
                 if slide["bild_url"]:
                     st.markdown("**Vorschau des generierten Bildes:**")
                     st.image(slide["bild_url"], use_container_width=True)
@@ -361,7 +356,6 @@ else:
                     st.info("Noch kein Bild für diese Folie generiert.")
 
         st.write("---")
-        # Download als PowerPoint
         pptx_datei = erstelle_pptx_aus_session()
         st.download_button(
             label="📥 Vollständige Präsentation (.pptx) herunterladen",
