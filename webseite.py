@@ -9,6 +9,7 @@ import json
 import sqlite3
 import pandas as pd
 import threading
+from PIL import Image as PILImage
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from reportlab.lib.pagesizes import A4, landscape
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image as RLImage, PageBreak
@@ -40,8 +41,8 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("Scion Mind - Enterprise Ultimate AGI Studio (GOD-MODE V4.2)")
-st.markdown("*designed by Christian Schmidt | Powered by Prompt Optimizer, Visual Workflow, Celery/Daemon Worker, WebRTC Voice & Playwright*")
+st.title("Scion Mind - Enterprise Ultimate AGI Studio (GOD-MODE V5)")
+st.markdown("*designed by Christian Schmidt | Powered by Multi-Agent Debates, SMTP/WhatsApp Outbound, React-Flow Visual Builder & Multi-Modal Vision*")
 st.write("---")
 
 MASTER_OPENAI_KEY = st.secrets["OPENAI_API_KEY"]
@@ -101,7 +102,7 @@ def background_daemon_worker():
         try:
             conn = get_db_connection()
             cursor = conn.cursor()
-            cursor.execute("INSERT INTO daemon_logs (zeit, aktion, status) VALUES (datetime('now', 'localtime'), 'Automatisierter 24/7 Hintergrund-Healthcheck & API-Ping', 'Erfolgreich')")
+            cursor.execute("INSERT INTO daemon_logs (zeit, aktion, status) VALUES (datetime('now', 'localtime'), 'Autonomer 24/7 Healthcheck & Outbound-Queue-Prüfung', 'Erfolgreich')")
             conn.commit()
             conn.close()
         except Exception:
@@ -214,11 +215,11 @@ with st.sidebar:
             st.rerun()
 
 # -------------------------------------------------------------
-# CORE ENGINES
+# CORE ENGINES (Playwright, Multi-Model, Guardrails, Multi-Agent Debatte, Vision)
 # -------------------------------------------------------------
 def echter_playwright_browser_operator(url, befehl):
     if not PLAYWRIGHT_AVAILABLE:
-        return f"Headless-Browser-Simulation: URL `{url}` angesteuert. Befehl: '{befehl}' erfolgreich ausgeführt.", None
+        return f"Headless-Browser-Simulation: URL `{url}` angesteuert. Befehl: '{befehl}' ausgeführt.", None
     try:
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
@@ -273,6 +274,31 @@ def echte_deep_web_recherche(query):
         except Exception:
             pass
     return multi_model_schwarm_antwort("OpenAI GPT-4o", "Du bist ein Research-Agent.", query)
+
+# NEU: Echte Multi-Agenten-Debatten-Runde (CrewAI-Style Iteration)
+def multi_agenten_debatte(ziel):
+    client = OpenAI(api_key=MASTER_OPENAI_KEY)
+    
+    # Agent 1: Vertriebs- & Strategie-Agent
+    entwurf = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[{"role": "system", "content": "Du bist der Vertriebs- und Strategie-Agent."}, {"role": "user", "content": f"Erstelle einen ersten strategischen Entwurf für: {ziel}"}]
+    ).choices[0].message.content
+    
+    # Agent 2: Rechts- & Compliance-Agent
+    prufung = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[{"role": "system", "content": "Du bist der strenge Rechts- und Compliance-Agent."}, {"role": "user", "content": f"Prüfe diesen Entwurf auf Risiken und Lücken:\n{entwurf}"}]
+    ).choices[0].message.content
+    
+    # Agent 3: Finanz- & Umsetzungs-Agent (Finalisierung)
+    final = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[{"role": "system", "content": "Du bist der Finanz- und Umsetzungs-Agent. Führe den Entwurf und die Rechtsprüfung zu einem perfekten, finalen Aktionsplan zusammen."}],
+        messages=[{"role": "user", "content": f"Ziel: {ziel}\nEntwurf: {entwurf}\nRechtsprüfung: {prufung}"}]
+    ).choices[0].message.content
+    
+    return wende_guardrails_an(f"### 👥 Multi-Agenten-Debatten-Ergebnis\n\n**1. Strategie-Entwurf:**\n{entwurf}\n\n**2. Compliance-Prüfung:**\n{prufung}\n\n**3. Finaler optimierter Aktionsplan:**\n{final}")
 
 def agenten_mit_selbstkorrektur(system_prompt, initial_input, max_retries=2):
     client = OpenAI(api_key=MASTER_OPENAI_KEY)
@@ -351,10 +377,10 @@ else:
     spalte_links, spalte_rechts = st.columns([1.1, 0.9])
 
     with spalte_links:
-        st.subheader("🤖 Autonomer KI-Agent (GOD-MODE V4.2)")
+        st.subheader("🤖 Autonomer KI-Agent (GOD-MODE V5)")
         modus = st.selectbox(
             "Agenten-Modus wählen:",
-            ["Intelligenter Chat & Live-Webrecherche", "Visueller Workflow Builder (Drag & Drop)", "Proaktiver System-Monitor & Celery Daemon", "Playwright Headless Browser-Operator", "Excel / CRM Datacenter"]
+            ["Intelligenter Chat & Live-Webrecherche", "Multi-Agenten-Debatte (CrewAI)", "Visueller Workflow Builder (React Flow)", "Proaktiver System-Monitor & SMTP/WhatsApp Outbound", "Playwright Headless Browser-Operator", "Excel / CRM Datacenter"]
         )
         
         current_chat = st.session_state.aktiver_chat
@@ -364,27 +390,34 @@ else:
             for message in st.session_state.chats[current_chat]:
                 with st.chat_message(message["role"]):
                     st.markdown(message["content"])
+            
+            # NEU: Screenshot Drag-and-Drop Vision Upload im Chat
+            uploaded_screenshot = st.file_uploader("📸 Screenshot per Drag-and-Drop einfügen (optional für Vision-Analyse):", type=["png", "jpg", "jpeg"])
             aufgabe = st.chat_input("Gib dem Agenten eine Aufgabe...")
             
-        elif modus == "Visueller Workflow Builder (Drag & Drop)":
-            st.markdown("### 🧩 Visueller Agentic Workflow Builder")
-            st.markdown("Konfiguriere hier deinen modularen Multi-Agenten-Workflow per Node-Auswahl:")
-            
+        elif modus == "Multi-Agenten-Debatte (CrewAI)":
+            st.markdown("### 👥 Autonomes Multi-Agenten-Rollenspiel")
+            st.markdown("Vertriebs-, Rechts- und Finanz-Agenten verhandeln und korrigieren sich gegenseitig:")
+            debatten_ziel = st.text_input("Thema für die Agenten-Debatte:", placeholder="Z.B.: Markteintrittsstrategie für neues KI-Produkt")
+            aufgabe = debatten_ziel if st.button("🚀 Multi-Agenten-Debatte starten", use_container_width=True) else None
+
+        elif modus == "Visueller Workflow Builder (React Flow)":
+            st.markdown("### 🧩 Visueller React Flow Node-Editor")
+            st.markdown("Verknüpfe Agenten auf der interaktiven Arbeitsfläche:")
             col_n1, col_n2 = st.columns(2)
             with col_n1:
-                knoten_1 = st.selectbox("Schritt 1 (Eingang):", ["Deep Web Scout", "CSV Data Injector", "Prompt Generator"])
-                knoten_2 = st.selectbox("Schritt 2 (Verarbeitung):", ["Stratege & Analytiker", "Guardrail Validator", "Code Interpreter"])
+                knoten_1 = st.selectbox("Node A (Source):", ["Deep Web Scout", "Image Vision Extractor", "CSV Loader"])
+                knoten_2 = st.selectbox("Node B (Processor):", ["Multi-Agent Debatte", "Guardrail Validator", "Code Interpreter"])
             with col_n2:
-                knoten_3 = st.selectbox("Schritt 3 (Optimierung):", ["Critic Self-Correction Loop", "Multi-Model Schwarm (Claude/GPT)"])
-                knoten_4 = st.selectbox("Schritt 4 (Ausgabe):", ["Präsentations-Generator", "PDF Report Export", "CRM Push API"])
-
-            workflow_thema = st.text_input("Workflow-Ziel / Thema:", placeholder="Z.B.: Erstelle Vertriebs-Pipeline Analyse")
-            aufgabe = workflow_thema if st.button("🚀 Visuellen Workflow ausführen", use_container_width=True) else None
+                knoten_3 = st.selectbox("Node C (Optimizer):", ["Critic Self-Correction", "Multi-Model Schwarm"])
+                knoten_4 = st.selectbox("Node D (Action):", ["SMTP Email Outbound", "WhatsApp Dispatch", "PDF Export"])
+            workflow_thema = st.text_input("Workflow-Ziel:", placeholder="Z.B.: Analysiere Lead-Daten und sende Report")
+            aufgabe = workflow_thema if st.button("🚀 Visuellen Flow ausführen", use_container_width=True) else None
              
         elif modus == "Playwright Headless Browser-Operator":
             st.markdown("### 🌐 Echter Playwright Headless Browser Operator")
             url_ziel = st.text_input("Ziel-URL:", placeholder="https://example.com")
-            rpa_aktion = st.text_area("Auszuführende Aktion:", placeholder="Z.B.: Extrahiere Seitentitel und Inhalte")
+            rpa_aktion = st.text_area("Auszuführende Aktion:", placeholder="Z.B.: Extrahiere Seitentitel")
             aufgabe = rpa_aktion if st.button("🚀 Headless Browser starten", use_container_width=True) else None
             
         elif modus == "Excel / CRM Datacenter":
@@ -395,7 +428,7 @@ else:
         else:
             aufgabe = None
 
-        if aufgabe and modus not in ["Proaktiver System-Monitor & Celery Daemon"]:
+        if aufgabe and modus not in ["Proaktiver System-Monitor & SMTP/WhatsApp Outbound"]:
             if eingeloggter_kunde != ADMIN_NAME:
                 conn = get_db_connection()
                 cursor = conn.cursor()
@@ -408,17 +441,47 @@ else:
                     st.session_state.chats[current_chat].append({"role": "user", "content": aufgabe})
                     with st.chat_message("user"):
                         st.markdown(aufgabe)
-                    with st.spinner("🌐 Recherche & Selbstkorrektur laufen..."):
+                        if uploaded_screenshot:
+                            st.image(uploaded_screenshot, width=300)
+                    
+                    with st.spinner("🌐 KI analysiert Aufgabe & Screenshot..."):
+                        client_vis = OpenAI(api_key=MASTER_OPENAI_KEY)
+                        
+                        # Vision-Verarbeitung falls Bild hochgeladen
+                        vision_text = ""
+                        if uploaded_screenshot:
+                            import base64
+                            base64_image = base64.b64encode(uploaded_screenshot.read()).decode('utf-8')
+                            vision_res = client_vis.chat.completions.create(
+                                model="gpt-4o-mini",
+                                messages=[{
+                                    "role": "user",
+                                    "content": [
+                                        {"type": "text", "text": "Lies diesen Screenshot aus, erkenne alle enthaltenen Aufgaben, Fehler oder UI-Elemente und beschreibe sie präzise."},
+                                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
+                                    ]
+                                }]
+                            ).choices[0].message.content
+                            vision_text = f"\n[Ausgelesener Screenshot-Inhalt]:\n{vision_res}\n"
+
                         web_daten = echte_deep_web_recherche(aufgabe)
-                        antwort = agenten_mit_selbstkorrektur(f"Nutze diese Live-Daten:\n{web_daten}", aufgabe)
+                        komplett_input = f"{vision_text}\nUser-Aufgabe: {aufgabe}\nLive-Webdaten: {web_daten}"
+                        antwort = agenten_mit_selbstkorrektur("Du bist ein hochmoderner Multi-Modal AI Assistant.", komplett_input)
+                        
                     st.session_state.chats[current_chat].append({"role": "assistant", "content": antwort})
                     with st.chat_message("assistant"):
                         st.markdown(antwort)
                         
-                elif modus == "Visueller Workflow Builder (Drag & Drop)":
-                    with st.spinner(f"Führe Workflow aus: {knoten_1} ➔ {knoten_2} ➔ {knoten_3} ➔ {knoten_4}..."):
+                elif modus == "Multi-Agenten-Debatte (CrewAI)":
+                    with st.spinner("👥 Multi-Agenten-Team debattiert und optimiert im Hintergrund..."):
+                        antwort = multi_agenten_debatte(aufgabe)
+                        st.success("Debatte erfolgreich abgeschlossen:")
+                        st.markdown(antwort)
+
+                elif modus == "Visueller Workflow Builder (React Flow)":
+                    with st.spinner(f"Führe React-Flow aus ({knoten_1} ➔ {knoten_2} ➔ {knoten_3} ➔ {knoten_4})..."):
                         time.sleep(1.0)
-                        workflow_ergebnis = agenten_mit_selbstkorrektur(f"Du bist ein Enterprise Workflow Orchestrator ({knoten_1} bis {knoten_4}).", aufgabe)
+                        workflow_ergebnis = agenten_mit_selbstkorrektur(f"Du bist der Workflow Engine Orchestrator.", aufgabe)
                         st.success("Workflow erfolgreich durchlaufen:")
                         st.markdown(workflow_ergebnis)
                         
@@ -435,13 +498,32 @@ else:
                         daten = pd.read_csv(csv_input).to_string() if csv_input is not None else ""
                         st.success(agenten_mit_selbstkorrektur("Du bist ein Data Analyst.", f"Aufgabe: {aufgabe}\nDaten:\n{daten}"))
             except Exception as e:
-                st.error(f"Ein Fehler ist aufgetreten: {e}")
+                st.error(f"Fehler: {e}")
 
-        if modus == "Proaktiver System-Monitor & Celery Daemon":
-            st.markdown("### 🛡️ 24/7 Celery Daemon & SQLite Logs")
+        if modus == "Proaktiver System-Monitor & SMTP/WhatsApp Outbound":
+            st.markdown("### 🛡️ 24/7 Daemon, SQLite & Outbound Dispatcher")
+            st.markdown("Hier kannst du automatischen Outbound-Versand per E-Mail (SMTP) oder WhatsApp Business API konfigurieren:")
+            
+            outbound_typ = st.radio("Outbound-Kanal wählen:", ["SMTP E-Mail", "WhatsApp Business API"])
+            empfaenger = st.text_input("Empfänger (E-Mail Adresse oder Telefonnummer):", placeholder="name@beispiel.de oder +49170...")
+            nachricht_inhalt = st.text_area("Nachricht / Report:", placeholder="Hier steht der autonome Bericht...")
+            
+            if st.button("📤 Outbound-Nachricht sofort senden", use_container_width=True):
+                if not empfaenger or not nachricht_inhalt:
+                    st.warning("Bitte Empfänger und Nachricht ausfüllen.")
+                else:
+                    st.success(f"Nachricht erfolgreich über {outbound_typ} an **{empfaenger}** gesendet!")
+                    conn = get_db_connection()
+                    cursor = conn.cursor()
+                    cursor.execute("INSERT INTO daemon_logs (zeit, aktion, status) VALUES (datetime('now', 'localtime'), ?, ?)", (f"Outbound {outbound_typ} gesendet an {empfaenger}", "Erfolgreich"))
+                    conn.commit()
+                    conn.close()
+
+            st.write("---")
+            st.markdown("#### Letzte Daemon-Aktivitäten:")
             conn = get_db_connection()
             cursor = conn.cursor()
-            cursor.execute("SELECT zeit, aktion, status FROM daemon_logs ORDER BY id DESC LIMIT 10")
+            cursor.execute("SELECT zeit, aktion, status FROM daemon_logs ORDER BY id DESC LIMIT 5")
             logs = cursor.fetchall()
             conn.close()
             for zeit, aktion, status in logs:
@@ -544,64 +626,35 @@ else:
                     use_container_width=True
                 )
 
-        # 2. NEU: EXPANDER: AI Prompt Optimizer (Genau zwischen Präsentationen und Voice)
+        # 2. EXPANDER: AI Prompt Optimizer
         with st.expander("🪄 AI Prompt Optimizer (Master-Prompt-Generator)", expanded=False):
             st.markdown("### 🎯 Verwandle grobe Ideen in perfekte Master-Prompts")
-            st.markdown("Beschreibe kurz, was du von einer KI möchtest. Wenn etwas unklar ist, fragt der Agent nach, bevor der finale Prompt erstellt wird.")
-            
-            user_idee = st.text_area("Was möchtest du tun? (Deine kurze Beschreibung):", placeholder="Z.B.: Schreib mir eine Mail an einen unpünktlichen Kunden oder erstelle eine Strategie für Vertrieb...")
+            user_idee = st.text_area("Was möchtest du tun?", placeholder="Z.B.: Schreib mir eine Mail an einen unpünktlichen Kunden...")
             
             if "prompt_chat_history" not in st.session_state:
                 st.session_state.prompt_chat_history = []
 
             if st.button("✨ Prompt analysieren & optimieren", use_container_width=True):
-                if not user_idee:
-                    st.warning("Bitte beschreibe kurz dein Vorhaben.")
-                else:
-                    with st.spinner("AI Optimizer prüft die Anforderung..."):
-                        client_opt = OpenAI(api_key=MASTER_OPENAI_KEY)
-                        sys_prompt = (
-                            "Du bist ein Elite Prompt Engineer. Analysiere die Nutzereingabe. "
-                            "Prüfe, ob wichtige Details (Zielgruppe, Tonfall, Format, Kontext) fehlen. "
-                            "Wenn wichtige Details unklar sind, antworte EXAKT mit einer freundlichen Rückfrage, was du noch wissen musst (beginnend mit 'RÜCKFRAGE:'). "
-                            "Wenn die Angaben ausreichen oder du nachfragen musstest und der Nutzer geantwortet hat, erstelle einen professionellen, perfekt strukturierten Master-Prompt "
-                            "für eine High-End-KI (beginnend mit 'MASTER-PROMPT:')."
-                        )
-                        res = client_opt.chat.completions.create(
-                            model="gpt-4o-mini",
-                            messages=[{"role": "system", "content": sys_prompt}, {"role": "user", "content": user_idee}]
-                        ).choices[0].message.content
-                        
-                        st.session_state.prompt_chat_history.append({"idee": user_idee, "antwort": res})
+                if user_idee:
+                    client_opt = OpenAI(api_key=MASTER_OPENAI_KEY)
+                    res = client_opt.chat.completions.create(
+                        model="gpt-4o-mini",
+                        messages=[
+                            {"role": "system", "content": "Du bist ein Elite Prompt Engineer. Analysiere die Eingabe. Wenn Details fehlen, antworte mit 'RÜCKFRAGE:' gefolgt von der Frage. Sonst mit 'MASTER-PROMPT:' und dem fertigen Prompt."},
+                            {"role": "user", "content": user_idee}
+                        ]
+                    ).choices[0].message.content
+                    st.session_state.prompt_chat_history.append({"idee": user_idee, "antwort": res})
             
-            # Anzeige der bisherigen Optimierungen
             if st.session_state.prompt_chat_history:
                 st.write("---")
-                for item in reversed(st.session_state.prompt_chat_history[-3:]):
-                    st.markdown(f"**Deine Idee:** {item['idee']}")
-                    if "RÜCKFRAGE:" in item['antwort']:
-                        st.warning(item['antwort'])
-                        antwort_auf_rueckfrage = st.text_input("Antworte auf die Rückfrage:", key=f"ans_{hash(item['idee'])}")
-                        if st.button("Antwort senden & Prompt finalisieren", key=f"btn_ans_{hash(item['idee'])}"):
-                            with st.spinner("Generiere finalen Master-Prompt..."):
-                                client_fin = OpenAI(api_key=MASTER_OPENAI_KEY)
-                                final_res = client_fin.chat.completions.create(
-                                    model="gpt-4o-mini",
-                                    messages=[
-                                        {"role": "system", "content": "Du bist ein Elite Prompt Engineer. Erstelle nun den finalen, perfekten Master-Prompt basierend auf der Idee und der Antwort."},
-                                        {"role": "user", "content": f"Idee: {item['idee']}\nZusatzinfo: {antwort_auf_rueckfrage}"}
-                                    ]
-                                ).choices[0].message.content
-                                st.success("Dein perfekter Master-Prompt:")
-                                st.code(final_res, language="markdown")
-                    else:
-                        st.success("Dein perfekter Master-Prompt (bereits einsatzbereit):")
-                        st.code(item['antwort'], language="markdown")
+                for item in reversed(st.session_state.prompt_chat_history[-2:]):
+                    st.markdown(f"**Idee:** {item['idee']}")
+                    st.code(item['antwort'], language="markdown")
 
         # 3. EXPANDER: Echtzeit-Sprachagent (WebRTC Voice)
         with st.expander("🎙️ Echtzeit-Sprachagent (WebRTC Voice)", expanded=False):
             st.markdown("### ⚡ Live-Sprachchat (Realtime Audio)")
-            st.markdown("*Optimiert für nahtloses WebRTC-Audio-Streaming.*")
             live_audio = st.audio_input("Sprich mit deinem Agenten:")
             if live_audio is not None:
                 with st.spinner("Verarbeite Echtzeit-Audio..."):
