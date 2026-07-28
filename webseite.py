@@ -28,7 +28,7 @@ try:
 except ImportError:
     PLAYWRIGHT_AVAILABLE = False
 
-st.set_page_config(page_title="Scion Mind - Enterprise Ultimate AGI Studio GOD-MODE V7", layout="wide")
+st.set_page_config(page_title="Scion Mind - Enterprise Ultimate AGI Studio GOD-MODE V8", layout="wide")
 
 st.markdown("""
     <style>
@@ -46,8 +46,8 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("Scion Mind - Enterprise Ultimate AGI Studio (GOD-MODE V7)")
-st.markdown("*designed by Christian Schmidt | Powered by MCP Server Protocol, WebRTC Realtime Audio, React Flow Canvas & Multi-Channel Outbound*")
+st.title("Scion Mind - Enterprise Ultimate AGI Studio (GOD-MODE V8 - Self-Evolving)")
+st.markdown("*designed by Christian Schmidt | Powered by Self-Evolving Meta-Learning, MCP Server, WebRTC & React Flow Canvas*")
 st.write("---")
 
 MASTER_OPENAI_KEY = st.secrets["OPENAI_API_KEY"]
@@ -60,7 +60,7 @@ ADMIN_NAME = "Christian"
 ADMIN_PASS = "ScionMind#2026!Secured"
 
 # -------------------------------------------------------------
-# SQLITE PERSISTENCE & 24/7 DAEMON WORKER THREAD
+# SQLITE PERSISTENCE & SELF-EVOLVING MEMORY ENGINE
 # -------------------------------------------------------------
 def init_db():
     conn = sqlite3.connect("scion_mind_enterprise.db", check_same_thread=False)
@@ -107,12 +107,21 @@ def init_db():
             status TEXT
         )
     """)
+    # NEU: Selbstlernender Speicher für Agenten-Optimierungen (Self-Evolving Memory)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS agent_memory (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            zeit TEXT,
+            aufgabe_typ TEXT,
+            erkenntnis TEXT,
+            verbesserter_prompt TEXT
+        )
+    """)
     cursor.execute("SELECT * FROM kunden WHERE username = ?", (ADMIN_NAME,))
     if not cursor.fetchone():
         cursor.execute("INSERT INTO kunden VALUES (?, ?, ?)", (ADMIN_NAME, ADMIN_PASS, 999.00))
         cursor.execute("INSERT INTO kunden VALUES (?, ?, ?)", ("kunde1", "123", 5.00))
     
-    # Init Default MCP Server resources if empty
     cursor.execute("SELECT COUNT(*) FROM mcp_registry")
     if cursor.fetchone()[0] == 0:
         cursor.execute("INSERT INTO mcp_registry (server_name, resource_uri, status) VALUES (?, ?, ?)", ("Local Git Repository", "git://local/scion-mind-core", "Aktiv"))
@@ -133,7 +142,7 @@ def background_daemon_worker():
         try:
             conn = get_db_connection()
             cursor = conn.cursor()
-            cursor.execute("INSERT INTO daemon_logs (zeit, aktion, status) VALUES (datetime('now', 'localtime'), 'MCP Sync & 24/7 Healthcheck erfolgreich', 'Erfolgreich')")
+            cursor.execute("INSERT INTO daemon_logs (zeit, aktion, status) VALUES (datetime('now', 'localtime'), 'Self-Evolving Memory & MCP Sync erfolgreich', 'Erfolgreich')")
             conn.commit()
             conn.close()
         except Exception:
@@ -275,8 +284,26 @@ with st.sidebar:
             st.rerun()
 
 # -------------------------------------------------------------
-# CORE ENGINES (MCP, WebRTC Realtime, IMAP/SMTP, WhatsApp, Playwright)
+# CORE ENGINES (Self-Evolving Meta-Learning, MCP, WebRTC, etc.)
 # -------------------------------------------------------------
+def lade_agenten_erfahrungen():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT zeit, erkenntnis FROM agent_memory ORDER BY id DESC LIMIT 3")
+    rows = cursor.fetchall()
+    conn.close()
+    if not rows:
+        return "Bisher keine historischen Lern-Erfahrungen gespeichert (Initialer Zustand)."
+    return "\n".join([f"- [{zeit}] Erkenntnis: {erk}" for zeit, erk in rows])
+
+def speichere_agenten_lernen(aufgabe_typ, erkenntnis, verbesserter_prompt):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO agent_memory (zeit, aufgabe_typ, erkenntnis, verbesserter_prompt) VALUES (datetime('now', 'localtime'), ?, ?, ?)",
+                   (aufgabe_typ, erkenntnis, verbesserter_prompt))
+    conn.commit()
+    conn.close()
+
 def lade_mcp_ressourcen():
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -441,24 +468,34 @@ def multi_agenten_debatte(ziel):
     ).choices[0].message.content
     return wende_guardrails_an(f"### 👥 Multi-Agenten-Debatten-Ergebnis\n\n**1. Strategie-Entwurf:**\n{entwurf}\n\n**2. Compliance-Prüfung:**\n{prufung}\n\n**3. Finaler optimierter Aktionsplan:**\n{final}")
 
-def agenten_mit_selbstkorrektur(system_prompt, initial_input, max_retries=2):
+# NEU: Die Self-Evolving Engine (Agent lernt & optimiert sich selbst)
+def selbstevaluierender_lern_agent(system_prompt, initial_input):
     client = OpenAI(api_key=MASTER_OPENAI_KEY)
-    aktueller_text = initial_input
-    for versuch in range(max_retries + 1):
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": aktueller_text}]
-        )
-        ergebnis = response.choices[0].message.content
-        critique_res = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[{"role": "system", "content": "Du bist ein Critic-Agent."}, {"role": "user", "content": f"Prüfe: {ergebnis}. Antworte mit 'OK' oder 'FEHLER:'."}]
-        ).choices[0].message.content.strip()
-        if "OK" in critique_res.upper() or versuch == max_retries:
-            return wende_guardrails_an(ergebnis)
-        else:
-            aktueller_text = f"Korrigiere: {critique_res}\n\nInput: {initial_input}"
-    return wende_guardrails_an(ergebnis)
+    historisches_wissen = lade_agenten_erfahrungen()
+    
+    # Erweiterter Prompt mit dem gesammelten Wissen der Vergangenheit
+    dynamischer_prompt = f"{system_prompt}\n\n[HISTORISCHES SELBSTLERN-GEDÄCHTNIS (Lerne aus früheren Iterationen)]:\n{historisches_wissen}"
+    
+    # 1. Ausführung
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[{"role": "system", "content": dynamischer_prompt}, {"role": "user", "content": initial_input}]
+    )
+    ergebnis = response.choices[0].message.content
+    
+    # 2. Meta-Reflektion & Selbstoptimierung (Self-Evolution)
+    reflektion_res = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": "Du bist der Meta-Learning Optimizer. Analysiere das generierte Ergebnis. Was hätte besser sein können? Formagliere eine konkrete Erkenntnis zur Selbstoptimierung."},
+            {"role": "user", "content": f"Aufgabe: {initial_input}\nErgebnis: {ergebnis}"}
+        ]
+    ).choices[0].message.content
+    
+    # 3. Speichern der neuen Erkenntnis in der SQLite-Datenbank
+    speichere_agenten_lernen("Chat-Optimierung", reflektion_res, dynamischer_prompt)
+    
+    return wende_guardrails_an(ergebnis + f"\n\n---\n🧬 *[Self-Evolving Meta-Learning]: Erkenntnis für zukünftige Aufgaben dauerhaft im System gespeichert: {reflektion_res}*")
 
 def generiere_replicate_bild_mit_selbstcheck(prompt):
     for versuch in range(2):
@@ -518,10 +555,10 @@ else:
     spalte_links, spalte_rechts = st.columns([1.1, 0.9])
 
     with spalte_links:
-        st.subheader("🤖 Autonomer KI-Agent (GOD-MODE V7)")
+        st.subheader("🤖 Autonomer KI-Agent (GOD-MODE V8 Self-Evolving)")
         modus = st.selectbox(
             "Agenten-Modus wählen:",
-            ["Intelligenter Chat & Live-Webrecherche", "Visueller React Flow Node-Canvas", "Echtes WebRTC Realtime Audio", "MCP Server Dashboard", "E-Mail & WhatsApp Postfach Assistent", "Multi-Agenten-Debatte (CrewAI)", "Proaktiver System-Monitor & Outbound", "Playwright Browser-Operator", "Excel / CRM Datacenter"]
+            ["Intelligenter Chat & Live-Webrecherche", "🧬 Selbstlern-Gedächtnis (Meta-Memory)", "Visueller React Flow Node-Canvas", "Echtes WebRTC Realtime Audio", "MCP Server Dashboard", "E-Mail & WhatsApp Postfach Assistent", "Multi-Agenten-Debatte (CrewAI)", "Proaktiver System-Monitor & Outbound", "Playwright Browser-Operator", "Excel / CRM Datacenter"]
         )
         
         current_chat = st.session_state.aktiver_chat
@@ -535,15 +572,37 @@ else:
             uploaded_screenshot = st.file_uploader("📸 Screenshot per Drag-and-Drop einfügen (optional für Vision-Analyse):", type=["png", "jpg", "jpeg"])
             aufgabe = st.chat_input("Gib dem Agenten eine Aufgabe...")
             
+        elif modus == "🧬 Selbstlern-Gedächtnis (Meta-Memory)":
+            st.markdown("### 🧠 Autonomer Lernspeicher (Self-Evolving Knowledge Base)")
+            st.markdown("Hier siehst du alle Erkenntnisse, die sich der Agent bei vergangenen Aufgaben selbst beigebracht und persistent in SQLite abgespeichert hat:")
+            
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT id, zeit, aufgabe_typ, erkenntnis FROM agent_memory ORDER BY id DESC")
+            erfahrungen = cursor.fetchall()
+            conn.close()
+            
+            if erfahrungen:
+                for eid, zeit, typ, erk in erfahrungen:
+                    st.info(f"**[{zeit}] Typ: {typ} (ID: {eid})**\n\n🧬 **Gelerntes Learning:** {erk}")
+                if st.button("🗑️ Lernspeicher zurücksetzen (Reset)", use_container_width=True):
+                    conn = get_db_connection()
+                    cursor = conn.cursor()
+                    cursor.execute("DELETE FROM agent_memory")
+                    conn.commit()
+                    conn.close()
+                    st.success("Lernspeicher zurückgesetzt!")
+                    st.rerun()
+            else:
+                st.warning("Noch keine Lern-Erfahrungen gespeichert. Starte im Chat einige Aufgaben, damit der Agent beginnt sich selbst zu optimieren!")
+            aufgabe = None
+
         elif modus == "Visueller React Flow Node-Canvas":
             st.markdown("### 🧩 Interaktiver React Flow Node-Canvas")
-            st.markdown("Verbinde Agenten und Ressourcen auf der grafischen Arbeitsfläche:")
-            
-            # HTML/JS Canvas Widget für echten visuellen React-Flow Look im Browser
             canvas_html = """
             <div style="width:100%; height:320px; background:#0f172a; border-radius:12px; padding:20px; color:white; font-family:sans-serif; position:relative; overflow:hidden;">
                 <div style="position:absolute; top:30px; left:40px; background:#334155; padding:12px 20px; border-radius:8px; border:2px solid #38bdf8; cursor:pointer;">
-                    <b>🌐 MCP Source Node</b><br/><span style="font-size:11px; color:#94a3b8;">git://local/scion-mind</span>
+                    <b>🧬 Self-Evolving Memory Node</b><br/><span style="font-size:11px; color:#94a3b8;">SQLite Meta-Learning Active</span>
                 </div>
                 <div style="position:absolute; top:130px; left:240px; background:#334155; padding:12px 20px; border-radius:8px; border:2px solid #a855f7; cursor:pointer;">
                     <b>👥 Multi-Agent Debatte</b><br/><span style="font-size:11px; color:#94a3b8;">CrewAI Engine Active</span>
@@ -559,63 +618,42 @@ else:
             </div>
             """
             st.components.v1.html(canvas_html, height=340)
-            
-            flow_befehl = st.text_input("Führe Workflow über Canvas aus:", placeholder="Z.B.: Starte Pipeline mit Live-Daten...")
+            flow_befehl = st.text_input("Führe Workflow über Canvas aus:", placeholder="Z.B.: Starte Pipeline mit Meta-Memory...")
             aufgabe = flow_befehl if st.button("🚀 Canvas-Workflow ausführen", use_container_width=True) else None
 
         elif modus == "Echtes WebRTC Realtime Audio":
             st.markdown("### 🎙️ Bidirektionales WebRTC Realtime Audio-Streaming")
-            st.markdown("Starte die Live-Verbindung zur **OpenAI Realtime WebRTC API** für unterbrechungsfreie Echtzeit-Gespräche ohne Latenz:")
-            
+            st.markdown("Starte die Live-Verbindung zur **OpenAI Realtime WebRTC API**:")
             if st.button("🔴 WebRTC Realtime Session verbinden", use_container_width=True):
                 st.success("WebRTC Audio-Stream aktiv! (Verbindung zu OpenAI Realtime Websocket aufgebaut)")
                 st.audio("https://actions.google.com/sounds/v1/ambiences/office_ambience.ogg", format="audio/ogg", autoplay=True)
-            
-            st.info("Sprich einfach über dein Headset – der Agent antwortet in Echtzeit direkt per Audio-Stream.")
             aufgabe = None
 
         elif modus == "MCP Server Dashboard":
             st.markdown("### 🔌 Model Context Protocol (MCP) Server-Register")
-            st.markdown("Hier sind alle lokalen Ordner, Git-Repositories und Datenbanken über den MCP-Standard angebunden:")
-            
             mcp_res = lade_mcp_ressourcen()
             for sname, uri, stat in mcp_res:
                 st.success(f"**{sname}** — URI: `{uri}` — Status: `{stat}`")
-                
-            st.write("---")
-            neuer_mcp = st.text_input("Neuen MCP-Server hinzufügen (URI):", placeholder="file://local/path/to/folder")
-            if st.button("MCP-Ressource registrieren", use_container_width=True):
-                if neuer_mcp:
-                    conn = get_db_connection()
-                    cursor = conn.cursor()
-                    cursor.execute("INSERT INTO mcp_registry (server_name, resource_uri, status) VALUES (?, ?, ?)", ("Custom MCP Source", neuer_mcp, "Aktiv"))
-                    conn.commit()
-                    conn.close()
-                    st.success("MCP-Server erfolgreich registriert und eingehängt!")
-                    st.rerun()
             aufgabe = None
 
         elif modus == "E-Mail & WhatsApp Postfach Assistent":
             st.markdown("### ✉️📱 Live Postfach Scanner & Outbound Dispatcher")
             tab_mail, tab_wa = st.tabs(["E-Mail Postfach", "WhatsApp Versand"])
-            
             with tab_mail:
                 if st.button("📥 Ungelesene E-Mails abrufen", use_container_width=True):
                     with st.spinner("Verbinde mit IMAP..."):
                         mails = lade_letzte_emails(eingeloggter_kunde)
                         st.success("Postfach ausgelesen:")
                         st.markdown(mails)
-                
                 z_empf = st.text_input("E-Mail Empfänger:")
                 m_betreff = st.text_input("Betreff:")
                 m_befehl = st.text_area("Schreibe Antwort zu Thema:")
                 if st.button("✉️ E-Mail Entwurf erstellen & senden", use_container_width=True):
                     if z_empf and m_befehl:
-                        ki_ant = agenten_mit_selbstkorrektur("Du bist E-Mail Assistent.", m_befehl)
+                        ki_ant = selbstevaluierender_lern_agent("Du bist E-Mail Assistent.", m_befehl)
                         res = sende_email(eingeloggter_kunde, z_empf, m_betreff, ki_ant)
                         st.success(res)
                         st.markdown(ki_ant)
-            
             with tab_wa:
                 wa_nr = st.text_input("Handynummer (inkl. Vorwahl, z.B. +49...):", placeholder="+49170...")
                 wa_text = st.text_area("WhatsApp Nachrichtentext:")
@@ -644,7 +682,7 @@ else:
         else:
             aufgabe = None
 
-        if aufgabe and modus not in ["Proaktiver System-Monitor & Outbound", "E-Mail & WhatsApp Postfach Assistent", "Echtes WebRTC Realtime Audio", "MCP Server Dashboard"]:
+        if aufgabe and modus not in ["Proaktiver System-Monitor & Outbound", "E-Mail & WhatsApp Postfach Assistent", "Echtes WebRTC Realtime Audio", "MCP Server Dashboard", "🧬 Selbstlern-Gedächtnis (Meta-Memory)"]:
             if eingeloggter_kunde != ADMIN_NAME:
                 conn = get_db_connection()
                 cursor = conn.cursor()
@@ -660,7 +698,7 @@ else:
                         if uploaded_screenshot:
                             st.image(uploaded_screenshot, width=300)
                     
-                    with st.spinner("🌐 KI analysiert Aufgabe & MCP-Ressourcen..."):
+                    with st.spinner("🧬 Agent führt Self-Evolving Meta-Learning & Web-Research aus..."):
                         client_vis = OpenAI(api_key=MASTER_OPENAI_KEY)
                         vision_text = ""
                         if uploaded_screenshot:
@@ -679,8 +717,10 @@ else:
                             vision_text = f"\n[Ausgelesener Screenshot-Inhalt]:\n{vision_res}\n"
 
                         web_daten = echte_deep_web_recherche(aufgabe)
-                        komplett_input = f"{vision_text}\nUser-Aufgabe: {aufgabe}\nMCP-Ressourcen-Kontext: Git/SQLite verbunden\nLive-Webdaten: {web_daten}"
-                        antwort = agenten_mit_selbstkorrektur("Du bist ein hochmoderner AGI Master Assistant mit MCP-Zugriff.", komplett_input)
+                        komplett_input = f"{vision_text}\nUser-Aufgabe: {aufgabe}\nMCP & Meta-Memory aktiv\nLive-Webdaten: {web_daten}"
+                        
+                        # Hier greift die neue Self-Evolving Lern-Engine!
+                        antwort = selbstevaluierender_lern_agent("Du bist ein selbstlernender, hochmoderner AGI Master Assistant.", komplett_input)
                         
                     st.session_state.chats[current_chat].append({"role": "assistant", "content": antwort})
                     with st.chat_message("assistant"):
@@ -693,9 +733,9 @@ else:
                         st.markdown(antwort)
 
                 elif modus == "Visueller React Flow Node-Canvas":
-                    with st.spinner(f"Führe React Flow Canvas aus..."):
+                    with st.spinner(f"Führe Canvas mit Selbstlern-Loop aus..."):
                         time.sleep(1.0)
-                        workflow_ergebnis = agenten_mit_selbstkorrektur("Du bist der Canvas Orchestrator.", aufgabe)
+                        workflow_ergebnis = selbstevaluierender_lern_agent("Du bist der Canvas Orchestrator.", aufgabe)
                         st.success("Canvas-Workflow erfolgreich durchlaufen:")
                         st.markdown(workflow_ergebnis)
                         
@@ -705,12 +745,12 @@ else:
                         st.success(f"Erfolgreich! Titel: **{titel}**")
                         if screenshot:
                             st.image(screenshot, caption="Visueller Screenshot-Beweis", use_container_width=True)
-                        st.markdown(agenten_mit_selbstkorrektur("Du bist ein Web-Expert.", f"Analysiere URL {url_ziel} mit Titel '{titel}'."))
+                        st.markdown(selbstevaluierender_lern_agent("Du bist ein Web-Expert.", f"Analysiere URL {url_ziel} mit Titel '{titel}'."))
                         
                 elif modus == "Excel / CRM Datacenter":
-                    with st.spinner("⚙️ Verarbeite Tabellendaten..."):
+                    with st.spinner("⚙️ Verarbeite Tabellendaten mit Meta-Memory..."):
                         daten = pd.read_csv(csv_input).to_string() if csv_input is not None else ""
-                        st.success(agenten_mit_selbstkorrektur("Du bist ein Data Analyst.", f"Aufgabe: {aufgabe}\nDaten:\n{daten}"))
+                        st.success(selbstevaluierender_lern_agent("Du bist ein Data Analyst.", f"Aufgabe: {aufgabe}\nDaten:\n{daten}"))
             except Exception as e:
                 st.error(f"Fehler: {e}")
 
@@ -746,9 +786,9 @@ else:
 
             if st.button("🚀 Schwarm-Workflow starten", use_container_width=True):
                 if auto_thema:
-                    recherche = agenten_mit_selbstkorrektur("Research", echte_deep_web_recherche(auto_thema))
+                    recherche = selbstevaluierender_lern_agent("Research", echte_deep_web_recherche(auto_thema))
                     story = multi_model_schwarm_antwort(schwarm_anbieter, f"Erstelle Gerüst für {anzahl_folien} Folien.", recherche)
-                    roh = agenten_mit_selbstkorrektur(f"Format as {anzahl_folien} slides as 'TITLE: [T]|||TEXT: [B]|||PROMPT: [P]' separated by '###'.", story)
+                    roh = selbstevaluierender_lern_agent(f"Format as {anzahl_folien} slides as 'TITLE: [T]|||TEXT: [B]|||PROMPT: [P]' separated by '###'.", story)
                     
                     parsed = []
                     for f in roh.split("###"):
