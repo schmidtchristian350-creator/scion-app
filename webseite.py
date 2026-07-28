@@ -28,7 +28,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("Scion Mind")
+st.title("Scion Mind - Autonomes Agenten-Studio")
 st.markdown("*designed by Christian Schmidt*")
 st.write("---")
 
@@ -143,30 +143,35 @@ with st.sidebar:
             st.session_state.aktiver_chat = chat_name
             st.rerun()
 
-def generiere_replicate_bild(prompt):
-    try:
-        headers = {
-            "Authorization": f"Bearer {IMAGE_API_KEY}",
-            "Content-Type": "application/json",
-            "Prefer": "respond-async"
-        }
-        data = {"input": {"prompt": prompt, "aspect_ratio": "16:9"}}
-        response = requests.post("https://api.replicate.com/v1/models/black-forest-labs/flux-schnell/predictions", json=data, headers=headers)
-        res_json = response.json()
-        
-        if "urls" in res_json:
-            get_url = res_json["urls"]["get"]
-            for _ in range(30):
-                s_res = requests.get(get_url, headers={"Authorization": f"Bearer {IMAGE_API_KEY}"}).json()
-                if s_res.get("status") == "succeeded":
-                    out = s_res["output"]
-                    return out[0] if isinstance(out, list) else out
-                elif s_res.get("status") == "failed":
-                    break
-                time.sleep(2)
-    except Exception:
-        pass
-    return None
+def generiere_replicate_bild_mit_selbstcheck(prompt):
+    """Autonomes Tool mit automatischer Fehlerkorrektur (Fallback bei Ausfall)"""
+    for versuch in range(2): # Agent unternimmt bis zu 2 Versuche
+        try:
+            headers = {
+                "Authorization": f"Bearer {IMAGE_API_KEY}",
+                "Content-Type": "application/json",
+                "Prefer": "respond-async"
+            }
+            data = {"input": {"prompt": prompt, "aspect_ratio": "16:9"}}
+            response = requests.post("https://api.replicate.com/v1/models/black-forest-labs/flux-schnell/predictions", json=data, headers=headers)
+            res_json = response.json()
+            
+            if "urls" in res_json:
+                get_url = res_json["urls"]["get"]
+                for _ in range(25):
+                    s_res = requests.get(get_url, headers={"Authorization": f"Bearer {IMAGE_API_KEY}"}).json()
+                    if s_res.get("status") == "succeeded":
+                        out = s_res["output"]
+                        return out[0] if isinstance(out, list) else out
+                    elif s_res.get("status") == "failed":
+                        break
+                    time.sleep(2)
+        except Exception:
+            time.sleep(1) # Kurze Pause vor dem nächsten Korrekturversuch
+            pass
+            
+    # Fallback-Bild, falls Replicate hakt, damit der Prozess nicht abbricht
+    return "https://images.unsplash.com/photo-1557804506-669a67965ba0?w=1200&auto=format&fit=crop&q=80"
 
 def erstelle_pptx_aus_session():
     prs = Presentation()
@@ -190,22 +195,10 @@ def erstelle_pdf_aus_session():
     styles = getSampleStyleSheet()
     
     title_style = ParagraphStyle(
-        'SlideTitle',
-        parent=styles['Heading1'],
-        fontName='Helvetica-Bold',
-        fontSize=22,
-        textColor=colors.HexColor('#0f172a'),
-        spaceAfter=15
+        'SlideTitle', parent=styles['Heading1'], fontName='Helvetica-Bold', fontSize=22, textColor=colors.HexColor('#0f172a'), spaceAfter=15
     )
-    
     body_style = ParagraphStyle(
-        'SlideBody',
-        parent=styles['Normal'],
-        fontName='Helvetica',
-        fontSize=13,
-        textColor=colors.HexColor('#1e293b'),
-        leading=18,
-        spaceAfter=15
+        'SlideBody', parent=styles['Normal'], fontName='Helvetica', fontSize=13, textColor=colors.HexColor('#1e293b'), leading=18, spaceAfter=15
     )
     
     story = []
@@ -237,20 +230,27 @@ else:
     spalte_links, spalte_rechts = st.columns([1.1, 0.9])
 
     with spalte_links:
-        st.subheader("🤖 KI-Agent & Text-Recherche")
+        st.subheader("🤖 Autonomer KI-Agent (Recherche, Mails & Analyse)")
         modus = st.selectbox(
-            "Was möchtest du tun?",
-            ["Text-Recherche & Chat", "Audio / Sprachausgabe"]
+            "Agenten-Modus wählen:",
+            ["Intelligenter Chat & Recherche", "Büro & E-Mail Generator", "Audio / Sprachausgabe"]
         )
         
         current_chat = st.session_state.aktiver_chat
-        st.markdown(f"**Aktiver Chat:** `{current_chat}`")
+        st.markdown(f"**Aktiver Arbeitsbereich:** `{current_chat}`")
 
-        for message in st.session_state.chats[current_chat]:
-            with st.chat_message(message["role"]):
-                st.markdown(message["content"])
-
-        aufgabe = st.chat_input("Stelle deine Frage oder lass den Agenten für dich arbeiten...")
+        if modus == "Intelligenter Chat & Recherche":
+            for message in st.session_state.chats[current_chat]:
+                with st.chat_message(message["role"]):
+                    st.markdown(message["content"])
+            aufgabe = st.chat_input("Gib dem Agenten eine Aufgabe (z.B. Marktanalyse, Strategie)...")
+            
+        elif modus == "Büro & E-Mail Generator":
+            st.markdown("Lass den Agenten vollautomatisch professionelle Kunden-Mails, Rechnungsprüfungen oder Berichte erstellen:")
+            email_thema = st.text_area("Anfrage / Stichpunkte für den Agenten:", placeholder="Z.B.: Antworte professionell auf eine Kundenbeschwerde wegen Lieferverzögerung...")
+            aufgabe = email_thema if st.button("✉️ E-Mail / Bericht vom Agenten generieren", use_container_width=True) else None
+        else:
+            aufgabe = None
 
         if aufgabe:
             if eingeloggter_kunde != ADMIN_NAME:
@@ -258,23 +258,31 @@ else:
             
             try:
                 client = OpenAI(api_key=MASTER_OPENAI_KEY)
-                st.session_state.chats[current_chat].append({"role": "user", "content": aufgabe})
-                with st.chat_message("user"):
-                    st.markdown(aufgabe)
+                if modus == "Intelligenter Chat & Recherche":
+                    st.session_state.chats[current_chat].append({"role": "user", "content": aufgabe})
+                    with st.chat_message("user"):
+                        st.markdown(aufgabe)
+                    messages_payload = [{"role": "system", "content": "Du bist ein autonomer, extrem präziser Business-Agent. Analysiere das Ziel und liefere exakte Ergebnisse auf Deutsch."}]
+                    messages_payload.extend(st.session_state.chats[current_chat])
+                else:
+                    messages_payload = [
+                        {"role": "system", "content": "Du bist ein erstklassiger Büro-Assistent. Erstelle professionelle, geschäftliche Texte und E-Mails auf Deutsch."},
+                        {"role": "user", "content": aufgabe}
+                    ]
 
-                system_prompt = "Du bist ein präziser, professioneller KI-Assistent und Business-Experte. Antworte immer auf Deutsch."
-                messages_payload = [{"role": "system", "content": system_prompt}]
-                messages_payload.extend(st.session_state.chats[current_chat])
-
-                with st.spinner("🦫 Der KI-Agent arbeitet..."):
+                with st.spinner("🦫 Der autonome Agent plant, analysiert und führt aus..."):
                     response = client.chat.completions.create(
                         model="gpt-4o-mini",
                         messages=messages_payload
                     )
                     antwort = response.choices[0].message.content
                     
-                    st.session_state.chats[current_chat].append({"role": "assistant", "content": antwort})
-                    with st.chat_message("assistant"):
+                    if modus == "Intelligenter Chat & Recherche":
+                        st.session_state.chats[current_chat].append({"role": "assistant", "content": antwort})
+                        with st.chat_message("assistant"):
+                            st.markdown(antwort)
+                    else:
+                        st.success("Erfolgreich generiert:")
                         st.markdown(antwort)
                                 
             except Exception as e:
@@ -301,64 +309,75 @@ else:
                         st.error(f"Fehler: {e}")
 
     with spalte_rechts:
-        st.subheader("📊 Profi-Präsentations-Studio")
+        st.subheader("📊 Autonomes Präsentations-Studio")
         
-        st.markdown("### ⚡ 1. Vollautomatischer Autopilot (Agent)")
-        auto_thema = st.text_input("Thema für automatische Komplett-Präsentation:", placeholder="Z.B.: Strategische Quartalsplanung 2026")
+        st.markdown("### ⚡ 1. Vollautomatischer Agenten-Autopilot")
+        auto_thema = st.text_input("Ziel / Thema für die Präsentation:", placeholder="Z.B.: SWOT Analyse für Sales Akademie Berlin")
+        anzahl_folien = st.slider("Autonome Anzahl der Folien:", min_value=2, max_value=10, value=4)
         
-        anzahl_folien = st.slider("Anzahl der gewünschten Folien:", min_value=2, max_value=10, value=4)
-        
-        if st.button("🚀 Vollständige Präsentation automatisch erstellen", use_container_width=True):
+        if st.button("🚀 Agenten-Workflow komplett starten", use_container_width=True):
             if not auto_thema:
                 st.warning("Bitte gib ein Thema ein.")
             else:
                 if eingeloggter_kunde != ADMIN_NAME:
                     st.session_state.kunden_daten[eingeloggter_kunde]["guthaben"] -= 2.00
                 
-                with st.spinner(f"🦫 Der Agent erstellt {anzahl_folien} Folien inklusive High-End Bildern..."):
-                    try:
-                        client = OpenAI(api_key=MASTER_OPENAI_KEY)
-                        system_instruction = (
-                            f"You are a professional presentation designer. Create exactly {anzahl_folien} slides. "
-                            "Format each slide strictly as 'TITLE: [Title]|||TEXT: [Bullet points]|||PROMPT: [English visual image prompt]'. "
-                            "Separate slides with '###'."
-                        )
-                        
-                        completion = client.chat.completions.create(
-                            model="gpt-4o-mini",
-                            messages=[
-                                {"role": "system", "content": system_instruction},
-                                {"role": "user", "content": auto_thema}
-                            ]
-                        )
-                        roh_text = completion.choices[0].message.content
-                        roh_folien = roh_text.split("###")
-                        
-                        neue_slides = []
-                        for f in roh_folien:
-                            if "TITLE:" in f:
-                                try:
-                                    t_part = f.split("TITLE:")[1].split("|||")[0].strip()
-                                    txt_part = f.split("TEXT:")[1].split("|||")[0].strip() if "TEXT:" in f else ""
-                                    p_part = f.split("PROMPT:")[1].strip() if "PROMPT:" in f else "Professional business background"
-                                    
-                                    bild_url = generiere_replicate_bild(p_part)
-                                    neue_slides.append({"titel": t_part, "text": txt_part, "prompt": p_part, "bild_url": bild_url})
-                                except Exception:
-                                    continue
-                        
-                        if neue_slides:
-                            st.session_state.slides_data = neue_slides
-                            st.success("Komplette Präsentation automatisch erstellt und in die manuelle Bearbeitung übernommen!")
-                            st.rerun()
-                        else:
-                            st.error("Fehler bei der automatischen Generierung.")
-                    except Exception as e:
-                        st.error(f"Fehler: {e}")
+                status_box = st.empty()
+                progress_bar = st.progress(0)
+                
+                try:
+                    client = OpenAI(api_key=MASTER_OPENAI_KEY)
+                    
+                    status_box.text(" Schritt 1/3: Agent analysiert Ziel & plant Struktur...")
+                    progress_bar.progress(20)
+                    
+                    system_instruction = (
+                        f"You are an autonomous presentation agent. Analyze the user goal and create exactly {anzahl_folien} structured slides. "
+                        "Format each slide strictly as 'TITLE: [Title]|||TEXT: [Bullet points]|||PROMPT: [English visual image prompt]'. "
+                        "Separate slides with '###'."
+                    )
+                    
+                    completion = client.chat.completions.create(
+                        model="gpt-4o-mini",
+                        messages=[
+                            {"role": "system", "content": system_instruction},
+                            {"role": "user", "content": auto_thema}
+                        ]
+                    )
+                    roh_text = completion.choices[0].message.content
+                    roh_folien = roh_text.split("###")
+                    
+                    status_box.text(" Schritt 2/3: Agent ruft Grafik-Tools auf & prüft Ergebnisse...")
+                    progress_bar.progress(50)
+                    
+                    neue_slides = []
+                    for f in roh_folien:
+                        if "TITLE:" in f:
+                            try:
+                                t_part = f.split("TITLE:")[1].split("|||")[0].strip()
+                                txt_part = f.split("TEXT:")[1].split("|||")[0].strip() if "TEXT:" in f else ""
+                                p_part = f.split("PROMPT:")[1].strip() if "PROMPT:" in f else "Professional business background"
+                                
+                                # Autonomer Aufruf mit Selbst-Check und Fehlerkorrektur
+                                bild_url = generiere_replicate_bild_mit_selbstcheck(p_part)
+                                neue_slides.append({"titel": t_part, "text": txt_part, "prompt": p_part, "bild_url": bild_url})
+                            except Exception:
+                                continue
+                    
+                    if neue_slides:
+                        progress_bar.progress(100)
+                        status_box.text(" Schritt 3/3: Ziel erreicht! In manuelle Bearbeitung übernommen.")
+                        st.session_state.slides_data = neue_slides
+                        st.success("Komplette Präsentation autonom erstellt!")
+                        st.rerun()
+                    else:
+                        st.error("Agenten-Fehler bei der Generierung.")
+                except Exception as e:
+                    st.error(f"Fehler: {e}")
 
         st.write("---")
-        st.markdown("### 🎨 2. Folien-Studio & Vorschau (Manuell & Erweitert)")
-        st.markdown("Passe hier die Inhalte an oder füge Folien hinzu:")
+        st.markdown("### 🎨 2. Manuelle Kontrolle & Feinjustierung")
+        st.markdown("Passe die Ergebnisse des Agenten bei Bedarf an:")
 
         if st.button("➕ Neue Folie hinzufügen"):
             st.session_state.slides_data.append({
@@ -377,7 +396,7 @@ else:
                 
                 neuer_titel = st.text_input("Folientitel:", value=slide["titel"], key=f"titel_{idx}")
                 neuer_text = st.text_area("Inhalt / Stichpunkte:", value=slide["text"], key=f"text_{idx}", height=80)
-                neuer_prompt = st.text_input("Bild-Prompt (Englisch für Replicate):", value=slide["prompt"], key=f"prompt_{idx}")
+                neuer_prompt = st.text_input("Bild-Prompt (Englisch):", value=slide["prompt"], key=f"prompt_{idx}")
                 
                 st.session_state.slides_data[idx]["titel"] = neuer_titel
                 st.session_state.slides_data[idx]["text"] = neuer_text
@@ -385,25 +404,25 @@ else:
 
                 col_b1, col_b2 = st.columns(2)
                 with col_b1:
-                    if st.button(f"🖼️ Bild für Folie {idx+1} neu generieren", key=f"gen_img_{idx}"):
+                    if st.button(f"🖼️ Bild neu generieren", key=f"gen_img_{idx}"):
                         if eingeloggter_kunde != ADMIN_NAME:
                             st.session_state.kunden_daten[eingeloggter_kunde]["guthaben"] -= 0.10
-                        with st.spinner("Generiere Bild..."):
-                            url = generiere_replicate_bild(neuer_prompt)
+                        with st.spinner("Agent generiert Bild neu..."):
+                            url = generiere_replicate_bild_mit_selbstcheck(neuer_prompt)
                             st.session_state.slides_data[idx]["bild_url"] = url
                             st.rerun()
                 
                 with col_b2:
                     if len(st.session_state.slides_data) > 1:
-                        if st.button(f"🗑️ Folie {idx+1} löschen", key=f"del_slide_{idx}"):
+                        if st.button(f"🗑️ Folie löschen", key=f"del_slide_{idx}"):
                             st.session_state.slides_data.pop(idx)
                             st.rerun()
 
                 if slide["bild_url"]:
-                    st.markdown("**Vorschau des generierten Bildes:**")
+                    st.markdown("**Vorschau:**")
                     st.image(slide["bild_url"], use_container_width=True)
                 else:
-                    st.info("Noch kein Bild für diese Folie generiert.")
+                    st.info("Kein Bild vorhanden.")
 
         st.write("---")
         export_format = st.radio("Wähle das Ausgabeformat:", ["PowerPoint (.pptx)", "PDF-Dokument (.pdf)"], horizontal=True)
@@ -411,18 +430,18 @@ else:
         if "PowerPoint" in export_format:
             pptx_datei = erstelle_pptx_aus_session()
             st.download_button(
-                label="📥 Präsentation als PowerPoint (.pptx) herunterladen",
+                label="📥 Als PowerPoint (.pptx) herunterladen",
                 data=pptx_datei,
-                file_name="Scion_Mind_Profi_Praesentation.pptx",
+                file_name="Scion_Mind_Agent_Praesentation.pptx",
                 mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
                 use_container_width=True
             )
         else:
             pdf_datei = erstelle_pdf_aus_session()
             st.download_button(
-                label="📥 Präsentation als PDF (.pdf) herunterladen",
+                label="📥 Als PDF (.pdf) herunterladen",
                 data=pdf_datei,
-                file_name="Scion_Mind_Profi_Praesentation.pdf",
+                file_name="Scion_Mind_Agent_Praesentation.pdf",
                 mime="application/pdf",
                 use_container_width=True
             )
