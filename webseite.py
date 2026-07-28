@@ -95,20 +95,18 @@ init_db()
 def get_db_connection():
     return sqlite3.connect("scion_mind_enterprise.db", check_same_thread=False)
 
-# Hintergrund-Scheduler / 24/7 Daemon Worker (simuliert Celery/Cron im Hintergrund)
 def background_daemon_worker():
     while True:
-        time.sleep(120) # Alle 2 Minuten Background-Check
+        time.sleep(120)
         try:
             conn = get_db_connection()
             cursor = conn.cursor()
-            cursor.execute("INSERT INTO daemon_logs (zeit, aktion, status) VALUES (datetime('datetime', 'localtime'), 'Automatisierter 24/7 Hintergrund-Healthcheck & API-Ping', 'Erfolgreich')")
+            cursor.execute("INSERT INTO daemon_logs (zeit, aktion, status) VALUES (datetime('now', 'localtime'), 'Automatisierter 24/7 Hintergrund-Healthcheck & API-Ping', 'Erfolgreich')")
             conn.commit()
             conn.close()
         except Exception:
             pass
 
-# Daemon im Hintergrund-Thread starten (falls noch nicht aktiv)
 if "daemon_started" not in st.session_state:
     st.session_state.daemon_started = True
     threading.Thread(target=background_daemon_worker, daemon=True).start()
@@ -216,7 +214,7 @@ with st.sidebar:
             st.rerun()
 
 # -------------------------------------------------------------
-# CORE ENGINES (Playwright, Multi-Model, Guardrails, WebRTC Audio)
+# CORE ENGINES
 # -------------------------------------------------------------
 def echter_playwright_browser_operator(url, befehl):
     if not PLAYWRIGHT_AVAILABLE:
@@ -380,8 +378,8 @@ else:
                 knoten_3 = st.selectbox("Schritt 3 (Optimierung):", ["Critic Self-Correction Loop", "Multi-Model Schwarm (Claude/GPT)"])
                 knoten_4 = st.selectbox("Schritt 4 (Ausgabe):", ["Präsentations-Generator", "PDF Report Export", "CRM Push API"])
 
-             workflow_thema = st.text_input("Workflow-Ziel / Thema:", placeholder="Z.B.: Erstelle Vertriebs-Pipeline Analyse")
-             aufgabe = workflow_thema if st.button("🚀 Visuellen Workflow ausführen", use_container_width=True) else None
+            workflow_thema = st.text_input("Workflow-Ziel / Thema:", placeholder="Z.B.: Erstelle Vertriebs-Pipeline Analyse")
+            aufgabe = workflow_thema if st.button("🚀 Visuellen Workflow ausführen", use_container_width=True) else None
              
         elif modus == "Playwright Headless Browser-Operator":
             st.markdown("### 🌐 Echter Playwright Headless Browser Operator")
