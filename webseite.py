@@ -37,7 +37,7 @@ st.write("---")
 
 MASTER_OPENAI_KEY = st.secrets["OPENAI_API_KEY"]
 IMAGE_API_KEY = st.secrets.get("VIDEO_API_KEY", MASTER_OPENAI_KEY)
-TAVILY_API_KEY = st.secrets.get("TAVILY_API_KEY", "")  # Optional für echte Websuche
+TAVILY_API_KEY = st.secrets.get("TAVILY_API_KEY", "")
 
 ADMIN_NAME = "Christian"
 ADMIN_PASS = "ScionMind#2026!Secured"
@@ -165,7 +165,6 @@ def get_cached_ai_response(model_name, system_content, user_content):
     )
     return response.choices[0].message.content
 
-# NEU: Echte Deep-Web-Search Funktion via Tavily API (Fallback auf GPT-Simulierung, wenn kein Key hinterlegt)
 def echte_deep_web_recherche(query):
     if TAVILY_API_KEY:
         try:
@@ -179,20 +178,17 @@ def echte_deep_web_recherche(query):
         except Exception:
             pass
     
-    # Fallback / Simulierte Deep Search mit GPT-4o-mini
     return get_cached_ai_response(
         "gpt-4o-mini",
         "Du bist ein Deep-Web-Research-Agent. Führe eine gründliche Recherche durch und liefere fundierte Fakten.",
         query
     )
 
-# NEU: Autonome Selbstkorrektur-Schleife (Critic Loop)
 def agenten_mit_selbstkorrektur(system_prompt, initial_input, max_retries=2):
     client = OpenAI(api_key=MASTER_OPENAI_KEY)
     aktueller_text = initial_input
     
     for versuch in range(max_retries + 1):
-        # 1. Ausführung durch den Agenten
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
@@ -202,7 +198,6 @@ def agenten_mit_selbstkorrektur(system_prompt, initial_input, max_retries=2):
         )
         ergebnis = response.choices[0].message.content
         
-        # 2. Kritischer Selbsttest (Critic Agent)
         critique_prompt = f"Prüfe das folgende Ergebnis auf Fehler, Lücken oder Ungenauigkeiten bezüglich der Aufgabe '{initial_input}'. Antworte EXAKT mit 'OK', wenn das Ergebnis perfekt ist. Falls nicht, antworte mit 'FEHLER:' gefolgt von einer präzisen Korrekturanweisung.\n\nErgebnis:\n{ergebnis}"
         critique_res = client.chat.completions.create(
             model="gpt-4o-mini",
@@ -212,7 +207,6 @@ def agenten_mit_selbstkorrektur(system_prompt, initial_input, max_retries=2):
         if "OK" in critique_res.upper() or versuch == max_retries:
             return ergebnis
         else:
-            # Korrekturschleife anpassen
             aktueller_text = f"Korrigiere basierend auf diesem Feedback: {critique_res}\n\nUrsprünglicher Input: {initial_input}"
             
     return ergebnis
@@ -355,7 +349,7 @@ else:
                             df = pd.read_csv(csv_input)
                             daten_inhalt = df.to_string()
                         
-                         prompt_operator = f"Du bist ein präziser RPA-Tabellen-Operator. Führe folgende Aufgabe aus: '{aufgabe}'.\nDaten:\n{daten_inhalt}"
+                        prompt_operator = f"Du bist ein präziser RPA-Tabellen-Operator. Führe folgende Aufgabe aus: '{aufgabe}'.\nDaten:\n{daten_inhalt}"
                         antwort = agenten_mit_selbstkorrektur("Du bist ein Business-Data-Operator.", prompt_operator)
                         st.success("Erfolgreich ausgeführt:")
                         st.markdown(antwort)
@@ -388,7 +382,6 @@ else:
                 st.info("Alle Systeme im grünen Bereich. Keine neuen Anomalien gefunden.")
 
     with spalte_rechts:
-        # EXPANDER 1: Präsentations- & Dokumenten-Studio mit optimalem 4er-Fließband, MCP & Selbstkorrektur
         with st.expander("📊 Autonomes Präsentations- & Dokumenten-Studio öffnen", expanded=False):
             st.markdown("### ⚡ Optimales 4er-Fließband (MCP & A2A)")
             auto_thema = st.text_input("Ziel / Thema für die Präsentation:", placeholder="Z.B.: Marktanalyse & Strategie 2026")
@@ -408,7 +401,6 @@ else:
                     progress_bar = st.progress(0)
                     
                     try:
-                        # SCHRITT 1: Agent 1 (Researcher / Scout mit Deep Web & Selbstkorrektur)
                         status_box.text(" Agent 1/4 (Researcher / Scout): Führt echte Deep-Web-Recherche durch...")
                         progress_bar.progress(15)
                         recherche_roh = echte_deep_web_recherche(auto_thema)
@@ -417,7 +409,6 @@ else:
                             recherche_roh
                         )
 
-                        # SCHRITT 2: Agent 2 (Stratege / Architekt mit MCP-Standard-Payload)
                         status_box.text(" Agent 2/4 (Stratege / Architekt): Baut das logische Storyboard über MCP-Protokoll...")
                         progress_bar.progress(35)
                         mcp_payload = json.dumps({"source": "Agent1", "target": "Agent2", "context": recherche_ergebnis, "slides": anzahl_folien}, ensure_ascii=False)
@@ -426,7 +417,6 @@ else:
                             mcp_payload
                         )
 
-                        # SCHRITT 3: Agent 3 (Copywriter / Redakteur mit Korrekturschleife)
                         status_box.text(" Agent 3/4 (Copywriter / Redakteur): Formuliert verkaufsstarke Bullet-Points...")
                         progress_bar.progress(60)
                         
@@ -438,7 +428,6 @@ else:
                         roh_text = agenten_mit_selbstkorrektur(system_instruction, auto_thema)
                         roh_folien = roh_text.split("###")
 
-                        # SCHRITT 4: Agent 4 (Art Director / Designer) & Asynchrone Bildgenerierung (Multi-Threading)
                         status_box.text(" Agent 4/4 (Art Director / Designer): Generiert High-End Bilder parallel via Multi-Threading...")
                         progress_bar.progress(85)
                         
@@ -546,7 +535,6 @@ else:
                     use_container_width=True
                 )
 
-        # EXPANDER 2: Echtzeit-Sprachagent & Audio-Generator
         with st.expander("🎙️ Echtzeit-Sprachagent (Voice Agent) & Audio", expanded=False):
             st.markdown("### ⚡ Live-Sprachchat (Voice Interface)")
             st.markdown("Nutze das Echtzeit-Audio-Widget, um direkt per Mikrofon mit dem Agenten zu sprechen:")
