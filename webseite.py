@@ -11,7 +11,6 @@ import pandas as pd
 import threading
 import imaplib
 import smtplib
-email_lib_available = True
 from email.header import decode_header
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -47,8 +46,8 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("Scion Mind - Enterprise Ultimate AGI Studio (GOD-MODE V6)")
-st.markdown("*designed by Christian Schmidt | Powered by Live Email Integration (IMAP/SMTP), Multi-Agent Debates, Vision & React Flow*")
+st.title("Scion Mind - Enterprise Ultimate AGI Studio (GOD-MODE V6.1)")
+st.markdown("*designed by Christian Schmidt | Powered by Live Email & WhatsApp Integration, Multi-Agent Debates, Vision & React Flow*")
 st.write("---")
 
 MASTER_OPENAI_KEY = st.secrets["OPENAI_API_KEY"]
@@ -91,6 +90,15 @@ def init_db():
             email_passwort TEXT
         )
     """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS whatsapp_config (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT,
+            provider TEXT,
+            api_token TEXT,
+            phone_id TEXT
+        )
+    """)
     cursor.execute("SELECT * FROM kunden WHERE username = ?", (ADMIN_NAME,))
     if not cursor.fetchone():
         cursor.execute("INSERT INTO kunden VALUES (?, ?, ?)", (ADMIN_NAME, ADMIN_PASS, 999.00))
@@ -110,7 +118,7 @@ def background_daemon_worker():
         try:
             conn = get_db_connection()
             cursor = conn.cursor()
-            cursor.execute("INSERT INTO daemon_logs (zeit, aktion, status) VALUES (datetime('now', 'localtime'), 'Autonomer 24/7 Healthcheck & E-Mail-Postfach-Scan', 'Erfolgreich')")
+            cursor.execute("INSERT INTO daemon_logs (zeit, aktion, status) VALUES (datetime('now', 'localtime'), 'Autonomer 24/7 Healthcheck & Postfach/WhatsApp-Scan', 'Erfolgreich')")
             conn.commit()
             conn.close()
         except Exception:
@@ -222,6 +230,23 @@ with st.sidebar:
                 conn.close()
                 st.success("E-Mail-Zugang erfolgreich gesichert!")
 
+        # NEU: Genau hier direkt darunter der WhatsApp-Verknüpfungs-Button / Expander
+        st.header("📱 WhatsApp Business Integration")
+        with st.expander("WhatsApp verknüpfen", expanded=False):
+            wa_provider = st.selectbox("API-Provider:", ["Meta Cloud API", "Twilio API"])
+            wa_token = st.text_input("API Token / Auth Token:", type="password", placeholder="Bearer Token oder Twilio Auth Token")
+            wa_phone_id = st.text_input("Phone Number ID / Account SID:", placeholder="ID oder SID eingeben")
+            
+            if st.button("WhatsApp-Verbindung speichern"):
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                cursor.execute("DELETE FROM whatsapp_config WHERE username = ?", (eingeloggter_kunde,))
+                cursor.execute("INSERT INTO whatsapp_config (username, provider, api_token, phone_id) VALUES (?, ?, ?, ?)",
+                               (eingeloggter_kunde, wa_provider, wa_token, wa_phone_id))
+                conn.commit()
+                conn.close()
+                st.success("WhatsApp erfolgreich verknüpft!")
+
         st.write("---")
         if st.button("Abmelden"):
             st.session_state.aktueller_user = None
@@ -241,7 +266,7 @@ with st.sidebar:
             st.rerun()
 
 # -------------------------------------------------------------
-# CORE ENGINES (Playwright, Multi-Model, Guardrails, E-Mail IMAP/SMTP)
+# CORE ENGINES (IMAP, SMTP, WhatsApp, Playwright, Multi-Model, Vision)
 # -------------------------------------------------------------
 def lade_letzte_emails(username):
     conn = get_db_connection()
@@ -261,10 +286,10 @@ def lade_letzte_emails(username):
         
         status, messages = mail.search(None, "UNSEEN")
         if status != "OK":
-            status, messages = mail.search(None, "ALL") # Fallback auf alle Mails wenn keine ungelesenen
+            status, messages = mail.search(None, "ALL")
             
         mail_ids = messages[0].split()
-        neueste_ids = mail_ids[-5:] # Die letzten 5 Mails
+        neueste_ids = mail_ids[-5:]
         
         ergebnis_liste = []
         for mid in reversed(neueste_ids):
@@ -279,7 +304,7 @@ def lade_letzte_emails(username):
                     from_ = msg.get("From")
                     ergebnis_liste.append(f"- **Von:** {from_}\n  **Betreff:** {subject}")
         mail.logout()
-        return "\n\n".join(ergebnis_liste) if ergebnis_liste.strip() else "Keine neuen E-Mails im Postfach gefunden."
+        return "\n\n".join(ergebnis_liste) if ergebnis_liste else "Keine E-Mails im Postfach gefunden."
     except Exception as e:
         return f"Fehler beim Abrufen der E-Mails: {str(e)}"
 
@@ -308,6 +333,33 @@ def sende_email(username, empfaenger, betreff, inhalt):
         return "E-Mail erfolgreich versendet!"
     except Exception as e:
         return f"Fehler beim E-Mail-Versand: {str(e)}"
+
+def sende_whatsapp(username, empfaenger_nummer, nachricht):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT provider, api_token, phone_id FROM whatsapp_config WHERE username = ?", (username,))
+    row = cursor.fetchone()
+    conn.close()
+    
+    if not row:
+        return "Fehler: Keine WhatsApp-Konfiguration hinterlegt."
+    
+    provider, token, phone_id = row
+    try:
+        if "Meta" in provider:
+            url = f"https://graph.facebook.com/v17.0/{phone_id}/messages"
+            headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+            payload = {"messaging_product": "whatsapp", "to": empfaenger_nummer, "type": "text", "text": {"body": nachricht}}
+            res = requests.post(url, json=payload, headers=headers).json()
+            return f"WhatsApp über Meta Cloud API gesendet! Antwort: {res}"
+        else:
+            # Twilio Fallback
+            from twilio.rest import Client
+            client = Client(phone_id, token) # phone_id dient hier als Account SID
+            msg = client.messages.create(body=nachricht, from_='whatsapp:+14155238886', to=f'whatsapp:{empfaenger_nummer}')
+            return f"WhatsApp über Twilio gesendet! ID: {msg.sid}"
+    except Exception as e:
+        return f"Fehler beim WhatsApp-Versand: {str(e)}"
 
 def echter_playwright_browser_operator(url, befehl):
     if not PLAYWRIGHT_AVAILABLE:
@@ -464,10 +516,10 @@ else:
     spalte_links, spalte_rechts = st.columns([1.1, 0.9])
 
     with spalte_links:
-        st.subheader("🤖 Autonomer KI-Agent (GOD-MODE V6)")
+        st.subheader("🤖 Autonomer KI-Agent (GOD-MODE V6.1)")
         modus = st.selectbox(
             "Agenten-Modus wählen:",
-            ["Intelligenter Chat & Live-Webrecherche", "E-Mail Postfach Assistent", "Multi-Agenten-Debatte (CrewAI)", "Visueller Workflow Builder (React Flow)", "Proaktiver System-Monitor & Outbound", "Playwright Headless Browser-Operator", "Excel / CRM Datacenter"]
+            ["Intelligenter Chat & Live-Webrecherche", "E-Mail & WhatsApp Postfach Assistent", "Multi-Agenten-Debatte (CrewAI)", "Visueller Workflow Builder (React Flow)", "Proaktiver System-Monitor & Outbound", "Playwright Headless Browser-Operator", "Excel / CRM Datacenter"]
         )
         
         current_chat = st.session_state.aktiver_chat
@@ -481,28 +533,34 @@ else:
             uploaded_screenshot = st.file_uploader("📸 Screenshot per Drag-and-Drop einfügen (optional für Vision-Analyse):", type=["png", "jpg", "jpeg"])
             aufgabe = st.chat_input("Gib dem Agenten eine Aufgabe...")
             
-        elif modus == "E-Mail Postfach Assistent":
-            st.markdown("### ✉️ Live E-Mail Postfach Scanner & Antwort-Generator")
-            if st.button("📥 Ungelesene Mails abrufen & analysieren", use_container_width=True):
-                with st.spinner("Verbinde mit Postfach (IMAP)..."):
-                    mails = lade_letzte_emails(eingeloggter_kunde)
-                    st.success("Postfach ausgelesen:")
-                    st.markdown(mails)
+        elif modus == "E-Mail & WhatsApp Postfach Assistent":
+            st.markdown("### ✉️📱 Live Postfach Scanner & Outbound Dispatcher")
+            tab_mail, tab_wa = st.tabs(["E-Mail Postfach", "WhatsApp Versand"])
             
-            st.write("---")
-            ziel_empfaenger = st.text_input("Empfänger-Adresse für Antwort:")
-            mail_betreff = st.text_input("Betreff:")
-            mail_befehl = st.text_area("Schreibe eine Antwort zu folgendem Thema:")
+            with tab_mail:
+                if st.button("📥 Ungelesene E-Mails abrufen", use_container_width=True):
+                    with st.spinner("Verbinde mit IMAP..."):
+                        mails = lade_letzte_emails(eingeloggter_kunde)
+                        st.success("Postfach ausgelesen:")
+                        st.markdown(mails)
+                
+                z_empf = st.text_input("E-Mail Empfänger:")
+                m_betreff = st.text_input("Betreff:")
+                m_befehl = st.text_area("Schreibe Antwort zu Thema:")
+                if st.button("✉️ E-Mail Entwurf erstellen & senden", use_container_width=True):
+                    if z_empf and m_befehl:
+                        ki_ant = agenten_mit_selbstkorrektur("Du bist E-Mail Assistent.", m_befehl)
+                        res = sende_email(eingeloggter_kunde, z_empf, m_betreff, ki_ant)
+                        st.success(res)
+                        st.markdown(ki_ant)
             
-            if st.button("✉️ E-Mail KI-Entwurf erstellen & senden", use_container_width=True):
-                if not ziel_empfaenger or not mail_befehl:
-                    st.warning("Bitte Empfänger und Inhalt angeben.")
-                else:
-                    with st.spinner("Generiere professionelle Antwort..."):
-                        ki_antwort = agenten_mit_selbstkorrektur("Du bist ein geschäftlicher E-Mail-Assistent.", mail_befehl)
-                        versand_res = sende_email(eingeloggter_kunde, ziel_empfaenger, mail_betreff, ki_antwort)
-                        st.success(versand_res)
-                        st.markdown(f"**Gesendeter Text:**\n{ki_antwort}")
+            with tab_wa:
+                wa_nr = st.text_input("Handynummer (inkl. Vorwahl, z.B. +49...):", placeholder="+49170...")
+                wa_text = st.text_area("WhatsApp Nachrichtentext:")
+                if st.button("💬 WhatsApp Nachricht senden", use_container_width=True):
+                    if wa_nr and wa_text:
+                        wa_res = sende_whatsapp(eingeloggter_kunde, wa_nr, wa_text)
+                        st.success(wa_res)
             aufgabe = None
 
         elif modus == "Multi-Agenten-Debatte (CrewAI)":
@@ -514,11 +572,11 @@ else:
             st.markdown("### 🧩 Visueller React Flow Node-Editor")
             col_n1, col_n2 = st.columns(2)
             with col_n1:
-                knoten_1 = st.selectbox("Node A (Source):", ["IMAP Email Inbox", "Image Vision Extractor", "CSV Loader"])
+                knoten_1 = st.selectbox("Node A (Source):", ["IMAP / WhatsApp Inbox", "Image Vision Extractor", "CSV Loader"])
                 knoten_2 = st.selectbox("Node B (Processor):", ["Multi-Agent Debatte", "Guardrail Validator", "Code Interpreter"])
             with col_n2:
                 knoten_3 = st.selectbox("Node C (Optimizer):", ["Critic Self-Correction", "Multi-Model Schwarm"])
-                knoten_4 = st.selectbox("Node D (Action):", ["SMTP Email Dispatch", "PDF Export"])
+                knoten_4 = st.selectbox("Node D (Action):", ["SMTP / WhatsApp Dispatch", "PDF Export"])
             workflow_thema = st.text_input("Workflow-Ziel:", placeholder="Z.B.: Analysiere Postfach und sende Report")
             aufgabe = workflow_thema if st.button("🚀 Visuellen Flow ausführen", use_container_width=True) else None
              
@@ -536,7 +594,7 @@ else:
         else:
             aufgabe = None
 
-        if aufgabe and modus not in ["Proaktiver System-Monitor & Outbound", "E-Mail Postfach Assistent"]:
+        if aufgabe and modus not in ["Proaktiver System-Monitor & Outbound", "E-Mail & WhatsApp Postfach Assistent"]:
             if eingeloggter_kunde != ADMIN_NAME:
                 conn = get_db_connection()
                 cursor = conn.cursor()
@@ -607,16 +665,16 @@ else:
                 st.error(f"Fehler: {e}")
 
         if modus == "Proaktiver System-Monitor & Outbound":
-            st.markdown("### 🛡️ 24/7 Daemon, SQLite & E-Mail Dispatcher")
-            empfaenger = st.text_input("Empfänger-E-Mail:")
-            betreff = st.text_input("Betreff:")
-            nachricht_inhalt = st.text_area("Nachricht / Report:")
-            
-            if st.button("📤 E-Mail sofort senden", use_container_width=True):
-                if not empfaenger or not nachricht_inhalt:
-                    st.warning("Bitte Empfänger und Nachricht ausfüllen.")
+            st.markdown("### 🛡️ 24/7 Daemon, SQLite & Dispatcher")
+            kanal = st.radio("Kanal:", ["E-Mail (SMTP)", "WhatsApp"])
+            empf = st.text_input("Empfänger (Mail oder Nummer):")
+            txt = st.text_area("Nachricht:")
+            if st.button("📤 Sofort senden", use_container_width=True):
+                if kanal.startswith("E-Mail"):
+                    res = sende_email(eingeloggter_kunde, empf, "Autonomer Report", txt)
+                    st.success(res)
                 else:
-                    res = sende_email(eingeloggter_kunde, empfaenger, betreff, nachricht_inhalt)
+                    res = sende_whatsapp(eingeloggter_kunde, empf, txt)
                     st.success(res)
 
             st.write("---")
