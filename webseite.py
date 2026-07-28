@@ -31,6 +31,7 @@ st.markdown("""
 
 st.title("Scion Mind - Enterprise Agent-Studio")
 st.markdown("*designed by Christian Schmidt*")
+st.markdown("*Powered by 4er-A2A*")
 st.write("---")
 
 MASTER_OPENAI_KEY = st.secrets["OPENAI_API_KEY"]
