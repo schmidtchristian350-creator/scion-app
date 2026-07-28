@@ -66,7 +66,7 @@ try:
 except ImportError:
     PLAYWRIGHT_AVAILABLE = False
 
-st.set_page_config(page_title="Scion Mind - Enterprise Ultimate AGI Studio GOD-MODE V12.12", layout="wide")
+st.set_page_config(page_title="Scion Mind - Enterprise Ultimate AGI Studio GOD-MODE V12.13", layout="wide")
 
 st.markdown("""
     <style>
@@ -84,8 +84,8 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("Scion Mind - Enterprise Ultimate AGI Studio (GOD-MODE V12.12)")
-st.markdown("*designed by Christian Schmidt | Powered by Instant-Sync Admin Panel & Sovereign Paywall Core*")
+st.title("Scion Mind - Enterprise Ultimate AGI Studio (GOD-MODE V12.13)")
+st.markdown("*designed by Christian Schmidt | Powered by Wertbasiertem Credit-System & Sovereign Paywall Core*")
 st.write("---")
 
 MASTER_OPENAI_KEY = st.secrets["OPENAI_API_KEY"]
@@ -98,7 +98,7 @@ ADMIN_NAME = "Christian"
 ADMIN_PASS = "ScionMind#2026!Secured"
 
 # -------------------------------------------------------------
-# SQLITE PERSISTENCE & V12.12 TABELLEN
+# SQLITE PERSISTENCE & V12.13 TABELLEN
 # -------------------------------------------------------------
 def init_db():
     conn = sqlite3.connect("scion_mind_enterprise.db", check_same_thread=False)
@@ -261,6 +261,18 @@ init_db()
 
 def get_db_connection():
     return sqlite3.connect("scion_mind_enterprise.db", check_same_thread=False)
+
+# -------------------------------------------------------------
+# WERTBASIERTE CREDIT-ABBUCHUNG (HILFSFUNKTION)
+# -------------------------------------------------------------
+def berechne_und_ziehe_credits_ab(username, kosten):
+    if username == ADMIN_NAME:
+        return
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("UPDATE kunden SET guthaben = MAX(0.0, guthaben - ?) WHERE username = ?", (kosten, username))
+    conn.commit()
+    conn.close()
 
 # -------------------------------------------------------------
 # FASTAPI MICROSERVICE FÜR ECHTE WEBHOOKS (PORT 8000)
@@ -556,7 +568,7 @@ with st.sidebar:
             st.rerun()
 
 # -------------------------------------------------------------
-# CORE ENGINES V12.12 (Inkl. Paywall-Prüfung)
+# CORE ENGINES V12.13 (Inkl. Wertbasiertem Credit-System)
 # -------------------------------------------------------------
 
 def verschruessle_api_key(api_key):
@@ -715,9 +727,6 @@ def langgraph_vorstands_schwarm(ziel):
         if SENTRY_AVAILABLE:
             sentry_sdk.capture_exception(e)
         return f"LangGraph Fehler: {str(e)}"
-
-def hierarchischer_vorstands_schwarm(ziel):
-    return langgraph_vorstands_schwarm(ziel)
 
 def generiere_und_teste_code_mit_qa(funktions_ziel):
     client = OpenAI(api_key=MASTER_OPENAI_KEY)
@@ -1095,7 +1104,7 @@ def selbstevaluierender_lern_agent(system_prompt, initial_input, use_local=False
     reflektion_res = ausfuehren_mit_ollama_fallback("Du bist Meta-Learning Optimizer.", f"Aufgabe: {initial_input}\nErgebnis: {ergebnis}", use_local=use_local)
     
     speichere_agenten_lernen("Chat-Optimierung", reflektion_res, dynamischer_prompt)
-    return wende_guardrails_an(ergebnis + f"\n\n---\n🧬 *[Scion Mind V12.12 Sovereign Core]: Instant-Sync Admin Panel aktiv.*")
+    return wende_guardrails_an(ergebnis + f"\n\n---\n🧬 *[Scion Mind V12.13 Sovereign Core]: Wertbasiertes Credit-System aktiv.*")
 
 def generiere_replicate_bild_mit_selbstcheck(prompt):
     for versuch in range(2):
@@ -1168,7 +1177,7 @@ else:
         spalte_links, spalte_rechts = st.columns([1.1, 0.9])
 
         with spalte_links:
-            st.subheader("🤖 Autonomer KI-Agent (GOD-MODE V12.12)")
+            st.subheader("🤖 Autonomer KI-Agent (GOD-MODE V12.13)")
             modus = st.selectbox(
                 "Agenten-Modus wählen:",
                 [
@@ -1210,7 +1219,7 @@ else:
                 aufgabe = st.chat_input("Gib dem Agenten eine Aufgabe (Souveränes LiteLLM & RAG aktiv)...")
                 
             elif modus == "🕸️ LangGraph Schwarm (Durable Checkpoints)":
-                st.markdown("### 🕸️ Autonomer LangGraph Vorstands-Schwarm")
+                st.markdown("### 🕸️ Autonomer LangGraph Vorstands-Schwarm *(Schwere Rechenaufgabe: 0.05 €)*")
                 schwarm_ziel = st.text_input("Unternehmensziel / Projekt:", placeholder="Z.B.: Markteintrittsstrategie inklusive Budgetplanung")
                 
                 col_s1, col_s2 = st.columns(2)
@@ -1231,19 +1240,23 @@ else:
                 aufgabe = schwarm_ziel if run_schwarm else None
                 
                 if aufgabe:
-                    with st.spinner("LangGraph Schwarm iteriert und sichert Checkpoints..."):
+                    # Wertbasierter Abzug für schwere Aufgabe: 0.05 €
+                    berechne_nid = eingeloggter_kunde
+                    berechne_und_ziehe_credits_ab(berechne_nid, 0.05)
+                    with st.spinner("LangGraph Schwarm iteriert und sichert Checkpoints (0.05 € berechnet)..."):
                         schwarm_ergebnis = langgraph_vorstands_schwarm(aufgabe)
                         st.success("Konsens erfolgreich gesichert!")
                         st.markdown(schwarm_ergebnis)
                     aufgabe = None
 
             elif modus == "🖥️ Live-Terminal & Realtime Stream":
-                st.markdown("### 🖥️ Live-Terminal & Realtime Stream")
+                st.markdown("### 🖥️ Live-Terminal & Realtime Stream *(Standard: 0.005 €)*")
                 terminal_befehl = st.text_input("Terminal Befehl / Aufgabe:", placeholder="Z.B.: Führe System-Check durch")
                 if st.button("⚡ Live Stream ausführen", use_container_width=True):
                     if terminal_befehl:
+                        berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005)
                         terminal_box = st.empty()
-                        log_text = "[INFO] Starte Scion Terminal V12.12...\n"
+                        log_text = "[INFO] Starte Scion Terminal V12.13 (0.005 € abgezogen)...\n"
                         terminal_box.code(log_text, language="bash")
                         time.sleep(0.5)
                         
@@ -1257,22 +1270,24 @@ else:
                 aufgabe = None
 
             elif modus == "🟢 Lokaler Ollama Fallback (Zero-Cloud)":
-                st.markdown("### 🟢 Souveräner Lokaler Ollama Fallback (100% Offline & DSGVO-sicher)")
+                st.markdown("### 🟢 Souveräner Lokaler Ollama Fallback *(Fast Gratis: 0.005 €)*")
                 lokaler_prompt = st.text_area("Anfrage für lokales Modell (Llama 3):", placeholder="Z.B.: Analysiere sensible Vertragsdaten...")
                 if st.button("🚀 Lokal ausführen (Zero Cloud Data Leak)", use_container_width=True):
                     if lokaler_prompt:
-                        with st.spinner("Frage lokales Ollama ab..."):
+                        berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005)
+                        with st.spinner("Frage lokales Ollama ab (0.005 € abgezogen)..."):
                             lokal_res = ausfuehren_mit_ollama_fallback("Du bist ein sicherer Offline-Assistent.", lokaler_prompt, use_local=True)
                             st.markdown(lokal_res)
                 aufgabe = None
 
             elif modus == "📄 Deep Document OCR & PDF-Parser":
-                st.markdown("### 📄 Multi-Modal Deep Document Intelligence & OCR")
+                st.markdown("### 📄 Multi-Modal Deep Document Intelligence & OCR *(Schwer: 0.05 €)*")
                 uploaded_doc = st.file_uploader("Dokument hochladen:", type=["pdf", "txt", "docx", "png", "jpg"])
                 doc_ziel = st.text_input("Aufgabe für Dokument:", placeholder="Z.B.: Extrahiere Rechnungsbeträge und prüfe Haftung")
                 if st.button("🚀 Analysieren & in FAISS-RAG speichern", use_container_width=True):
                     if uploaded_doc and doc_ziel:
-                        with st.spinner("OCR-Agent analysiert..."):
+                        berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.05)
+                        with st.spinner("OCR-Agent analysiert (0.05 € berechnet)..."):
                             analysis = litellm_router_abfrage("Document OCR Expert", f"Aufgabe: {doc_ziel}\nDatei: {uploaded_doc.name}")
                             conn = get_db_connection()
                             cursor = conn.cursor()
@@ -1285,7 +1300,7 @@ else:
                 aufgabe = None
 
             elif modus == "📊 Analytics & P&L Break-Even Rechner":
-                st.markdown("### 📊 P&L-Break-Even & Margin Calculator")
+                st.markdown("### 📊 P&L-Break-Even & Margin Calculator *(Standard: 0.005 €)*")
                 st.markdown("Berechne sofort finanzielle Kennzahlen für maximale unternehmerische Kontrolle:")
                 
                 p_fix = st.number_input("Monatliche Fixkosten (€):", value=15000.0, step=1000.0)
@@ -1293,16 +1308,18 @@ else:
                 p_var = st.number_input("Variable Kosten pro Stück (€):", value=50.0, step=5.0)
                 
                 if st.button("💰 P&L-Break-Even berechnen", use_container_width=True):
+                    berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005)
                     pl_ergebnis = berechne_pl_break_even(p_fix, p_preis, p_var)
                     st.markdown(pl_ergebnis)
                 aufgabe = None
 
             elif modus == "🛠️ Recursive Tool Creator & Git-Ops":
-                st.markdown("### 🛠️ Recursive Tool Creator & Git-Commit Agent")
+                st.markdown("### 🛠️ Recursive Tool Creator & Git-Commit Agent *(Schwer: 0.05 €)*")
                 tool_idee = st.text_area("Tool-Beschreibung:", placeholder="Z.B.: Ein Tool, das Börsenkurse abruft.")
                 if st.button("✨ Tool autonom generieren & als Git-Commit sichern", use_container_width=True):
                     if tool_idee:
-                        with st.spinner("Agent schreibt, testet und commited sein Tool..."):
+                        berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.05)
+                        with st.spinner("Agent schreibt, testet und commited sein Tool (0.05 € berechnet)..."):
                             tool_ergebnis = erzeuge_rekursives_tool(tool_idee)
                             git_res = simuliere_git_commit(f"Added custom tool: {tool_idee[:30]}")
                             st.markdown(tool_ergebnis)
@@ -1310,13 +1327,14 @@ else:
                 aufgabe = None
 
             elif modus == "🎯 Autonomer Deep Web-Scraper & Lead-Gen":
-                st.markdown("### 🎯 Pydantic-gesteuerter Lead-Generator & Scraper")
+                st.markdown("### 🎯 Pydantic-gesteuerter Lead-Generator & Scraper *(Schwer: 0.05 €)*")
                 c_branche = st.text_input("Branche:", placeholder="Z.B.: Handwerksbetriebe")
                 c_region = st.text_input("Region:", placeholder="Z.B.: Erfurt")
                 
                 if st.button("🚀 Pydantic Scraper starten", use_container_width=True):
                     if c_branche and c_region:
-                        with st.spinner("Scraper crawlt Leads und validiert Schemata..."):
+                        berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.05)
+                        with st.spinner("Scraper crawlt Leads und validiert Schemata (0.05 € berechnet)..."):
                             res_leads = ausfuehren_deep_lead_scraper(c_branche, c_region)
                             st.success(res_leads)
                             
@@ -1331,41 +1349,44 @@ else:
                 aufgabe = None
 
             elif modus == "🧪 Automatisiertes Self-Testing & QA-Agent":
-                st.markdown("### 🧪 Automatisiertes Self-Testing & QA-Agent (Pytest)")
+                st.markdown("### 🧪 Automatisiertes Self-Testing & QA-Agent (Pytest) *(Schwer: 0.05 €)*")
                 qa_ziel = st.text_area("Funktions-Ziel:", placeholder="Z.B.: Schreibe Funktion zur Validierung von IBAN-Nummern")
                 if st.button("🚀 QA-Testsuite ausführen", use_container_width=True):
                     if qa_ziel:
-                        with st.spinner("QA-Agent generiert Code, Unit-Tests und testet in Sandbox..."):
+                        berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.05)
+                        with st.spinner("QA-Agent generiert Code, Unit-Tests und testet in Sandbox (0.05 € berechnet)..."):
                             qa_bericht = generiere_und_teste_code_mit_qa(qa_ziel)
                             st.markdown(qa_bericht)
                 aufgabe = None
 
             elif modus == "🔄 Asynchrone Task-Queue (Hintergrund-Schwarm)":
-                st.markdown("### 🔄 Asynchrone ThreadPool Task-Queue")
+                st.markdown("### 🔄 Asynchrone ThreadPool Task-Queue *(Standard: 0.005 €)*")
                 t_agent = st.selectbox("Agenten-Typ:", ["Vertriebs-Agent", "Compliance-Prüfer", "Support-Autoresponder", "Finanz-Analyst"])
                 t_ziel = st.text_area("Aufgabe für den Hintergrund-Agenten:")
                 if st.button("🚀 In Task-Queue einreihen", use_container_width=True):
                     if t_ziel:
+                        berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005)
                         conn = get_db_connection()
                         cursor = conn.cursor()
                         cursor.execute("INSERT INTO async_task_queue (zeit, agent_typ, task_ziel, status, ergebnis) VALUES (datetime('now', 'localtime'), ?, ?, 'Offen', 'Wartet...')",
                                        (t_agent, t_ziel))
                         conn.commit()
                         conn.close()
-                        st.success("Task im Hintergrund-Schwarm eingereiht!")
+                        st.success("Task im Hintergrund-Schwarm eingereiht (0.005 € berechnet)!")
                 aufgabe = None
 
             elif modus == "🛠️ Closed-Loop Self-Healing Sandbox (REPL)":
-                st.markdown("### 🛠️ Closed-Loop Self-Healing Code-Interpreter")
+                st.markdown("### 🛠️ Closed-Loop Self-Healing Code-Interpreter *(Standard: 0.005 €)*")
                 user_code = st.text_area("Python Code:", value="import pandas as pd\ndf = pd.DataFrame({'A': [10, 20]})\nprint(df['A'].mean())", height=150)
                 if st.button("🚀 Closed-Loop Ausführung starten", use_container_width=True):
-                    with st.spinner("Führe aus & heile Fehler automatisch..."):
+                    berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005)
+                    with st.spinner("Führe aus & heile Fehler automatisch (0.005 € berechnet)..."):
                         ergebnis = ausfuehren_in_self_healing_sandbox(user_code)
                         st.markdown(ergebnis)
                 aufgabe = None
 
             elif modus == "🔐 Fernet Verschlüsselter API-Key Vault":
-                st.markdown("### 🔐 Enterprise Fernet Zero-Knowledge Key Vault")
+                st.markdown("### 🔐 Enterprise Fernet Zero-Knowledge Key Vault *(Gratis)*")
                 v_service = st.selectbox("Service:", ["OpenAI Key", "Anthropic Key", "Tavily Key", "Replicate Key"])
                 v_key = st.text_input("API Key:", type="password")
                 if st.button("🔒 Verschlüsseln & Sichern", use_container_width=True):
@@ -1381,28 +1402,30 @@ else:
                 aufgabe = None
 
             elif modus == "📚 Vektor-DB & RAG (Wissens-Archiv)":
-                st.markdown("### 📚 FAISS Vektor-DB & RAG Wissens-Archiv")
+                st.markdown("### 📚 FAISS Vektor-DB & RAG Wissens-Archiv *(Standard: 0.005 €)*")
                 rag_titel = st.text_input("Dokument Titel:")
                 rag_inhalt = st.text_area("Inhalt:")
                 if st.button("📥 In FAISS DB indizieren", use_container_width=True):
                     if rag_titel and rag_inhalt:
+                        berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005)
                         conn = get_db_connection()
                         cursor = conn.cursor()
                         cursor.execute("INSERT INTO rag_documents (titel, inhalt, vektor_metadaten) VALUES (?, ?, ?)", 
                                        (rag_titel, rag_inhalt, "FAISS-v2"))
                         conn.commit()
                         conn.close()
-                        st.success("Erfolgreich indiziert!")
+                        st.success("Erfolgreich indiziert (0.005 € berechnet)!")
                 aufgabe = None
 
             elif modus == "🔔 Event Webhooks & Live-Trigger":
-                st.markdown("### 🔔 Event-gesteuerte Webhooks (FastAPI)")
+                st.markdown("### 🔔 Event-gesteuerte Webhooks (FastAPI) *(Standard: 0.005 €)*")
                 st.info("FastAPI Gateway aktiv unter `http://127.0.0.1:8000/webhook/inbound`")
                 event_kanal = st.selectbox("Kanal:", ["WhatsApp Webhook", "IMAP Trigger", "CRM Hook"])
                 event_text = st.text_area("Payload:")
                 if st.button("⚡ Verarbeiten", use_container_width=True):
                     if event_text:
-                        with st.spinner("Verarbeite..."):
+                        berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005)
+                        with st.spinner("Verarbeite (0.005 € berechnet)..."):
                             ki_antwort = selbstevaluierender_lern_agent("Event Bot", f"Event auf {event_kanal}: {event_text}")
                             conn = get_db_connection()
                             cursor = conn.cursor()
@@ -1415,7 +1438,7 @@ else:
                 aufgabe = None
 
             elif modus == "🧬 Selbstlern-Gedächtnis (Meta-Memory)":
-                st.markdown("### 🧠 Autonomes Meta-Learning Gedächtnis")
+                st.markdown("### 🧠 Autonomes Meta-Learning Gedächtnis *(Gratis)*")
                 conn = get_db_connection()
                 cursor = conn.cursor()
                 cursor.execute("SELECT id, zeit, aufgabe_typ, erkenntnis FROM agent_memory ORDER BY id DESC")
@@ -1429,18 +1452,19 @@ else:
                 aufgabe = None
 
             elif modus == "📊 Konkurrenten SWOT-Analyzer":
-                st.markdown("### 📊 One-Click Competitor SWOT-Analyzer")
+                st.markdown("### 📊 One-Click Competitor SWOT-Analyzer *(Schwer: 0.05 €)*")
                 konkurrent_input = st.text_input("Name oder Website des Mitbewerbers:", placeholder="Z.B.: Mitbewerber GmbH")
                 if st.button("🚀 SWOT-Analyse starten", use_container_width=True):
                     if konkurrent_input:
-                        with st.spinner("Analysiere Marktposition & Web-Daten..."):
+                        berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.05)
+                        with st.spinner("Analysiere Marktposition & Web-Daten (0.05 € berechnet)..."):
                             swot_bericht = starte_swot_analyse(konkurrent_input)
                             st.success("SWOT-Analyse erfolgreich erstellt:")
                             st.markdown(swot_bericht)
                 aufgabe = None
 
             elif modus == "Visueller React Flow Node-Canvas":
-                st.markdown("### 🧩 Interaktiver React Flow Node-Canvas")
+                st.markdown("### 🧩 Interaktiver React Flow Node-Canvas *(Standard: 0.005 €)*")
                 canvas_html = """
                 <div style="width:100%; height:320px; background:#0f172a; border-radius:12px; padding:20px; color:white; font-family:sans-serif; position:relative; overflow:hidden;">
                     <div style="position:absolute; top:30px; left:40px; background:#334155; padding:12px 20px; border-radius:8px; border:2px solid #38bdf8;">
@@ -1460,28 +1484,34 @@ else:
                 """
                 st.components.v1.html(canvas_html, height=340)
                 flow_befehl = st.text_input("Workflow:", placeholder="Z.B.: Starte Pipeline...")
-                aufgabe = flow_befehl if st.button("🚀 Canvas ausführen", use_container_width=True) else None
+                if st.button("🚀 Canvas ausführen", use_container_width=True):
+                    berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005)
+                    aufgabe = flow_befehl
+                else:
+                    aufgabe = None
 
             elif modus == "Echtes WebRTC Realtime Audio":
-                st.markdown("### 🎙️ Bidirektionales WebRTC Audio-Streaming")
+                st.markdown("### 🎙️ Bidirektionales WebRTC Audio-Streaming *(Standard: 0.005 €)*")
                 if st.button("🔴 WebRTC Session verbinden", use_container_width=True):
-                    st.success("WebRTC Audio aktiv!")
+                    berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005)
+                    st.success("WebRTC Audio aktiv (0.005 € berechnet)!")
                     st.audio("https://actions.google.com/sounds/v1/ambiences/office_ambience.ogg", format="audio/mp3", autoplay=True)
                 aufgabe = None
 
             elif modus == "MCP Server Dashboard":
-                st.markdown("### 🔌 Model Context Protocol (MCP) Server")
+                st.markdown("### 🔌 Model Context Protocol (MCP) Server *(Gratis)*")
                 mcp_res = lade_mcp_ressourcen()
                 for sname, uri, stat in mcp_res:
                     st.success(f"**{sname}** — URI: `{uri}` — Status: `{stat}`")
                 aufgabe = None
 
             elif modus == "E-Mail & WhatsApp Postfach Assistent":
-                st.markdown("### ✉️📱 Postfach Scanner & Sentiment Autoresponder")
+                st.markdown("### ✉️📱 Postfach Scanner & Sentiment Autoresponder *(Standard: 0.005 €)*")
                 tab_mail, tab_wa = st.tabs(["E-Mail & Sentiment", "WhatsApp"])
                 with tab_mail:
                     if st.button("📥 E-Mails abrufen & analysieren", use_container_width=True):
-                        with st.spinner("Lese IMAP & bewerte Sentiment..."):
+                        berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005)
+                        with st.spinner("Lese IMAP & bewerte Sentiment (0.005 € berechnet)..."):
                             mails = lade_letzte_emails(eingeloggter_kunde)
                             st.success("Postfach nach Sentiment geclustert:")
                             st.markdown(mails)
@@ -1490,6 +1520,7 @@ else:
                     m_befehl = st.text_area("Thema:")
                     if st.button("✉️ E-Mail senden", use_container_width=True):
                         if z_empf and m_befehl:
+                            berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005)
                             ki_ant = selbstevaluierender_lern_agent("Mail Assistent", m_befehl)
                             res = sende_email(eingeloggter_kunde, z_empf, m_betreff, ki_ant)
                             st.success(res)
@@ -1498,20 +1529,29 @@ else:
                     wa_text = st.text_area("Nachricht:")
                     if st.button("💬 WhatsApp senden", use_container_width=True):
                         if wa_nr and wa_text:
+                            berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005)
                             wa_res = sende_whatsapp(eingeloggter_kunde, wa_nr, wa_text)
                             st.success(wa_res)
                 aufgabe = None
 
             elif modus == "Multi-Agenten-Debatte (LangGraph)":
-                st.markdown("### 👥 LangGraph Multi-Agenten-Rollenspiel")
+                st.markdown("### 👥 LangGraph Multi-Agenten-Rollenspiel *(Schwer: 0.05 €)*")
                 debatten_ziel = st.text_input("Thema:", placeholder="Z.B.: Strategische Expansion")
-                aufgabe = debatten_ziel if st.button("🚀 Debatte starten", use_container_width=True) else None
+                if st.button("🚀 Debatte starten", use_container_width=True):
+                    berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.05)
+                    aufgabe = debatten_ziel
+                else:
+                    aufgabe = None
                  
             elif modus == "Computer-Use Browser-Operator":
-                st.markdown("### 🌐 Computer-Use Browser-Operator")
+                st.markdown("### 🌐 Computer-Use Browser-Operator *(Schwer: 0.05 €)*")
                 url_ziel = st.text_input("Ziel-URL:", placeholder="https://example.com")
                 rpa_aktion = st.text_area("RPA-Aktion:", placeholder="Z.B.: Klicke Login, fülle Formular aus")
-                aufgabe = rpa_aktion if st.button("🚀 Computer-Use starten", use_container_width=True) else None
+                if st.button("🚀 Computer-Use starten", use_container_width=True):
+                    berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.05)
+                    aufgabe = rpa_aktion
+                else:
+                    aufgabe = None
             else:
                 aufgabe = None
 
@@ -1524,12 +1564,8 @@ else:
                 "🕸️ LangGraph Schwarm (Durable Checkpoints)", "🖥️ Live-Terminal & Realtime Stream", "🟢 Lokaler Ollama Fallback (Zero-Cloud)",
                 "🎯 Autonomer Deep Web-Scraper & Lead-Gen", "🧪 Automatisiertes Self-Testing & QA-Agent", "📊 Konkurrenten SWOT-Analyzer", "Computer-Use Browser-Operator"
             ]:
-                if eingeloggter_kunde != ADMIN_NAME:
-                    conn = get_db_connection()
-                    cursor = conn.cursor()
-                    cursor.execute("UPDATE kunden SET guthaben = guthaben - 0.05 WHERE username = ?", (eingeloggter_kunde,))
-                    conn.commit()
-                    conn.close()
+                # Standard-Chat-Nachricht kostet ultra-faire 0,005 € (1/2 Cent)
+                berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005)
                 
                 try:
                     if modus == "Intelligenter Chat & Live-Webrecherche":
@@ -1539,7 +1575,7 @@ else:
                             if uploaded_screenshot:
                                 st.image(uploaded_screenshot, width=300)
                         
-                        with st.spinner("🧠 Agent verarbeitet mit souveränem LiteLLM Router & FAISS RAG..."):
+                        with st.spinner("🧠 Agent verarbeitet mit souveränem LiteLLM Router & FAISS RAG (0.005 € berechnet)..."):
                             client_vis = OpenAI(api_key=MASTER_OPENAI_KEY)
                             vision_text = ""
                             if uploaded_screenshot:
@@ -1566,20 +1602,20 @@ else:
                             st.markdown(antwort)
                             
                     elif modus == "Multi-Agenten-Debatte (LangGraph)":
-                        with st.spinner("👥 LangGraph Team debattiert..."):
+                        with st.spinner("👥 LangGraph Team debattiert (0.05 € berechnet)..."):
                             antwort = langgraph_vorstands_schwarm(aufgabe)
                             st.success("Konsens:")
                             st.markdown(antwort)
 
                     elif modus == "Visueller React Flow Node-Canvas":
-                        with st.spinner("Führe Workflow aus..."):
+                        with st.spinner("Führe Workflow aus (0.005 € berechnet)..."):
                             time.sleep(1.0)
                             workflow_ergebnis = selbstevaluierender_lern_agent("Canvas Orchestrator", aufgabe)
                             st.success("Erfolgreich:")
                             st.markdown(workflow_ergebnis)
                             
                     elif modus == "Computer-Use Browser-Operator":
-                        with st.spinner("🖥️ Computer-Use Agent steuert Browser..."):
+                        with st.spinner("🖥️ Computer-Use Agent steuert Browser (0.05 € berechnet)..."):
                             titel, screenshot = echter_playwright_browser_operator(url_ziel, aufgabe)
                             st.success(f"Titel: **{titel}**")
                             if screenshot:
@@ -1596,6 +1632,7 @@ else:
                 empf = st.text_input("Empfänger:")
                 txt = st.text_area("Nachricht:")
                 if st.button("📤 Senden", use_container_width=True):
+                    berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005)
                     if kanal.startswith("E-Mail"):
                         res = sende_email(eingeloggter_kunde, empf, "Autonomer Report", txt)
                         st.success(res)
@@ -1615,13 +1652,14 @@ else:
 
         with spalte_rechts:
             with st.expander("📊 Präsentations- & Dokumenten-Studio", expanded=False):
-                st.markdown("### ⚡ Multi-Model Fließband")
+                st.markdown("### ⚡ Multi-Model Fließband *(Schwer: 0.05 €)*")
                 auto_thema = st.text_input("Thema:", placeholder="Z.B.: KI-Strategie 2026")
                 anzahl_folien = st.slider("Folien:", 2, 10, 4)
                 schwarm_anbieter = st.selectbox("Anbieter:", ["OpenAI GPT-4o", "Anthropic Claude (3.5 Sonnet)", "Google Gemini (1.5 Pro)"])
 
                 if st.button("🚀 Präsentation generieren", use_container_width=True):
                     if auto_thema:
+                        berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.05)
                         recherche = selbstevaluierender_lern_agent("Research", echte_deep_web_recherche(auto_thema))
                         story = multi_model_schwarm_antwort(schwarm_anbieter, f"Erstelle {anzahl_folien} Folien.", recherche)
                         roh = selbstevaluierender_lern_agent(f"Format as {anzahl_folien} slides as 'TITLE: [T]|||TEXT: [B]|||PROMPT: [P]' separated by '###'.", story)
@@ -1640,7 +1678,7 @@ else:
                             neue.append({"titel": item["titel"], "text": item["text"], "prompt": item["prompt"], "bild_url": generiere_replicate_bild_mit_selbstcheck(item["prompt"])})
                         if neue:
                             st.session_state.slides_data = neue
-                            st.success("Präsentation erstellt!")
+                            st.success("Präsentation erstellt (0.05 € berechnet)!")
                             st.rerun()
 
                 st.write("---")
@@ -1671,8 +1709,9 @@ else:
 
                         col_b1, col_b2 = st.columns(2)
                         with col_b1:
-                            if st.button(f"🖼️ Bild neu", key=f"gen_img_{idx}", use_container_width=True):
-                                with st.spinner("Generiere Bild..."):
+                            if st.button(f"🖼️ Bild neu (0.05 €)", key=f"gen_img_{idx}", use_container_width=True):
+                                berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.05)
+                                with st.spinner("Generiere Bild via Replicate/Flux (0.05 € berechnet)..."):
                                     url = generiere_replicate_bild_mit_selbstcheck(neuer_prompt)
                                     st.session_state.slides_data[idx]["bild_url"] = url
                                     st.rerun()
@@ -1694,7 +1733,7 @@ else:
                     st.download_button(label="📥 PDF-Dokument (.pdf)", data=erstelle_pdf_aus_session(), file_name="Scion_Mind_Praesentation.pdf", mime="application/pdf", use_container_width=True)
 
             with st.expander("🪄 AI Prompt Optimizer", expanded=False):
-                st.markdown("### 🎯 Master-Prompt-Generator")
+                st.markdown("### 🎯 Master-Prompt-Generator *(Standard: 0.005 €)*")
                 user_idee = st.text_area("Was möchtest du tun?", placeholder="Z.B.: Optimiere diesen Vertriebstext...")
                 
                 if "prompt_chat_history" not in st.session_state:
@@ -1702,6 +1741,7 @@ else:
 
                 if st.button("✨ Prompt optimieren", use_container_width=True):
                     if user_idee:
+                        berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005)
                         res = litellm_router_abfrage("Elite Prompt Engineer", user_idee, model_pref="auto")
                         st.session_state.prompt_chat_history.append({"idee": user_idee, "antwort": res})
                 
@@ -1712,10 +1752,11 @@ else:
                         st.code(item['antwort'], language="markdown")
 
             with st.expander("🎙️ Echtzeit-Sprachagent (Voice Loop)", expanded=False):
-                st.markdown("### ⚡ Live-Sprachchat (Headset)")
+                st.markdown("### ⚡ Live-Sprachchat (Headset) *(Standard: 0.005 €)*")
                 live_audio = st.audio_input("Sprich mit deinem Agenten:")
                 if live_audio is not None:
-                    with st.spinner("Verarbeite Audio..."):
+                    berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005)
+                    with st.spinner("Verarbeite Audio (0.005 € berechnet)..."):
                         try:
                             client_v = OpenAI(api_key=MASTER_OPENAI_KEY)
                             transcript = client_v.audio.transcriptions.create(model="whisper-1", file=("audio.wav", live_audio.read())).text
