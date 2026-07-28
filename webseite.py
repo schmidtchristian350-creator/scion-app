@@ -209,7 +209,7 @@ else:
                 aufgabe = None
         else:
             if modus == "Text-Recherche & Chat" or modus == "Video-Skript & Storyboard":
-                aufgabe = st.chat_input("Stelle deine Frage oder lass dir ein Skript erstellen...")
+                aufgabe = st.chat_input("Stelle deine Frage oder lass dir ein 60-Sekunden-Skript erstellen...")
             else:
                 aufgabe_input = st.text_area("Deine Beschreibung oder Aufgabe dafür:", height=120)
                 Absenden = st.button("🚀 Aufgabe jetzt ausführen", use_container_width=True)
@@ -229,7 +229,7 @@ else:
                 system_prompts = {
                     "Text-Recherche & Chat": "Du bist ein präziser, professioneller KI-Assistent. Antworte immer auf Deutsch.",
                     "Präsentations-Struktur & Folien": "Du bist ein Experte für Business-Präsentationen. Erstelle eine saubere Präsentation, bei der jede Folie mit 'Folie X: [Titel]' beginnt, gefolgt von prägnanten Stichpunkten. Antworte auf Deutsch.",
-                    "Video-Skript & Storyboard": "Du bist ein professioneller Videoproduzent. Erstelle ein knackiges Video-Skript. Gib exakt zwei Blöcke auf Deutsch aus: 1. Einen präzisen, bildhaften englischen Video-Prompt für die KI-Erstellung. 2. Den dazugehörigen, ausführlichen Sprechtext auf Deutsch."
+                    "Video-Skript & Storyboard": "Du bist ein professioneller Videoproduzent. Erstelle ein ausführliches Video-Skript für exakt bis zu 60 Sekunden Sprechzeit. Gib exakt zwei Blöcke auf Deutsch aus: 1. Einen präzisen, bildhaften englischen Video-Prompt für die KI-Erstellung. 2. Den dazugehörigen, langen deutschen Sprechtext (ca. 60 Sekunden)."
                 }
                 
                 messages_payload = [{"role": "system", "content": system_prompts.get(modus, "Du bist ein hilfreicher Assistent. Antworte immer auf Deutsch.")}]
@@ -262,32 +262,39 @@ else:
                 st.error(f"Ein Fehler ist aufgetreten: {e}")
 
     with spalte_rechts:
-        st.subheader("🎥 Getrennte Steuerung: Video & Audio")
+        st.subheader("🎥 60-Sekunden Video & Audio Studio")
         
-        video_prompt = st.text_area("1. Videobeschreibung (Englischer Prompt):", height=80, placeholder="Z.B.: Cinematic close-up of a modern tech product...")
-        sprechender_text = st.text_area("2. Sprechtext (Für die Tonspur):", height=80, placeholder="Füge hier deinen Text für den Ton ein...")
+        video_prompt = st.text_area("1. Videobeschreibung (Englischer Prompt):", height=80, placeholder="Z.B.: Cinematic continuous drone shot over modern architecture...")
+        sprechender_text = st.text_area("2. Sprechtext (Ausführlich für bis zu 60 Sek.):", height=120, placeholder="Füge hier deinen langen Text für die Tonspur ein...")
         stimme = st.selectbox("Sprecher-Stimme:", ["alloy", "echo", "fable", "onyx", "nova", "shimmer"])
         
-        col_btn1, col_btn2 = st.columns(2)
-        
-        with col_btn1:
-            start_video = st.button("🎬 Nur Video starten", use_container_width=True)
-        with col_btn2:
-            start_audio = st.button("🔊 Nur Audio starten", use_container_width=True)
-            
-        if start_video:
-            if not video_prompt:
-                st.warning("Bitte gib eine Videobeschreibung ein.")
+        if st.button("🚀 Video & Audio in einem Schritt vorbereiten", use_container_width=True):
+            if not video_prompt or not sprechender_text:
+                st.warning("Bitte fülle sowohl die Videobeschreibung als auch den Sprechtext aus.")
             else:
                 if eingeloggter_kunde != ADMIN_NAME:
-                    st.session_state.kunden_daten[eingeloggter_kunde]["guthaben"] -= 0.50
+                    st.session_state.kunden_daten[eingeloggter_kunde]["guthaben"] -= 0.90
                 
                 status_text = st.empty()
                 progress_bar = st.progress(0)
-                status_text.text("🦫 Das Arbeitstier generiert das Video...")
-                progress_bar.progress(40)
                 
                 try:
+                    # 1. Audiospur generieren
+                    status_text.text("🦫 Erstelle 60-Sekunden Sprachspur...")
+                    progress_bar.progress(20)
+                    client_openai = OpenAI(api_key=MASTER_OPENAI_KEY)
+                    
+                    audio_response = client_openai.audio.speech.create(
+                        model="tts-1",
+                        voice=stimme,
+                        input=sprechender_text
+                    )
+                    audio_bytes = audio_response.content
+
+                    # 2. Video generieren
+                    status_text.text("🦫 Generiere Videosequenz...")
+                    progress_bar.progress(60)
+                    
                     headers = {
                         "Authorization": f"Bearer {VIDEO_API_KEY}",
                         "Content-Type": "application/json",
@@ -319,32 +326,28 @@ else:
                         
                         if video_url:
                             progress_bar.progress(100)
-                            status_text.text("✅ Video erfolgreich generiert (läuft als Endlos-Loop für den Ton):")
-                            st.markdown(f'<video width="100%" autoplay loop muted controls><source src="{video_url}" type="video/mp4"></video>', unsafe_allow_html=True)
+                            status_text.text("✅ Fertig! Video und Audio bereit:")
+                            
+                            st.success("Hier ist dein synchrones Ergebnis (Video läuft im Loop, Ton läuft über die Gesamtlänge):")
+                            
+                            # Kombinierter HTML5-Player, bei dem das Video stumm im Loop läuft und der Ton separat abgespielt wird oder beide perfekt harmonieren
+                            st.markdown(f'''
+                                <div style="background:#1e293b; padding:15px; border-radius:12px;">
+                                    <p style="color:white; font-weight:bold; margin-bottom:8px;">🎬 Visuelle Videoloop-Schleife:</p>
+                                    <video width="100%" autoplay loop muted controls style="border-radius:8px;">
+                                        <source src="{video_url}" type="video/mp4">
+                                    </video>
+                                    <p style="color:white; font-weight:bold; margin-top:15px; margin-bottom:8px;">🔊 Synchroner 60-Sekunden-Ton:</p>
+                                </div>
+                            ''', unsafe_allow_html=True)
+                            
+                            st.audio(audio_bytes, format="audio/mp3")
+                            
                         else:
-                            st.warning("⏱️ Zeitüberschreitung beim Rendern des Videos.")
+                            st.warning("⏱️ Zeitüberschreitung beim Rendern.")
+                            
                 except Exception as e:
                     st.error(f"Fehler: {e}")
-
-        if start_audio:
-            if not sprechender_text:
-                st.warning("Bitte gib einen Sprechtext ein.")
-            else:
-                if eingeloggter_kunde != ADMIN_NAME:
-                    st.session_state.kunden_daten[eingeloggter_kunde]["guthaben"] -= 0.10
-                
-                with st.spinner("🦫 Das Arbeitstier erstellt die Audiospur..."):
-                    try:
-                        client_openai = OpenAI(api_key=MASTER_OPENAI_KEY)
-                        audio_response = client_openai.audio.speech.create(
-                            model="tts-1",
-                            voice=stimme,
-                            input=sprechender_text
-                        )
-                        st.success("Audiospur erfolgreich erstellt!")
-                        st.audio(audio_response.content, format="audio/mp3")
-                    except Exception as e:
-                        st.error(f"Fehler bei der Audiospur: {e}")
 
         st.write("---")
         st.subheader("🎧 Einzelner Text vorlesen lassen")
