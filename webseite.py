@@ -46,7 +46,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("Scion Mind - Enterprise Ultimate AGI Studio (GOD-MODE V6.1)")
+st.title("Scion Mind - Enterprise Ultimate AGI Studio (GOD-MODE V6.2)")
 st.markdown("*designed by Christian Schmidt | Powered by Live Email & WhatsApp Integration, Multi-Agent Debates, Vision & React Flow*")
 st.write("---")
 
@@ -142,12 +142,13 @@ if "aktiver_chat" not in st.session_state:
     st.session_state.aktiver_chat = "Chat 1"
 
 with st.sidebar:
-    st.header("🔑 Konto & Login (Persistent)")
-    auth_modus = st.radio("Aktion wählen:", ["Einloggen", "Neuen Account erstellen"])
-    
     eingeloggter_kunde = st.session_state.get("aktueller_user", None)
 
+    # 1. WENN NICHT EINGELOGGT: Zeige saubere Login-Maske
     if not eingeloggter_kunde:
+        st.header("🔑 Konto & Login")
+        auth_modus = st.radio("Aktion wählen:", ["Einloggen", "Neuen Account erstellen"], label_visibility="collapsed")
+        
         if auth_modus == "Einloggen":
             login_name = st.text_input("Benutzername:")
             login_pass = st.text_input("Passwort:", type="password")
@@ -186,9 +187,8 @@ with st.sidebar:
                         st.rerun()
                     conn.close()
 
-    eingeloggter_kunde = st.session_state.get("aktueller_user", None)
-
-    if eingeloggter_kunde:
+    # 2. WENN EINGELOGGT: Login-Maske wird komplett ausgeblendet, dafür saubere Übersicht
+    else:
         conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("SELECT guthaben FROM kunden WHERE username = ?", (eingeloggter_kunde,))
@@ -196,13 +196,11 @@ with st.sidebar:
         guthaben = row[0] if row else 0.0
         conn.close()
 
-        st.write("---")
-        st.success(f"Eingeloggt als: **{eingeloggter_kunde}**")
-        
+        st.markdown(f"### 👤 {eingeloggter_kunde}")
         if eingeloggter_kunde == ADMIN_NAME:
-            st.metric(label="Status", value="👑 Admin (Kostenlos)")
+            st.caption("👑 Administrator (Vollzugriff)")
         else:
-            st.metric(label="Dein Guthaben", value=f"{guthaben:.2f} €")
+            st.caption(f"💰 Guthaben: **{guthaben:.2f} €**")
             if st.button("10 € Guthaben aufladen"):
                 conn = get_db_connection()
                 cursor = conn.cursor()
@@ -213,8 +211,8 @@ with st.sidebar:
                 st.rerun()
 
         st.write("---")
-        st.header("✉️ E-Mail-Postfach Integration")
-        with st.expander("Postfach-Zugang konfigurieren", expanded=False):
+        st.markdown("### ✉️ E-Mail-Postfach")
+        with st.expander("Konfigurieren", expanded=False):
             mail_adr = st.text_input("E-Mail Adresse:", placeholder="name@domain.de")
             mail_pwd = st.text_input("Passwort (App-Passwort):", type="password")
             imap_s = st.text_input("IMAP-Server:", value="imap.gmail.com")
@@ -228,14 +226,13 @@ with st.sidebar:
                                (eingeloggter_kunde, imap_s, smtp_s, mail_adr, mail_pwd))
                 conn.commit()
                 conn.close()
-                st.success("E-Mail-Zugang erfolgreich gesichert!")
+                st.success("E-Mail-Zugang gesichert!")
 
-        # NEU: Genau hier direkt darunter der WhatsApp-Verknüpfungs-Button / Expander
-        st.header("📱 WhatsApp Business Integration")
-        with st.expander("WhatsApp verknüpfen", expanded=False):
+        st.markdown("### 📱 WhatsApp Business")
+        with st.expander("Verknüpfen", expanded=False):
             wa_provider = st.selectbox("API-Provider:", ["Meta Cloud API", "Twilio API"])
-            wa_token = st.text_input("API Token / Auth Token:", type="password", placeholder="Bearer Token oder Twilio Auth Token")
-            wa_phone_id = st.text_input("Phone Number ID / Account SID:", placeholder="ID oder SID eingeben")
+            wa_token = st.text_input("API Token / Auth Token:", type="password")
+            wa_phone_id = st.text_input("Phone Number ID / Account SID:")
             
             if st.button("WhatsApp-Verbindung speichern"):
                 conn = get_db_connection()
@@ -245,24 +242,24 @@ with st.sidebar:
                                (eingeloggter_kunde, wa_provider, wa_token, wa_phone_id))
                 conn.commit()
                 conn.close()
-                st.success("WhatsApp erfolgreich verknüpft!")
+                st.success("WhatsApp verknüpft!")
+
+        st.write("---")
+        st.markdown("### 💬 Deine Chats")
+        if st.button("➕ Neuer Chat"):
+            neuer_name = f"Chat {len(st.session_state.chats) + 1}"
+            st.session_state.chats[neuer_name] = []
+            st.session_state.aktiver_chat = neuer_name
+            st.rerun()
+
+        for chat_name in list(st.session_state.chats.keys()):
+            if st.button(chat_name, key=f"btn_{chat_name}"):
+                st.session_state.aktiver_chat = chat_name
+                st.rerun()
 
         st.write("---")
         if st.button("Abmelden"):
             st.session_state.aktueller_user = None
-            st.rerun()
-
-    st.write("---")
-    st.header("💬 Deine Chats")
-    if st.button("➕ Neuer Chat"):
-        neuer_name = f"Chat {len(st.session_state.chats) + 1}"
-        st.session_state.chats[neuer_name] = []
-        st.session_state.aktiver_chat = neuer_name
-        st.rerun()
-
-    for chat_name in list(st.session_state.chats.keys()):
-        if st.button(chat_name, key=f"btn_{chat_name}"):
-            st.session_state.aktiver_chat = chat_name
             st.rerun()
 
 # -------------------------------------------------------------
@@ -353,9 +350,8 @@ def sende_whatsapp(username, empfaenger_nummer, nachricht):
             res = requests.post(url, json=payload, headers=headers).json()
             return f"WhatsApp über Meta Cloud API gesendet! Antwort: {res}"
         else:
-            # Twilio Fallback
             from twilio.rest import Client
-            client = Client(phone_id, token) # phone_id dient hier als Account SID
+            client = Client(phone_id, token)
             msg = client.messages.create(body=nachricht, from_='whatsapp:+14155238886', to=f'whatsapp:{empfaenger_nummer}')
             return f"WhatsApp über Twilio gesendet! ID: {msg.sid}"
     except Exception as e:
@@ -516,7 +512,7 @@ else:
     spalte_links, spalte_rechts = st.columns([1.1, 0.9])
 
     with spalte_links:
-        st.subheader("🤖 Autonomer KI-Agent (GOD-MODE V6.1)")
+        st.subheader("🤖 Autonomer KI-Agent (GOD-MODE V6.2)")
         modus = st.selectbox(
             "Agenten-Modus wählen:",
             ["Intelligenter Chat & Live-Webrecherche", "E-Mail & WhatsApp Postfach Assistent", "Multi-Agenten-Debatte (CrewAI)", "Visueller Workflow Builder (React Flow)", "Proaktiver System-Monitor & Outbound", "Playwright Headless Browser-Operator", "Excel / CRM Datacenter"]
