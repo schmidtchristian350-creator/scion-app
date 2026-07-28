@@ -5,7 +5,10 @@ from io import BytesIO
 import re
 import requests
 import time
-from weasyprint import HTML
+from reportlab.lib.pagesizes import A4, landscape
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image as RLImage, PageBreak
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib import colors
 
 st.set_page_config(page_title="Scion Mind", layout="wide")
 
@@ -41,7 +44,6 @@ if "kunden_daten" not in st.session_state:
         "kunde1": {"passwort": "123", "guthaben": 5.00}
     }
 
-# Session State für das Multi-Slide Studio
 if "slides_data" not in st.session_state:
     st.session_state.slides_data = [
         {"titel": "Folie 1: Willkommen", "text": "Hier steht der Text für Folie 1...", "prompt": "Professional corporate presentation slide background, modern clean style", "bild_url": None}
@@ -183,40 +185,50 @@ def erstelle_pptx_aus_session():
     return pptx_io
 
 def erstelle_pdf_aus_session():
-    html_content = """
-    <!DOCTYPE html>
-    <html>
-    <head>
-    <meta charset="utf-8">
-    <style>
-        @page { size: A4 landscape; margin: 20mm; background-color: #ffffff; }
-        body { font-family: Helvetica, Arial, sans-serif; color: #1e293b; margin: 0; padding: 0; }
-        .slide { page-break-after: always; height: 100vh; display: flex; flex-direction: column; justify-content: center; padding: 20px; }
-        h1 { color: #0f172a; font-size: 28px; border-bottom: 2px solid #cbd5e1; padding-bottom: 10px; }
-        p { font-size: 16px; line-height: 1.6; white-space: pre-line; }
-        img { max-width: 100%; height: auto; border-radius: 8px; margin-top: 15px; }
-    </style>
-    </head>
-    <body>
-    """
-    for slide in st.session_state.slides_data:
-        html_content += f"""
-        <div class="slide">
-            <h1>{slide['titel']}</h1>
-            <p>{slide['text']}</p>
-        """
-        if slide['bild_url']:
-            html_content += f"""<img src="{slide['bild_url']}">"""
-        html_content += "</div>"
-        
-    html_content += "</body></html>"
-    
     pdf_io = BytesIO()
-    HTML(string=html_content).write_pdf(pdf_io)
+    doc = SimpleDocTemplate(pdf_io, pagesize=landscape(A4), rightMargin=40, leftMargin=40, topMargin=40, bottomMargin=40)
+    styles = getSampleStyleSheet()
+    
+    title_style = ParagraphStyle(
+        'SlideTitle',
+        parent=styles['Heading1'],
+        fontName='Helvetica-Bold',
+        fontSize=22,
+        textColor=colors.HexColor('#0f172a'),
+        spaceAfter=15
+    )
+    
+    body_style = ParagraphStyle(
+        'SlideBody',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=13,
+        textColor=colors.HexColor('#1e293b'),
+        leading=18,
+        spaceAfter=15
+    )
+    
+    story = []
+    for i, slide in enumerate(st.session_state.slides_data):
+        story.append(Paragraph(slide['titel'], title_style))
+        story.append(Paragraph(slide['text'].replace('\n', '<br/>'), body_style))
+        
+        if slide['bild_url']:
+            try:
+                img_data = requests.get(slide['bild_url']).content
+                img_io = BytesIO(img_data)
+                img = RLImage(img_io, width=320, height=180)
+                story.append(img)
+            except Exception:
+                pass
+                
+        if i < len(st.session_state.slides_data) - 1:
+            story.append(PageBreak())
+            
+    doc.build(story)
     pdf_io.seek(0)
     return pdf_io
 
-# Hauptbereich-Prüfung
 if not eingeloggter_kunde or eingeloggter_kunde not in st.session_state.kunden_daten:
     st.warning("👈 Bitte melde dich links an oder registriere dich, um den Service zu nutzen.")
 elif eingeloggter_kunde != ADMIN_NAME and st.session_state.kunden_daten[eingeloggter_kunde]["guthaben"] <= 0:
@@ -394,7 +406,6 @@ else:
                     st.info("Noch kein Bild für diese Folie generiert.")
 
         st.write("---")
-        # NEU: Format-Auswahl vor dem Download
         export_format = st.radio("Wähle das Ausgabeformat:", ["PowerPoint (.pptx)", "PDF-Dokument (.pdf)"], horizontal=True)
 
         if "PowerPoint" in export_format:
