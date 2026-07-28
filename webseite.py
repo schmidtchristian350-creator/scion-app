@@ -212,7 +212,7 @@ else:
                     "Video-Skript & Storyboard": "Du bist ein professioneller Videoproduzent. Erstelle ein detailliertes Video-Skript mit Szenenbeschreibung und Sprechtext auf Deutsch."
                 }
                 
-                    messages_payload = [{"role": "system", "content": system_prompts.get(modus, "Du bist ein hilfreicher Assistent.")}]
+                messages_payload = [{"role": "system", "content": system_prompts.get(modus, "Du bist ein hilfreicher Assistent.")}]
                 messages_payload.extend(st.session_state.chats[current_chat])
 
                 with st.spinner("Die KI verarbeitet deine Anfrage..."):
@@ -264,7 +264,6 @@ else:
                         "Prefer": "respond-async"
                     }
                     
-                    # Nutzung des offiziellen Modell-Pfads statt veraltetem Hash-Code
                     data = {
                         "input": {"prompt": video_prompt}
                     }
