@@ -192,9 +192,9 @@ else:
                 with st.chat_message(message["role"]):
                     st.markdown(message["content"])
 
-        # Spracheingabe für den Chat
         st.markdown("🎤 **Oder per Spracheingabe steuern:**")
-         Sprach_eingabe_chat = st.audio_input("Sprchnachricht aufnehmen", key="audio_chat")
+        Sprach_eingabe_chat = st.audio_input("Sprachnachricht aufnehmen", key="audio_chat")
+        
         if Sprach_eingabe_chat is not None:
             try:
                 client_stt = OpenAI(api_key=MASTER_OPENAI_KEY)
@@ -203,7 +203,7 @@ else:
                     file=("audio.wav", Sprach_eingabe_chat.read())
                 )
                 aufgabe = transcript.text
-                st.info(Erkannter Text: "{aufgabe}")
+                st.info(f"Erkannter Text: \"{aufgabe}\"")
             except Exception as e:
                 st.error(f"Spracherkennungsfehler: {e}")
                 aufgabe = None
@@ -320,7 +320,6 @@ else:
                         if video_url:
                             progress_bar.progress(100)
                             status_text.text("✅ Video erfolgreich generiert (läuft als Endlos-Loop für den Ton):")
-                            # HTML Video-Tag mit Loop, damit das kurze Video nahtlos wiederholt wird
                             st.markdown(f'<video width="100%" autoplay loop muted controls><source src="{video_url}" type="video/mp4"></video>', unsafe_allow_html=True)
                         else:
                             st.warning("⏱️ Zeitüberschreitung beim Rendern des Videos.")
