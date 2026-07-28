@@ -17,7 +17,7 @@ st.markdown("""
     .stApp { background-color: #f8f9fa; }
     [data-testid="stSidebar"] { background-color: #1e293b; color: white; }
     [data-testid="stSidebar"] label, [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3, [data-testid="stSidebar"] p { color: white !important; }
-    .stButton button { background-color: #0f172a; color: white; border-radius: 8px; border: none; font-weight: bold; }
+    .stButton button { background-color: #0f172a; color: white; border-radius: 8px; border: none; font-weight: bold; width: 100%; }
     .stButton button:hover { background-color: #334155; color: white; }
     input, textarea, [data-baseweb="input"] div, [data-baseweb="base-input"] { background-color: #ffffff !important; border-radius: 8px !important; border: 1px solid #cbd5e1 !important; }
     input:focus, textarea:focus, [data-baseweb="input"] input:focus { border-color: #0f172a !important; box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.1) !important; }
@@ -286,7 +286,6 @@ else:
 
         st.write("---")
         
-        # NEU: Sprachausgabe sauber in ein aufklappbares Feld (Expander) verpackt
         with st.expander("🎧 Text in Sprache umwandeln (Audio-Generator)"):
             vorlese_text = st.text_area("Text zum Vorlesen:", height=70, placeholder="Füge hier Text ein...")
             einzel_stimme = st.selectbox("Wähle eine Stimme:", ["alloy", "echo", "fable", "onyx", "nova", "shimmer"])
@@ -307,138 +306,139 @@ else:
                             st.error(f"Fehler: {e}")
 
     with spalte_rechts:
-        st.subheader("📊 Autonomes Präsentations-Studio")
-        
-        st.markdown("### ⚡ 1. Vollautomatischer Agenten-Autopilot")
-        auto_thema = st.text_input("Ziel / Thema für die Präsentation:", placeholder="Z.B.: SWOT Analyse für Sales Akademie Berlin")
-        anzahl_folien = st.slider("Autonome Anzahl der Folien:", min_value=2, max_value=10, value=4)
-        
-        if st.button("🚀 Agenten-Workflow komplett starten", use_container_width=True):
-            if not auto_thema:
-                st.warning("Bitte gib ein Thema ein.")
-            else:
-                if eingeloggter_kunde != ADMIN_NAME:
-                    st.session_state.kunden_daten[eingeloggter_kunde]["guthaben"] -= 2.00
-                
-                status_box = st.empty()
-                progress_bar = st.progress(0)
-                
-                try:
-                    client = OpenAI(api_key=MASTER_OPENAI_KEY)
-                    
-                    status_box.text(" Schritt 1/3: Agent analysiert Ziel & plant Struktur...")
-                    progress_bar.progress(20)
-                    
-                    system_instruction = (
-                        f"You are an autonomous presentation agent. Analyze the user goal and create exactly {anzahl_folien} structured slides. "
-                        "Format each slide strictly as 'TITLE: [Title]|||TEXT: [Bullet points]|||PROMPT: [English visual image prompt]'. "
-                        "Separate slides with '###'."
-                    )
-                    
-                    completion = client.chat.completions.create(
-                        model="gpt-4o-mini",
-                        messages=[
-                            {"role": "system", "content": system_instruction},
-                            {"role": "user", "content": auto_thema}
-                        ]
-                    )
-                    roh_text = completion.choices[0].message.content
-                    roh_folien = roh_text.split("###")
-                    
-                    status_box.text(" Schritt 2/3: Agent ruft Grafik-Tools auf & prüft Ergebnisse...")
-                    progress_bar.progress(50)
-                    
-                    neue_slides = []
-                    for f in roh_folien:
-                        if "TITLE:" in f:
-                            try:
-                                t_part = f.split("TITLE:")[1].split("|||")[0].strip()
-                                txt_part = f.split("TEXT:")[1].split("|||")[0].strip() if "TEXT:" in f else ""
-                                p_part = f.split("PROMPT:")[1].strip() if "PROMPT:" in f else "Professional business background"
-                                
-                                bild_url = generiere_replicate_bild_mit_selbstcheck(p_part)
-                                neue_slides.append({"titel": t_part, "text": txt_part, "prompt": p_part, "bild_url": bild_url})
-                            except Exception:
-                                continue
-                    
-                    if neue_slides:
-                        progress_bar.progress(100)
-                        status_box.text(" Schritt 3/3: Ziel erreicht! In manuelle Bearbeitung übernommen.")
-                        st.session_state.slides_data = neue_slides
-                        st.success("Komplette Präsentation autonom erstellt!")
-                        st.rerun()
-                    else:
-                        st.error("Agenten-Fehler bei der Generierung.")
-                except Exception as e:
-                    st.error(f"Fehler: {e}")
-
-        st.write("---")
-        st.markdown("### 🎨 2. Manuelle Kontrolle & Feinjustierung")
-        st.markdown("Passe die Ergebnisse des Agenten bei Bedarf an:")
-
-        if st.button("➕ Neue Folie hinzufügen"):
-            st.session_state.slides_data.append({
-                "titel": f"Folie {len(st.session_state.slides_data) + 1}: Neuer Titel",
-                "text": "Stichpunkt 1\nStichpunkt 2",
-                "prompt": "Professional modern slide background",
-                "bild_url": None
-            })
-            st.rerun()
-
-        folien_tabs = st.tabs([f"Folie {i+1}" for i in range(len(st.session_state.slides_data))])
-
-        for idx, tab in enumerate(folien_tabs):
-            with tab:
-                slide = st.session_state.slides_data[idx]
-                
-                neuer_titel = st.text_input("Folientitel:", value=slide["titel"], key=f"titel_{idx}")
-                neuer_text = st.text_area("Inhalt / Stichpunkte:", value=slide["text"], key=f"text_{idx}", height=80)
-                neuer_prompt = st.text_input("Bild-Prompt (Englisch):", value=slide["prompt"], key=f"prompt_{idx}")
-                
-                st.session_state.slides_data[idx]["titel"] = neuer_titel
-                st.session_state.slides_data[idx]["text"] = neuer_text
-                st.session_state.slides_data[idx]["prompt"] = neuer_prompt
-
-                col_b1, col_b2 = st.columns(2)
-                with col_b1:
-                    if st.button(f"🖼️ Bild neu generieren", key=f"gen_img_{idx}"):
-                        if eingeloggter_kunde != ADMIN_NAME:
-                            st.session_state.kunden_daten[eingeloggter_kunde]["guthaben"] -= 0.10
-                        with st.spinner("Agent generiert Bild neu..."):
-                            url = generiere_replicate_bild_mit_selbstcheck(neuer_prompt)
-                            st.session_state.slides_data[idx]["bild_url"] = url
-                            st.rerun()
-                
-                with col_b2:
-                    if len(st.session_state.slides_data) > 1:
-                        if st.button(f"🗑️ Folie löschen", key=f"del_slide_{idx}"):
-                            st.session_state.slides_data.pop(idx)
-                            st.rerun()
-
-                if slide["bild_url"]:
-                    st.markdown("**Vorschau:**")
-                    st.image(slide["bild_url"], use_container_width=True)
+        # NEU: Das komplette Präsentations-Studio in einen sauberen Expander verpackt
+        with st.expander("📊 Autonomes Präsentations- & Dokumenten-Studio öffnen", expanded=True):
+            
+            st.markdown("### ⚡ 1. Vollautomatischer Agenten-Autopilot")
+            auto_thema = st.text_input("Ziel / Thema für die Präsentation:", placeholder="Z.B.: SWOT Analyse für Sales Akademie Berlin")
+            anzahl_folien = st.slider("Autonome Anzahl der Folien:", min_value=2, max_value=10, value=4)
+            
+            if st.button("🚀 Agenten-Workflow komplett starten", use_container_width=True):
+                if not auto_thema:
+                    st.warning("Bitte gib ein Thema ein.")
                 else:
-                    st.info("Kein Bild vorhanden.")
+                    if eingeloggter_kunde != ADMIN_NAME:
+                        st.session_state.kunden_daten[eingeloggter_kunde]["guthaben"] -= 2.00
+                    
+                    status_box = st.empty()
+                    progress_bar = st.progress(0)
+                    
+                    try:
+                        client = OpenAI(api_key=MASTER_OPENAI_KEY)
+                        
+                        status_box.text(" Schritt 1/3: Agent analysiert Ziel & plant Struktur...")
+                        progress_bar.progress(20)
+                        
+                        system_instruction = (
+                            f"You are an autonomous presentation agent. Analyze the user goal and create exactly {anzahl_folien} structured slides. "
+                            "Format each slide strictly as 'TITLE: [Title]|||TEXT: [Bullet points]|||PROMPT: [English visual image prompt]'. "
+                            "Separate slides with '###'."
+                        )
+                        
+                        completion = client.chat.completions.create(
+                            model="gpt-4o-mini",
+                            messages=[
+                                {"role": "system", "content": system_instruction},
+                                {"role": "user", "content": auto_thema}
+                            ]
+                        )
+                        roh_text = completion.choices[0].message.content
+                        roh_folien = roh_text.split("###")
+                        
+                        status_box.text(" Schritt 2/3: Agent ruft Grafik-Tools auf & prüft Ergebnisse...")
+                        progress_bar.progress(50)
+                        
+                        neue_slides = []
+                        for f in roh_folien:
+                            if "TITLE:" in f:
+                                try:
+                                    t_part = f.split("TITLE:")[1].split("|||")[0].strip()
+                                    txt_part = f.split("TEXT:")[1].split("|||")[0].strip() if "TEXT:" in f else ""
+                                    p_part = f.split("PROMPT:")[1].strip() if "PROMPT:" in f else "Professional business background"
+                                    
+                                    bild_url = generiere_replicate_bild_mit_selbstcheck(p_part)
+                                    neue_slides.append({"titel": t_part, "text": txt_part, "prompt": p_part, "bild_url": bild_url})
+                                except Exception:
+                                    continue
+                        
+                        if neue_slides:
+                            progress_bar.progress(100)
+                            status_box.text(" Schritt 3/3: Ziel erreicht! In manuelle Bearbeitung übernommen.")
+                            st.session_state.slides_data = neue_slides
+                            st.success("Komplette Präsentation autonom erstellt!")
+                            st.rerun()
+                        else:
+                            st.error("Agenten-Fehler bei der Generierung.")
+                    except Exception as e:
+                        st.error(f"Fehler: {e}")
 
-        st.write("---")
-        export_format = st.radio("Wähle das Ausgabeformat:", ["PowerPoint (.pptx)", "PDF-Dokument (.pdf)"], horizontal=True)
+            st.write("---")
+            st.markdown("### 🎨 2. Manuelle Kontrolle & Feinjustierung")
 
-        if "PowerPoint" in export_format:
-            pptx_datei = erstelle_pptx_aus_session()
-            st.download_button(
-                label="📥 Als PowerPoint (.pptx) herunterladen",
-                data=pptx_datei,
-                file_name="Scion_Mind_Agent_Praesentation.pptx",
-                mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
-                use_container_width=True
-            )
-        else:
-            pdf_datei = erstelle_pdf_aus_session()
-            st.download_button(
-                label="📥 Als PDF (.pdf) herunterladen",
-                data=pdf_datei,
-                file_name="Scion_Mind_Agent_Praesentation.pdf",
-                mime="application/pdf",
-                use_container_width=True
-            )
+            if st.button("➕ Neue Folie hinzufügen", use_container_width=True):
+                st.session_state.slides_data.append({
+                    "titel": f"Folie {len(st.session_state.slides_data) + 1}: Neuer Titel",
+                    "text": "Stichpunkt 1\nStichpunkt 2",
+                    "prompt": "Professional modern slide background",
+                    "bild_url": None
+                })
+                st.rerun()
+
+            st.write("")
+            folien_tabs = st.tabs([f"Folie {i+1}" for i in range(len(st.session_state.slides_data))])
+
+            for idx, tab in enumerate(folien_tabs):
+                with tab:
+                    slide = st.session_state.slides_data[idx]
+                    
+                    neuer_titel = st.text_input("Folientitel:", value=slide["titel"], key=f"titel_{idx}")
+                    neuer_text = st.text_area("Inhalt / Stichpunkte:", value=slide["text"], key=f"text_{idx}", height=80)
+                    neuer_prompt = st.text_input("Bild-Prompt (Englisch):", value=slide["prompt"], key=f"prompt_{idx}")
+                    
+                    st.session_state.slides_data[idx]["titel"] = neuer_titel
+                    st.session_state.slides_data[idx]["text"] = neuer_text
+                    st.session_state.slides_data[idx]["prompt"] = neuer_prompt
+
+                    col_b1, col_b2 = st.columns(2)
+                    with col_b1:
+                        if st.button(f"🖼️ Bild neu generieren", key=f"gen_img_{idx}", use_container_width=True):
+                            if eingeloggter_kunde != ADMIN_NAME:
+                                st.session_state.kunden_daten[eingeloggter_kunde]["guthaben"] -= 0.10
+                            with st.spinner("Agent generiert Bild neu..."):
+                                url = generiere_replicate_bild_mit_selbstcheck(neuer_prompt)
+                                st.session_state.slides_data[idx]["bild_url"] = url
+                                st.rerun()
+                    
+                    with col_b2:
+                        if len(st.session_state.slides_data) > 1:
+                            if st.button(f"🗑️ Folie löschen", key=f"del_slide_{idx}", use_container_width=True):
+                                st.session_state.slides_data.pop(idx)
+                                st.rerun()
+
+                    if slide["bild_url"]:
+                        st.markdown("**Vorschau:**")
+                        st.image(slide["bild_url"], use_container_width=True)
+                    else:
+                        st.info("Kein Bild vorhanden.")
+
+            st.write("---")
+            export_format = st.radio("Wähle das Ausgabeformat:", ["PowerPoint (.pptx)", "PDF-Dokument (.pdf)"], horizontal=True)
+
+            if "PowerPoint" in export_format:
+                pptx_datei = erstelle_pptx_aus_session()
+                st.download_button(
+                    label="📥 Als PowerPoint (.pptx) herunterladen",
+                    data=pptx_datei,
+                    file_name="Scion_Mind_Agent_Praesentation.pptx",
+                    mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                    use_container_width=True
+                )
+            else:
+                pdf_datei = erstelle_pdf_aus_session()
+                st.download_button(
+                    label="📥 Als PDF (.pdf) herunterladen",
+                    data=pdf_datei,
+                    file_name="Scion_Mind_Agent_Praesentation.pdf",
+                    mime="application/pdf",
+                    use_container_width=True
+                )
