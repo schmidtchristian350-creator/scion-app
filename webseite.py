@@ -209,7 +209,7 @@ else:
                 aufgabe = None
         else:
             if modus == "Text-Recherche & Chat" or modus == "Video-Skript & Storyboard":
-                aufgabe = st.chat_input("Stelle deine Frage oder lass dir ein 60-Sekunden-Skript in 4 Szenen erstellen...")
+                aufgabe = st.chat_input("Stelle deine Frage oder lass dir ein Thema für dein Video geben...")
             else:
                 aufgabe_input = st.text_area("Deine Beschreibung oder Aufgabe dafür:", height=120)
                 Absenden = st.button("🚀 Aufgabe jetzt ausführen", use_container_width=True)
@@ -229,7 +229,7 @@ else:
                 system_prompts = {
                     "Text-Recherche & Chat": "Du bist ein präziser, professioneller KI-Assistent. Antworte immer auf Deutsch.",
                     "Präsentations-Struktur & Folien": "Du bist ein Experte für Business-Präsentationen. Erstelle eine saubere Präsentation, bei der jede Folie mit 'Folie X: [Titel]' beginnt, gefolgt von prägnanten Stichpunkten. Antworte auf Deutsch.",
-                    "Video-Skript & Storyboard": "Du bist ein professioneller Videoproduzent. Erstelle ein detailliertes Video-Skript für ein 60-Sekunden-Video, aufgeteilt in genau 4 verschiedene Szenen. Gib für jede Szene folgendes auf Deutsch aus: Szene X - Bild-Prompt (auf Englisch für die KI) und Sprechtext."
+                    "Video-Skript & Storyboard": "Du bist ein professioneller Videoproduzent. Erstelle ein detailliertes Video-Skript für ein 60-Sekunden-Video auf Deutsch."
                 }
                 
                 messages_payload = [{"role": "system", "content": system_prompts.get(modus, "Du bist ein hilfreicher Assistent. Antworte immer auf Deutsch.")}]
@@ -262,21 +262,16 @@ else:
                 st.error(f"Ein Fehler ist aufgetreten: {e}")
 
     with spalte_rechts:
-        st.subheader("🎬 60-Sekunden Multi-Szenen Studio")
+        st.subheader("🎬 Vollautomatisches 60-Sekunden Studio")
         
-        st.markdown("Generiere nacheinander bis zu 4 Szenen und die passende Tonspur für deinen Film:")
-        scene1 = st.text_area("Szene 1 (Englischer Prompt):", height=60, placeholder="Z.B.: Cinematic intro shot...")
-        scene2 = st.text_area("Szene 2 (Englischer Prompt):", height=60, placeholder="Z.B.: Close-up action shot...")
-        scene3 = st.text_area("Szene 3 (Englischer Prompt):", height=60, placeholder="Z.B.: Product feature view...")
-        scene4 = st.text_area("Szene 4 (Englischer Prompt):", height=60, placeholder="Z.B.: Final outro call to action...")
+        st.markdown("Gib einfach nur dein **Thema** oder deinen **Sprechtext** ein – die KI erstellt vollautomatisch alle Szenen und den Ton im Hintergrund!")
         
-        sprechender_text = st.text_area("Gesamter Sprechtext für die 60-Sekunden-Tonspur:", height=100, placeholder="Füge hier deinen vollständigen Text ein...")
+        thema_text = st.text_area("Dein Thema oder vollständiger Text für das Video:", height=120, placeholder="Z.B.: Erstelle ein Werbevideo für unsere neue smarte Kaffeemaschine...")
         stimme = st.selectbox("Sprecher-Stimme:", ["alloy", "echo", "fable", "onyx", "nova", "shimmer"])
         
-        if st.button("🚀 60-Sekunden Audio & Szenen generieren", use_container_width=True):
-            prompts = [s for s in [scene1, scene2, scene3, scene4] if s.strip()]
-            if not prompts or not sprechender_text:
-                st.warning("Bitte fülle mindestens eine Szene und den Sprechtext aus.")
+        if st.button("🚀 Vollautomatisches Video & Audio generieren", use_container_width=True):
+            if not thema_text:
+                st.warning("Bitte gib ein Thema oder einen Text für dein Video ein.")
             else:
                 if eingeloggter_kunde != ADMIN_NAME:
                     st.session_state.kunden_daten[eingeloggter_kunde]["guthaben"] -= 2.00
@@ -287,13 +282,29 @@ else:
                 try:
                     client_openai = OpenAI(api_key=MASTER_OPENAI_KEY)
                     
-                    # 1. Audiospur erstellen
-                    status_text.text("🦫 Erstelle die 60-Sekunden Tonspur...")
+                    # 1. Automatisches Erstellen von 3 visuellen Prompts basierend auf dem Thema
+                    status_text.text("🦫 Die KI plant die Filmszenen im Hintergrund...")
                     progress_bar.progress(10)
+                    
+                    prompt_gen = client_openai.chat.completions.create(
+                        model="gpt-4o-mini",
+                        messages=[
+                            {"role": "system", "content": "You are a professional video director. Based on the user's topic, create exactly 3 distinct cinematic English video prompts separated by '|||'."},
+                            {"role": "user", "content": thema_text}
+                        ]
+                    )
+                    prompts = prompt_gen.choices[0].message.content.split("|||")
+                    prompts = [p.strip() for p in prompts if p.strip()]
+                    if not prompts:
+                        prompts = ["Cinematic shot of modern product", "Close-up dynamic view", "Professional closing shot"]
+
+                    # 2. Audiospur erstellen
+                    status_text.text("🦫 Erstelle die professionelle Tonspur...")
+                    progress_bar.progress(25)
                     audio_response = client_openai.audio.speech.create(
                         model="tts-1",
                         voice=stimme,
-                        input=sprechender_text
+                        input=thema_text
                     )
                     audio_bytes = audio_response.content
                     
@@ -304,10 +315,10 @@ else:
                     }
                     
                     video_urls = []
-                    # 2. Jede Szene einzeln bei Replicate generieren
-                    for idx, prompt in enumerate(prompts):
-                        status_text.text(f"🦫 Generiere Szene {idx+1} von {len(prompts)}...")
-                        progress_bar.progress(20 + int(idx * 15))
+                    # 3. Automatische Generierung der Videoszenen im Hintergrund
+                    for idx, prompt in enumerate(prompts[:3]):
+                        status_text.text(f"🦫 Generiere Filmszene {idx+1} von 3 im Hintergrund...")
+                        progress_bar.progress(40 + int(idx * 15))
                         
                         data = {"input": {"prompt": prompt}}
                         response = requests.post("https://api.replicate.com/v1/models/minimax/video-01/predictions", json=data, headers=headers)
@@ -334,14 +345,14 @@ else:
                     
                     if video_urls:
                         progress_bar.progress(100)
-                        status_text.text("✅ Dein Multi-Szenen-Film ist bereit!")
+                        status_text.text("✅ Dein automatisches Video-Paket ist fertig!")
                         
-                        st.success("Hier ist deine 60-Sekunden Tonspur und deine generierten Videoszenen nacheinander:")
+                        st.success("Die KI hat alles für dich vorbereitet. Spiele erst den Ton ab und lass im Anschluss die Filmszenen nacheinander ablaufen:")
                         
-                        st.markdown("### 🔊 Komplette 60-Sekunden Tonspur:")
+                        st.markdown("### 🔊 Synchroner Ton (Gesamtlänge):")
                         st.audio(audio_bytes, format="audio/mp3")
                         
-                        st.markdown("### 🎬 Generierte Videoszenen (folge einfach Szene 1 bis 4):")
+                        st.markdown("### 🎬 Automatisierte Filmszenen (Szene 1 bis 3):")
                         for i, v_url in enumerate(video_urls):
                             st.markdown(f"**Szene {i+1}:**")
                             st.video(v_url)
