@@ -31,7 +31,7 @@ try:
 except ImportError:
     PLAYWRIGHT_AVAILABLE = False
 
-st.set_page_config(page_title="Scion Mind - Enterprise Ultimate AGI Studio GOD-MODE V9", layout="wide")
+st.set_page_config(page_title="Scion Mind - Enterprise Ultimate AGI Studio GOD-MODE V9.1", layout="wide")
 
 st.markdown("""
     <style>
@@ -49,7 +49,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("Scion Mind - Enterprise Ultimate AGI Studio (GOD-MODE V9 - RAG, Sandbox & RBAC)")
+st.title("Scion Mind - Enterprise Ultimate AGI Studio (GOD-MODE V9.1)")
 st.markdown("*designed by Christian Schmidt | Powered by Local RAG Vector DB, Event Webhooks, Python Sandbox, Enterprise RBAC & Self-Evolving Memory*")
 st.write("---")
 
@@ -63,7 +63,7 @@ ADMIN_NAME = "Christian"
 ADMIN_PASS = "ScionMind#2026!Secured"
 
 # -------------------------------------------------------------
-# SQLITE PERSISTENCE & NEW V9 ENTERPRISE TABLES
+# SQLITE PERSISTENCE & AUTO-MIGRATION
 # -------------------------------------------------------------
 def init_db():
     conn = sqlite3.connect("scion_mind_enterprise.db", check_same_thread=False)
@@ -77,6 +77,14 @@ def init_db():
             workspace TEXT
         )
     """)
+    # Automatische Spalten-Migration für bestehende Datenbanken
+    cursor.execute("PRAGMA table_info(kunden)")
+    columns = [col[1] for col in cursor.fetchall()]
+    if "rolle" not in columns:
+        cursor.execute("ALTER TABLE kunden ADD COLUMN rolle TEXT DEFAULT 'Standard'")
+    if "workspace" not in columns:
+        cursor.execute("ALTER TABLE kunden ADD COLUMN workspace TEXT DEFAULT 'Default-Hub'")
+
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS daemon_logs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -121,7 +129,6 @@ def init_db():
             verbesserter_prompt TEXT
         )
     """)
-    # NEU: 1. Vektor / RAG Dokumenten-Wissensdatenbank
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS rag_documents (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -130,7 +137,6 @@ def init_db():
             vektor_metadaten TEXT
         )
     """)
-    # NEU: 2. Event Webhooks Log
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS event_webhooks (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -141,19 +147,18 @@ def init_db():
         )
     """)
     
-    # Admin initialisieren mit Rolle Admin
+    # Admin initialisieren
     cursor.execute("SELECT * FROM kunden WHERE username = ?", (ADMIN_NAME,))
     if not cursor.fetchone():
         cursor.execute("INSERT INTO kunden VALUES (?, ?, ?, ?, ?)", (ADMIN_NAME, ADMIN_PASS, 999.00, "Administrator", "Global-Executive"))
-        cursor.execute("INSERT INTO kunden VALUES (?, ?, ?, ?, ?)", ("vertriebsleiter", "123", 50.00, "Vertriebsleiter", "Sales-Hub"))
-        cursor.execute("INSERT INTO kunden VALUES (?, ?, ?, ?, ?)", ("support_agent", "123", 25.00, "Support-Agent", "Customer-Care"))
-    
+    else:
+        cursor.execute("UPDATE kunden SET rolle = ?, workspace = ? WHERE username = ?", ("Administrator", "Global-Executive", ADMIN_NAME))
+
     cursor.execute("SELECT COUNT(*) FROM mcp_registry")
     if cursor.fetchone()[0] == 0:
         cursor.execute("INSERT INTO mcp_registry (server_name, resource_uri, status) VALUES (?, ?, ?)", ("Local Git Repository", "git://local/scion-mind-core", "Aktiv"))
         cursor.execute("INSERT INTO mcp_registry (server_name, resource_uri, status) VALUES (?, ?, ?)", ("SQLite Enterprise DB", "sqlite://local/scion_mind_enterprise.db", "Aktiv"))
     
-    # Initialer RAG Beispieldokumente-Eintrag
     cursor.execute("SELECT COUNT(*) FROM rag_documents")
     if cursor.fetchone()[0] == 0:
         cursor.execute("INSERT INTO rag_documents (titel, inhalt, vektor_metadaten) VALUES (?, ?, ?)", 
@@ -173,7 +178,6 @@ def background_daemon_worker():
         try:
             conn = get_db_connection()
             cursor = conn.cursor()
-            # Echte Event-Gestützte Prüfung (Simuliert echten IMAP-/Webhook-Trigger)
             cursor.execute("INSERT INTO daemon_logs (zeit, aktion, status) VALUES (datetime('now', 'localtime'), 'Event-Driven Webhook & RAG Index Sync', 'Erfolgreich')")
             conn.commit()
             conn.close()
@@ -330,7 +334,6 @@ def suche_in_rag_vektor_db(query):
         if any(keyword in inhalt.lower() or keyword in titel.lower() for keyword in query_lower.split()):
             treffer.append(f"**[RAG-Dokument: {titel}]**\n{inhalt}")
     if not treffer and docs:
-        # Fallback Standard-Dokument mitliefern
         treffer.append(f"**[RAG-Dokument: {docs[0][0]}]**\n{docs[0][1]}")
     return "\n\n".join(treffer)
 
@@ -341,7 +344,6 @@ def ausfuehren_in_python_sandbox(code_string):
     
     ergebnis_msg = ""
     try:
-        # Sichere Ausführung in isoliertem Namespace
         local_scope = {}
         exec(code_string, {"__builtins__": __builtins__, "pd": pd, "requests": requests, "json": json}, local_scope)
         ergebnis_msg = new_stdout.getvalue()
@@ -618,7 +620,7 @@ else:
     spalte_links, spalte_rechts = st.columns([1.1, 0.9])
 
     with spalte_links:
-        st.subheader("🤖 Autonomer KI-Agent (GOD-MODE V9)")
+        st.subheader("🤖 Autonomer KI-Agent (GOD-MODE V9.1)")
         modus = st.selectbox(
             "Agenten-Modus wählen:",
             [
