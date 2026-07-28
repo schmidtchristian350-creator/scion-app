@@ -358,7 +358,7 @@ else:
                         # SCHRITT 2: Agent 2 (Stratege / Architekt)
                         status_box.text(" Agent 2/4 (Stratege / Architekt): Baut das logische Storyboard-Gerüst...")
                         progress_bar.progress(35)
-                         storyboard_ergebnis = get_cached_ai_response(
+                        storyboard_ergebnis = get_cached_ai_response(
                             aktiviertes_modell,
                             f"Du bist Agent 2 (Stratege/Architekt). Basierend auf diesen Fakten: '{recherche_ergebnis}', erstelle das logische Inhaltsgerüst für genau {anzahl_folien} Folien.",
                             auto_thema
