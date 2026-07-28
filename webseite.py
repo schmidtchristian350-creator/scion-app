@@ -212,7 +212,7 @@ else:
                     "Video-Skript & Storyboard": "Du bist ein professioneller Videoproduzent. Erstelle ein detailliertes Video-Skript mit Szenenbeschreibung und Sprechtext auf Deutsch."
                 }
                 
-                messages_payload = [{"role": "system", "content": system_prompts.get(modus, "Du bist ein hilfreicher Assistent.")}]
+                    messages_payload = [{"role": "system", "content": system_prompts.get(modus, "Du bist ein hilfreicher Assistent.")}]
                 messages_payload.extend(st.session_state.chats[current_chat])
 
                 with st.spinner("Die KI verarbeitet deine Anfrage..."):
@@ -264,13 +264,12 @@ else:
                         "Prefer": "respond-async"
                     }
                     
-                    # Hier übergeben wir den offiziellen Version-Hash für ein stabiles Video-Modell auf Replicate
+                    # Nutzung des offiziellen Modell-Pfads statt veraltetem Hash-Code
                     data = {
-                        "version": "9f747673945c62801b13b84701c7d39fd9ef1aef31e27c4b68aac70b13a5fced",
                         "input": {"prompt": video_prompt}
                     }
                     
-                    response = requests.post("https://api.replicate.com/v1/predictions", json=data, headers=headers)
+                    response = requests.post("https://api.replicate.com/v1/models/minimax/video-01/predictions", json=data, headers=headers)
                     res_json = response.json()
                     
                     if "error" in res_json or "urls" not in res_json:
