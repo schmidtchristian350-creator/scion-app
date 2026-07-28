@@ -178,7 +178,7 @@ else:
     spalte_links, spalte_rechts = st.columns([1.2, 0.8])
 
     with spalte_links:
-        st.subheader("🤖 KI-Arbeitsbereich")
+        st.subheader("🤖 KI-Arbeitsbereich (Prompts & Skripte generieren)")
         modus = st.selectbox(
             "Was möchtest du erstellen lassen?",
             ["Text-Recherche & Chat", "Präsentations-Struktur & Folien", "Video-Skript & Storyboard"]
@@ -187,13 +187,13 @@ else:
         current_chat = st.session_state.aktiver_chat
         st.markdown(f"**Aktiver Chat:** `{current_chat}`")
 
-        if modus == "Text-Recherche & Chat":
+        if modus == "Text-Recherche & Chat" or modus == "Video-Skript & Storyboard":
             for message in st.session_state.chats[current_chat]:
                 with st.chat_message(message["role"]):
                     st.markdown(message["content"])
 
-        if modus == "Text-Recherche & Chat":
-            aufgabe = st.chat_input("Stelle deine Frage oder Aufgabe...")
+        if modus == "Text-Recherche & Chat" or modus == "Video-Skript & Storyboard":
+            aufgabe = st.chat_input("Stelle deine Frage oder lass dir einen Videoprompt erstellen...")
         else:
             aufgabe_input = st.text_area("Deine Beschreibung oder Aufgabe dafür:", height=120)
             Absenden = st.button("🚀 Aufgabe jetzt ausführen", use_container_width=True)
@@ -213,7 +213,7 @@ else:
                 system_prompts = {
                     "Text-Recherche & Chat": "Du bist ein präziser, professioneller KI-Assistent. Antworte immer auf Deutsch.",
                     "Präsentations-Struktur & Folien": "Du bist ein Experte für Business-Präsentationen. Erstelle eine saubere Präsentation, bei der jede Folie mit 'Folie X: [Titel]' beginnt, gefolgt von prägnanten Stichpunkten.",
-                    "Video-Skript & Storyboard": "Du bist ein professioneller Videoproduzent. Erstelle ein detailliertes Video-Skript mit Szenenbeschreibung und Sprechtext auf Deutsch."
+                    "Video-Skript & Storyboard": "Du bist ein professioneller Videoproduzent. Gib dem Nutzer exakt zwei getrennte Blöcke aus: 1. Einen präzisen, bildhaften englischen Video-Prompt für die KI-Generierung. 2. Einen professionellen Sprechtext auf Deutsch (30-60 Sekunden)."
                 }
                 
                 messages_payload = [{"role": "system", "content": system_prompts.get(modus, "Du bist ein hilfreicher Assistent.")}]
@@ -239,20 +239,21 @@ else:
                                 mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
                                 use_container_width=True
                             )
-                st.rerun()
+                if modus != "Text-Recherche & Chat" and modus != "Video-Skript & Storyboard":
+                    st.rerun()
                                 
             except Exception as e:
                 st.error(f"Ein Fehler ist aufgetreten: {e}")
 
     with spalte_rechts:
-        st.subheader("🎥 Echter KI-Video Generator mit Ton & Länge")
-        video_prompt = st.text_area("Videobeschreibung:", height=100, placeholder="Z.B.: Cinematic drone shot over a modern tech office...")
-        sprechender_text = st.text_area("Sprechtext für das Video (für Ton & Länge 30-60 Sek.):", height=100, placeholder="Füge hier den Text ein, den der Sprecher im Video über 30-60 Sekunden erzählen soll...")
+        st.subheader("🎥 Echter KI-Video Generator")
+        video_prompt = st.text_area("Videobeschreibung (kopiere deinen Prompt hierher):", height=100, placeholder="Z.B.: Cinematic drone shot over a modern tech office...")
+        sprechender_text = st.text_area("Sprechtext (kopiere deinen Skript-Text hierher):", height=100, placeholder="Füge hier den Text für die Sprachspur ein...")
         stimme = st.selectbox("Sprecher-Stimme:", ["alloy", "echo", "fable", "onyx", "nova", "shimmer"])
         
-        if st.button("🎬 Video mit Ton & Länge generieren", use_container_width=True):
+        if st.button("🎬 Video & Audio generieren", use_container_width=True):
             if not video_prompt or not sprechender_text:
-                st.warning("Bitte gib sowohl eine Videobeschreibung als auch den Sprechtext an.")
+                st.warning("Bitte fülle sowohl die Videobeschreibung als auch den Sprechtext aus.")
             else:
                 if eingeloggter_kunde != ADMIN_NAME:
                     st.session_state.kunden_daten[eingeloggter_kunde]["guthaben"] -= 0.80
@@ -261,7 +262,7 @@ else:
                 progress_bar = st.progress(0)
                 
                 try:
-                    # 1. Sprachdatei generieren (bestimmt die Länge des Videos)
+                    # 1. Sprachdatei generieren
                     status_text.text("🦫 Erstelle professionelle Sprachspur...")
                     progress_bar.progress(20)
                     client_openai = OpenAI(api_key=MASTER_OPENAI_KEY)
@@ -275,28 +276,16 @@ else:
                     with open(audio_path, "wb") as f:
                         f.write(audio_response.content)
 
-                    # 2. Videoprompt optimieren
-                    status_text.text("🦫 Optimiere Videoprompt...")
-                    progress_bar.progress(40)
-                    opt_response = client_openai.chat.completions.create(
-                        model="gpt-4o-mini",
-                        messages=[
-                            {"role": "system", "content": "You are a professional video prompt engineer. Convert the user's concept into a vivid, cinematic English video prompt in 1-2 sentences."},
-                            {"role": "user", "content": video_prompt}
-                        ]
-                    )
-                    clean_prompt = opt_response.choices[0].message.content
-                    
-                    # 3. Video bei Replicate anfordern
+                    # 2. Video bei Replicate anfordern
                     status_text.text("🦫 Generiere Videosequenz...")
-                    progress_bar.progress(60)
+                    progress_bar.progress(50)
                     
                     headers = {
                         "Authorization": f"Bearer {VIDEO_API_KEY}",
                         "Content-Type": "application/json",
                         "Prefer": "respond-async"
                     }
-                    data = {"input": {"prompt": clean_prompt}}
+                    data = {"input": {"prompt": video_prompt}}
                     
                     response = requests.post("https://api.replicate.com/v1/models/minimax/video-01/predictions", json=data, headers=headers)
                     res_json = response.json()
