@@ -41,7 +41,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("Scion Mind - Enterprise Ultimate AGI Studio (GOD-MODE V5)")
+st.title("Scion Mind - Enterprise Ultimate AGI Studio (GOD-MODE V5.1)")
 st.markdown("*designed by Christian Schmidt | Powered by Multi-Agent Debates, SMTP/WhatsApp Outbound, React-Flow Visual Builder & Multi-Modal Vision*")
 st.write("---")
 
@@ -215,7 +215,7 @@ with st.sidebar:
             st.rerun()
 
 # -------------------------------------------------------------
-# CORE ENGINES (Playwright, Multi-Model, Guardrails, Multi-Agent Debatte, Vision)
+# CORE ENGINES
 # -------------------------------------------------------------
 def echter_playwright_browser_operator(url, befehl):
     if not PLAYWRIGHT_AVAILABLE:
@@ -275,27 +275,32 @@ def echte_deep_web_recherche(query):
             pass
     return multi_model_schwarm_antwort("OpenAI GPT-4o", "Du bist ein Research-Agent.", query)
 
-# NEU: Echte Multi-Agenten-Debatten-Runde (CrewAI-Style Iteration)
+# KORRIGIERTE MULTI-AGENTEN-DEBATTE (Kein doppelter messages-Argumentenkonflikt)
 def multi_agenten_debatte(ziel):
     client = OpenAI(api_key=MASTER_OPENAI_KEY)
     
-    # Agent 1: Vertriebs- & Strategie-Agent
     entwurf = client.chat.completions.create(
         model="gpt-4o-mini",
-        messages=[{"role": "system", "content": "Du bist der Vertriebs- und Strategie-Agent."}, {"role": "user", "content": f"Erstelle einen ersten strategischen Entwurf für: {ziel}"}]
+        messages=[
+            {"role": "system", "content": "Du bist der Vertriebs- und Strategie-Agent."},
+            {"role": "user", "content": f"Erstelle einen ersten strategischen Entwurf für: {ziel}"}
+        ]
     ).choices[0].message.content
     
-    # Agent 2: Rechts- & Compliance-Agent
     prufung = client.chat.completions.create(
         model="gpt-4o-mini",
-        messages=[{"role": "system", "content": "Du bist der strenge Rechts- und Compliance-Agent."}, {"role": "user", "content": f"Prüfe diesen Entwurf auf Risiken und Lücken:\n{entwurf}"}]
+        messages=[
+            {"role": "system", "content": "Du bist der strenge Rechts- und Compliance-Agent."},
+            {"role": "user", "content": f"Prüfe diesen Entwurf auf Risiken und Lücken:\n{entwurf}"}
+        ]
     ).choices[0].message.content
     
-    # Agent 3: Finanz- & Umsetzungs-Agent (Finalisierung)
     final = client.chat.completions.create(
         model="gpt-4o-mini",
-        messages=[{"role": "system", "content": "Du bist der Finanz- und Umsetzungs-Agent. Führe den Entwurf und die Rechtsprüfung zu einem perfekten, finalen Aktionsplan zusammen."}],
-        messages=[{"role": "user", "content": f"Ziel: {ziel}\nEntwurf: {entwurf}\nRechtsprüfung: {prufung}"}]
+        messages=[
+            {"role": "system", "content": "Du bist der Finanz- und Umsetzungs-Agent. Führe den Entwurf und die Rechtsprüfung zu einem perfekten, finalen Aktionsplan zusammen."},
+            {"role": "user", "content": f"Ziel: {ziel}\nEntwurf: {entwurf}\nRechtsprüfung: {prufung}"}
+        ]
     ).choices[0].message.content
     
     return wende_guardrails_an(f"### 👥 Multi-Agenten-Debatten-Ergebnis\n\n**1. Strategie-Entwurf:**\n{entwurf}\n\n**2. Compliance-Prüfung:**\n{prufung}\n\n**3. Finaler optimierter Aktionsplan:**\n{final}")
@@ -377,7 +382,7 @@ else:
     spalte_links, spalte_rechts = st.columns([1.1, 0.9])
 
     with spalte_links:
-        st.subheader("🤖 Autonomer KI-Agent (GOD-MODE V5)")
+        st.subheader("🤖 Autonomer KI-Agent (GOD-MODE V5.1)")
         modus = st.selectbox(
             "Agenten-Modus wählen:",
             ["Intelligenter Chat & Live-Webrecherche", "Multi-Agenten-Debatte (CrewAI)", "Visueller Workflow Builder (React Flow)", "Proaktiver System-Monitor & SMTP/WhatsApp Outbound", "Playwright Headless Browser-Operator", "Excel / CRM Datacenter"]
@@ -391,7 +396,6 @@ else:
                 with st.chat_message(message["role"]):
                     st.markdown(message["content"])
             
-            # NEU: Screenshot Drag-and-Drop Vision Upload im Chat
             uploaded_screenshot = st.file_uploader("📸 Screenshot per Drag-and-Drop einfügen (optional für Vision-Analyse):", type=["png", "jpg", "jpeg"])
             aufgabe = st.chat_input("Gib dem Agenten eine Aufgabe...")
             
@@ -447,7 +451,6 @@ else:
                     with st.spinner("🌐 KI analysiert Aufgabe & Screenshot..."):
                         client_vis = OpenAI(api_key=MASTER_OPENAI_KEY)
                         
-                        # Vision-Verarbeitung falls Bild hochgeladen
                         vision_text = ""
                         if uploaded_screenshot:
                             import base64
@@ -502,8 +505,6 @@ else:
 
         if modus == "Proaktiver System-Monitor & SMTP/WhatsApp Outbound":
             st.markdown("### 🛡️ 24/7 Daemon, SQLite & Outbound Dispatcher")
-            st.markdown("Hier kannst du automatischen Outbound-Versand per E-Mail (SMTP) oder WhatsApp Business API konfigurieren:")
-            
             outbound_typ = st.radio("Outbound-Kanal wählen:", ["SMTP E-Mail", "WhatsApp Business API"])
             empfaenger = st.text_input("Empfänger (E-Mail Adresse oder Telefonnummer):", placeholder="name@beispiel.de oder +49170...")
             nachricht_inhalt = st.text_area("Nachricht / Report:", placeholder="Hier steht der autonome Bericht...")
