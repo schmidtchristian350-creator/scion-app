@@ -1292,451 +1292,528 @@ else:
 
         with spalte_links:
             st.subheader("🤖 Autonomer KI-Agent (GOD-MODE V12.17)")
-            modus = st.selectbox(
-                "Agenten-Modus wählen:",
-                [
-                    "Intelligenter Chat & Live-Webrecherche", 
-                    "🕸️ LangGraph Schwarm (Durable Checkpoints)",
-                    "🖥️ Live-Terminal & Realtime Stream",
-                    "🟢 Lokaler Ollama Fallback (Zero-Cloud)",
-                    "📄 Deep Document OCR & PDF-Parser",
-                    "📊 Analytics & P&L Break-Even Rechner",
-                    "🛠️ Recursive Tool Creator & Git-Ops",
-                    "🎯 Autonomer Deep Web-Scraper & Lead-Gen",
-                    "🧪 Automatisiertes Self-Testing & QA-Agent",
-                    "🔄 Asynchrone Task-Queue (Hintergrund-Schwarm)",
-                    "🛠️ Closed-Loop Self-Healing Sandbox (REPL)",
-                    "🔐 Fernet Verschlüsselter API-Key Vault",
-                    "📚 Vektor-DB & RAG (Wissens-Archiv)", 
-                    "🔔 Event Webhooks & Live-Trigger",
-                    "🧬 Selbstlern-Gedächtnis (Meta-Memory)", 
-                    "📊 Konkurrenten SWOT-Analyzer",
-                    "Visueller React Flow Node-Canvas", 
-                    "Echtes WebRTC Realtime Audio", 
-                    "MCP Server Dashboard", 
-                    "E-Mail & WhatsApp Postfach Assistent", 
-                    "Multi-Agenten-Debatte (LangGraph)", 
-                    "Proaktiver System-Monitor & Outbound", 
-                    "Computer-Use Browser-Operator"
-                ]
+            
+            # NEU: Autonomer Modus als Standard-Option ganz oben eingefügt
+            agenten_modus = st.radio(
+                "Steuerungs-Modus:",
+                ["🚀 Autonomer Agent (Auto-Tool & Live-Fortschritt)", "🔧 Manueller Modus (Direktwahl)"],
+                horizontal=True
             )
              
             current_chat = st.session_state.aktiver_chat
             st.markdown(f"**Aktiver Workspace:** `{current_chat}`")
 
-            if modus == "Intelligenter Chat & Live-Webrecherche":
+            if agenten_modus == "🚀 Autonomer Agent (Auto-Tool & Live-Fortschritt)":
                 for message in st.session_state.chats[current_chat]:
                     with st.chat_message(message["role"]):
                         st.markdown(message["content"])
-                 
+                
                 uploaded_screenshot = st.file_uploader("📸 Screenshot einfügen (Vision-Analyse):", type=["png", "jpg", "jpeg"])
-                aufgabe = st.chat_input("Gib dem Agenten eine Aufgabe (Souveränes LiteLLM & RAG aktiv)...")
-                 
-            elif modus == "🕸️ LangGraph Schwarm (Durable Checkpoints)":
-                st.markdown("### 🕸️ Autonomer LangGraph Vorstands-Schwarm *(Schwere Rechenaufgabe: 0.05 €)*")
-                schwarm_ziel = st.text_input("Unternehmensziel / Projekt:", placeholder="Z.B.: Markteintrittsstrategie inklusive Budgetplanung")
-                 
-                col_s1, col_s2 = st.columns(2)
-                with col_s1:
-                    run_schwarm = st.button("🚀 Schwarm starten", use_container_width=True)
-                with col_s2:
-                    check_id_input = st.text_input("Session-ID laden:", placeholder="session_...")
-                    resume_schwarm = st.button("📥 Checkpoint laden", use_container_width=True)
-
-                if resume_schwarm and check_id_input:
-                    c_step, c_payload = lade_letzten_checkpoint(check_id_input)
-                    if c_step:
-                        st.success(f"Checkpoint geladen! Letzter Schritt: **{c_step}**")
-                        st.json(c_payload)
-                    else:
-                        st.error("Kein Checkpoint gefunden.")
-
-                aufgabe = schwarm_ziel if run_schwarm else None
-                 
+                aufgabe = st.chat_input("Gib dem Agenten eine Aufgabe. Er wählt Werkzeuge und Schritte völlig selbstständig...")
+                
                 if aufgabe:
-                    berechne_nid = eingeloggter_kunde
-                    berechne_und_ziehe_credits_ab(berechne_nid, 0.05, grund="LangGraph Schwarm")
-                    with st.spinner("LangGraph Schwarm iteriert und sichert Checkpoints (0.05 € berechnet)..."):
-                        schwarm_ergebnis = langgraph_vorstands_schwarm(aufgabe)
-                        st.success("Konsens erfolgreich gesichert!")
-                        st.markdown(schwarm_ergebnis)
+                    berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005, grund="Autonomer Agent Workflow")
+                    st.session_state.chats[current_chat].append({"role": "user", "content": aufgabe})
+                    with st.chat_message("user"):
+                        st.markdown(aufgabe)
+                        if uploaded_screenshot:
+                            st.image(uploaded_screenshot, width=300)
+
+                    # Die Live-Statusbox für den autonomen Fortschritt und Tool-Wechsel
+                    with st.status("🧠 Autonomer Agent plant und arbeitet...", expanded=True) as status_box:
+                        st.write("🔍 **Schritt 1/3:** Analysiere Absicht und wähle passendes Werkzeug...")
+                        time.sleep(0.6)
+                        
+                        # KI entscheidet selbstständig über das Tool basierend auf dem Prompt
+                        client_router = OpenAI(api_key=MASTER_OPENAI_KEY)
+                        router_entscheidung = client_router.chat.completions.create(
+                            model="gpt-4o-mini",
+                            messages=[
+                                {
+                                    "role": "system",
+                                    "content": (
+                                        "Du bist ein Router für Enterprise-Tools. Wähle basierend auf der Nutzeraufgabe genau ein passendes Tool aus: "
+                                        "['WEB_RECHERCHE', 'PL_RECHNER', 'SWOT_ANALYSE', 'CODE_SANDBOX', 'STANDARD_CHAT']."
+                                        "Antworte AUSSCHLIESSLICH mit dem Tool-Namen."
+                                    )
+                                },
+                                {"role": "user", "content": aufgabe}
+                            ]
+                        ).choices[0].message.content.strip()
+                        
+                        st.write(f"⚙️ **Schritt 2/3:** Werkzeug ausgewählt: `{router_entscheidung}` – Führe Ausführung aus...")
+                        time.sleep(0.5)
+
+                        # Ausführung je nach gewähltem Tool des Agenten
+                        if "PL_RECHNER" in router_entscheidung or "break-even" in aufgabe.lower():
+                            tool_genutzt = "📊 Analytics & P&L Break-Even Rechner"
+                            ergebnis_tool = berechne_pl_break_even(15000.0, 150.0, 50.0)
+                        elif "SWOT" in router_entscheidung or "swot" in aufgabe.lower():
+                            tool_genutzt = "📊 Konkurrenten SWOT-Analyzer"
+                            ergebnis_tool = starte_swot_analyse(aufgabe)
+                        elif "CODE_SANDBOX" in router_entscheidung or "python" in aufgabe.lower():
+                            tool_genutzt = "🛠️ Closed-Loop Self-Healing Sandbox"
+                            ergebnis_tool = ausfuehren_in_self_healing_sandbox("import pandas as pd\ndf = pd.DataFrame({'Status': ['Aktiv']})\nprint(df)")
+                        else:
+                            tool_genutzt = "🌐 Intelligenter Chat & Live-Webrecherche (LiteLLM & RAG)"
+                            web_daten = echte_deep_web_recherche(aufgabe)
+                            ergebnis_tool = selbstevaluierender_lern_agent(
+                                f"Du bist AGI Master Assistant für {eingeloggter_kunde} (Rolle: {rolle}, Workspace: {workspace}).",
+                                f"Aufgabe: {aufgabe}\nWebdaten: {web_daten}"
+                            )
+
+                        st.write("✅ **Schritt 3/3:** Aufgabe vollständig abgeschlossen!")
+                        status_box.update(label=f"✨ Autonomer Prozess erfolgreich beendet! (Genutztes Tool: {tool_genutzt})", state="complete", expanded=False)
+
+                    # Ausgabe im Chat
+                    finaler_text = f"🤖 **Autonomer Ausführungsbericht:**\n- **Gewähltes Tool:** `{tool_genutzt}`\n\n{ergebnis_tool}"
+                    st.session_state.chats[current_chat].append({"role": "assistant", "content": finaler_text})
+                    with st.chat_message("assistant"):
+                        st.markdown(finaler_text)
+
+            else:
+                modus = st.selectbox(
+                    "Agenten-Modus wählen:",
+                    [
+                        "Intelligenter Chat & Live-Webrecherche", 
+                        "🕸️ LangGraph Schwarm (Durable Checkpoints)",
+                        "🖥️ Live-Terminal & Realtime Stream",
+                        "🟢 Lokaler Ollama Fallback (Zero-Cloud)",
+                        "📄 Deep Document OCR & PDF-Parser",
+                        "📊 Analytics & P&L Break-Even Rechner",
+                        "🛠️ Recursive Tool Creator & Git-Ops",
+                        "🎯 Autonomer Deep Web-Scraper & Lead-Gen",
+                        "🧪 Automatisiertes Self-Testing & QA-Agent",
+                        "🔄 Asynchrone Task-Queue (Hintergrund-Schwarm)",
+                        "🛠️ Closed-Loop Self-Healing Sandbox (REPL)",
+                        "🔐 Fernet Verschlüsselter API-Key Vault",
+                        "📚 Vektor-DB & RAG (Wissens-Archiv)", 
+                        "🔔 Event Webhooks & Live-Trigger",
+                        "🧬 Selbstlern-Gedächtnis (Meta-Memory)", 
+                        "📊 Konkurrenten SWOT-Analyzer",
+                        "Visueller React Flow Node-Canvas", 
+                        "Echtes WebRTC Realtime Audio", 
+                        "MCP Server Dashboard", 
+                        "E-Mail & WhatsApp Postfach Assistent", 
+                        "Multi-Agenten-Debatte (LangGraph)", 
+                        "Proaktiver System-Monitor & Outbound", 
+                        "Computer-Use Browser-Operator"
+                    ]
+                )
+                 
+                if modus == "Intelligenter Chat & Live-Webrecherche":
+                    for message in st.session_state.chats[current_chat]:
+                        with st.chat_message(message["role"]):
+                            st.markdown(message["content"])
+                     
+                    uploaded_screenshot = st.file_uploader("📸 Screenshot einfügen (Vision-Analyse):", type=["png", "jpg", "jpeg"])
+                    aufgabe = st.chat_input("Gib dem Agenten eine Aufgabe (Souveränes LiteLLM & RAG aktiv)...")
+                     
+                elif modus == "🕸️ LangGraph Schwarm (Durable Checkpoints)":
+                    st.markdown("### 🕸️ Autonomer LangGraph Vorstands-Schwarm *(Schwere Rechenaufgabe: 0.05 €)*")
+                    schwarm_ziel = st.text_input("Unternehmensziel / Projekt:", placeholder="Z.B.: Markteintrittsstrategie inklusive Budgetplanung")
+                     
+                    col_s1, col_s2 = st.columns(2)
+                    with col_s1:
+                        run_schwarm = st.button("🚀 Schwarm starten", use_container_width=True)
+                    with col_s2:
+                        check_id_input = st.text_input("Session-ID laden:", placeholder="session_...")
+                        resume_schwarm = st.button("📥 Checkpoint laden", use_container_width=True)
+
+                    if resume_schwarm and check_id_input:
+                        c_step, c_payload = lade_letzten_checkpoint(check_id_input)
+                        if c_step:
+                            st.success(f"Checkpoint geladen! Letzter Schritt: **{c_step}**")
+                            st.json(c_payload)
+                        else:
+                            st.error("Kein Checkpoint gefunden.")
+
+                    aufgabe = schwarm_ziel if run_schwarm else None
+                     
+                    if aufgabe:
+                        berechne_nid = eingeloggter_kunde
+                        berechne_und_ziehe_credits_ab(berechne_nid, 0.05, grund="LangGraph Schwarm")
+                        with st.spinner("LangGraph Schwarm iteriert und sichert Checkpoints (0.05 € berechnet)..."):
+                            schwarm_ergebnis = langgraph_vorstands_schwarm(aufgabe)
+                            st.success("Konsens erfolgreich gesichert!")
+                            st.markdown(schwarm_ergebnis)
+                        aufgabe = None
+
+                elif modus == "🖥️ Live-Terminal & Realtime Stream":
+                    st.markdown("### 🖥️ Live-Terminal & Realtime Stream *(Standard: 0.005 €)*")
+                    terminal_befehl = st.text_input("Terminal Befehl / Aufgabe:", placeholder="Z.B.: Führe System-Check durch")
+                    if st.button("⚡ Live Stream ausführen", use_container_width=True):
+                        if terminal_befehl:
+                            berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005, grund="Live-Terminal")
+                            terminal_box = st.empty()
+                            log_text = "[INFO] Starte Scion Terminal V12.17 (0.005 € abgezogen)...\n"
+                            terminal_box.code(log_text, language="bash")
+                            time.sleep(0.5)
+                             
+                            log_text += f"[EXEC] Aufgabe: '{terminal_befehl}'\n"
+                            terminal_box.code(log_text, language="bash")
+                            time.sleep(0.7)
+                             
+                            resp = litellm_router_abfrage("Terminal Assistant", terminal_befehl, model_pref="auto")
+                            log_text += f"[SUCCESS]\n{resp}"
+                            terminal_box.code(log_text, language="bash")
                     aufgabe = None
 
-            elif modus == "🖥️ Live-Terminal & Realtime Stream":
-                st.markdown("### 🖥️ Live-Terminal & Realtime Stream *(Standard: 0.005 €)*")
-                terminal_befehl = st.text_input("Terminal Befehl / Aufgabe:", placeholder="Z.B.: Führe System-Check durch")
-                if st.button("⚡ Live Stream ausführen", use_container_width=True):
-                    if terminal_befehl:
-                        berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005, grund="Live-Terminal")
-                        terminal_box = st.empty()
-                        log_text = "[INFO] Starte Scion Terminal V12.17 (0.005 € abgezogen)...\n"
-                        terminal_box.code(log_text, language="bash")
-                        time.sleep(0.5)
-                         
-                        log_text += f"[EXEC] Aufgabe: '{terminal_befehl}'\n"
-                        terminal_box.code(log_text, language="bash")
-                        time.sleep(0.7)
-                         
-                        resp = litellm_router_abfrage("Terminal Assistant", terminal_befehl, model_pref="auto")
-                        log_text += f"[SUCCESS]\n{resp}"
-                        terminal_box.code(log_text, language="bash")
-                aufgabe = None
+                elif modus == "🟢 Lokaler Ollama Fallback (Zero-Cloud)":
+                    st.markdown("### 🟢 Souveräner Lokaler Ollama Fallback *(Fast Gratis: 0.005 €)*")
+                    lokaler_prompt = st.text_area("Anfrage für lokales Modell (Llama 3):", placeholder="Z.B.: Analysiere sensible Vertragsdaten...")
+                    if st.button("🚀 Lokal ausführen (Zero Cloud Data Leak)", use_container_width=True):
+                        if lokaler_prompt:
+                            berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005, grund="Ollama Fallback")
+                            with st.spinner("Frage lokales Ollama ab (0.005 € abgezogen)..."):
+                                lokal_res = ausfuehren_mit_ollama_fallback("Du bist ein sicherer Offline-Assistent.", lokaler_prompt, use_local=True)
+                                st.markdown(lokal_res)
+                    aufgabe = None
 
-            elif modus == "🟢 Lokaler Ollama Fallback (Zero-Cloud)":
-                st.markdown("### 🟢 Souveräner Lokaler Ollama Fallback *(Fast Gratis: 0.005 €)*")
-                lokaler_prompt = st.text_area("Anfrage für lokales Modell (Llama 3):", placeholder="Z.B.: Analysiere sensible Vertragsdaten...")
-                if st.button("🚀 Lokal ausführen (Zero Cloud Data Leak)", use_container_width=True):
-                    if lokaler_prompt:
-                        berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005, grund="Ollama Fallback")
-                        with st.spinner("Frage lokales Ollama ab (0.005 € abgezogen)..."):
-                            lokal_res = ausfuehren_mit_ollama_fallback("Du bist ein sicherer Offline-Assistent.", lokaler_prompt, use_local=True)
-                            st.markdown(lokal_res)
-                aufgabe = None
+                elif modus == "📄 Deep Document OCR & PDF-Parser":
+                    st.markdown("### 📄 Multi-Modal Deep Document Intelligence & OCR *(Schwer: 0.05 €)*")
+                    uploaded_doc = st.file_uploader("Dokument hochladen:", type=["pdf", "txt", "docx", "png", "jpg"])
+                    doc_ziel = st.text_input("Aufgabe für Dokument:", placeholder="Z.B.: Extrahiere Rechnungsbeträge und prüfe Haftung")
+                    if st.button("🚀 Analysieren & in FAISS-RAG speichern", use_container_width=True):
+                        if uploaded_doc and doc_ziel:
+                            berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.05, grund="OCR Dokumentenanalyse")
+                            with st.spinner("OCR-Agent analysiert (0.05 € berechnet)..."):
+                                analysis = litellm_router_abfrage("Document OCR Expert", f"Aufgabe: {doc_ziel}\nDatei: {uploaded_doc.name}")
+                                conn = get_db_connection()
+                                cursor = conn.cursor()
+                                cursor.execute("INSERT INTO rag_documents (titel, inhalt, vektor_metadaten) VALUES (?, ?, ?)", 
+                                               (f"OCR: {uploaded_doc.name}", analysis, "FAISS-v1"))
+                                conn.commit()
+                                conn.close()
+                                st.success("Dokument in FAISS-RAG-DB indiziert!")
+                                st.markdown(analysis)
+                    aufgabe = None
 
-            elif modus == "📄 Deep Document OCR & PDF-Parser":
-                st.markdown("### 📄 Multi-Modal Deep Document Intelligence & OCR *(Schwer: 0.05 €)*")
-                uploaded_doc = st.file_uploader("Dokument hochladen:", type=["pdf", "txt", "docx", "png", "jpg"])
-                doc_ziel = st.text_input("Aufgabe für Dokument:", placeholder="Z.B.: Extrahiere Rechnungsbeträge und prüfe Haftung")
-                if st.button("🚀 Analysieren & in FAISS-RAG speichern", use_container_width=True):
-                    if uploaded_doc and doc_ziel:
-                        berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.05, grund="OCR Dokumentenanalyse")
-                        with st.spinner("OCR-Agent analysiert (0.05 € berechnet)..."):
-                            analysis = litellm_router_abfrage("Document OCR Expert", f"Aufgabe: {doc_ziel}\nDatei: {uploaded_doc.name}")
+                elif modus == "📊 Analytics & P&L Break-Even Rechner":
+                    st.markdown("### 📊 P&L-Break-Even & Margin Calculator *(Standard: 0.005 €)*")
+                    st.markdown("Berechne sofort finanzielle Kennzahlen für maximale unternehmerische Kontrolle:")
+                     
+                    p_fix = st.number_input("Monatliche Fixkosten (€):", value=15000.0, step=1000.0)
+                    p_preis = st.number_input("Verkaufspreis pro Stück (€):", value=150.0, step=10.0)
+                    p_var = st.number_input("Variable Kosten pro Stück (€):", value=50.0, step=5.0)
+                     
+                    if st.button("💰 P&L-Break-Even berechnen", use_container_width=True):
+                        berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005, grund="P&L Rechner")
+                        pl_ergebnis = berechne_pl_break_even(p_fix, p_preis, p_var)
+                        st.markdown(pl_ergebnis)
+                    aufgabe = None
+
+                elif modus == "🛠️ Recursive Tool Creator & Git-Ops":
+                    st.markdown("### 🛠️ Recursive Tool Creator & Git-Commit Agent *(Schwer: 0.05 €)*")
+                    tool_idee = st.text_area("Tool-Beschreibung:", placeholder="Z.B.: Ein Tool, das Börsenkurse abruft.")
+                    if st.button("✨ Tool autonom generieren & als Git-Commit sichern", use_container_width=True):
+                        if tool_idee:
+                            berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.05, grund="Recursive Tool Creator")
+                            with st.spinner("Agent schreibt, testet und commited sein Tool (0.05 € berechnet)..."):
+                                tool_ergebnis = erzeuge_rekursives_tool(tool_idee)
+                                git_res = simuliere_git_commit(f"Added custom tool: {tool_idee[:30]}")
+                                st.markdown(tool_ergebnis)
+                                st.success(git_res)
+                    aufgabe = None
+
+                elif modus == "🎯 Autonomer Deep Web-Scraper & Lead-Gen":
+                    st.markdown("### 🎯 Pydantic-gesteuerter Lead-Generator & Scraper *(Schwer: 0.05 €)*")
+                    c_branche = st.text_input("Branche:", placeholder="Z.B.: Handwerksbetriebe")
+                    c_region = st.text_input("Region:", placeholder="Z.B.: Erfurt")
+                     
+                    if st.button("🚀 Pydantic Scraper starten", use_container_width=True):
+                        if c_branche and c_region:
+                            berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.05, grund="Lead Scraper")
+                            with st.spinner("Scraper crawlt Leads und validiert Schemata (0.05 € berechnet)..."):
+                                res_leads = ausfuehren_deep_lead_scraper(c_branche, c_region)
+                                st.success(res_leads)
+                                 
+                                conn = get_db_connection()
+                                cursor = conn.cursor()
+                                cursor.execute("SELECT firma, geschaeftsfuehrer, website, design_status, akquise_mail FROM lead_gen_vault ORDER BY id DESC LIMIT 3")
+                                saved_leads = cursor.fetchall()
+                                conn.close()
+                                 
+                                for f, gf, web, des, mail in saved_leads:
+                                    st.info(f"**Firma:** {f} (GF: {gf})\n- Website: `{web}`\n- Design: `{des}`\n\n**Mail:**\n{mail}")
+                    aufgabe = None
+
+                elif modus == "🧪 Automatisiertes Self-Testing & QA-Agent":
+                    st.markdown("### 🧪 Automatisiertes Self-Testing & QA-Agent (Pytest) *(Schwer: 0.05 €)*")
+                    qa_ziel = st.text_input("Funktions-Ziel:", placeholder="Z.B.: Schreibe Funktion zur Validierung von IBAN-Nummern")
+                    if st.button("🚀 QA-Testsuite ausführen", use_container_width=True):
+                        if qa_ziel:
+                            berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.05, grund="QA Agent")
+                            with st.spinner("QA-Agent generiert Code, Unit-Tests und testet in Sandbox (0.05 € berechnet)..."):
+                                qa_bericht = generiere_und_teste_code_mit_qa(qa_ziel)
+                                st.markdown(qa_bericht)
+                    aufgabe = None
+
+                elif modus == "🔄 Asynchrone Task-Queue (Hintergrund-Schwarm)":
+                    st.markdown("### 🔄 Asynchrone ThreadPool Task-Queue *(Standard: 0.005 €)*")
+                    t_agent = st.selectbox("Agenten-Typ:", ["Vertriebs-Agent", "Compliance-Prüfer", "Support-Autoresponder", "Finanz-Analyst"])
+                    t_ziel = st.text_area("Aufgabe für den Hintergrund-Agenten:")
+                    if st.button("🚀 In Task-Queue einreihen", use_container_width=True):
+                        if t_ziel:
+                            berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005, grund="Task Queue")
+                            conn = get_db_connection()
+                            cursor = conn.cursor()
+                            cursor.execute("INSERT INTO async_task_queue (zeit, agent_typ, task_ziel, status, ergebnis) VALUES (datetime('now', 'localtime'), ?, ?, 'Offen', 'Wartet...')",
+                                           (t_agent, t_ziel))
+                            conn.commit()
+                            conn.close()
+                            st.success("Task im Hintergrund-Schwarm eingereiht (0.005 € berechnet)!")
+                    aufgabe = None
+
+                elif modus == "🛠️ Closed-Loop Self-Healing Sandbox (REPL)":
+                    st.markdown("### 🛠️ Closed-Loop Self-Healing Code-Interpreter *(Standard: 0.005 €)*")
+                    user_code = st.text_area("Python Code:", value="import pandas as pd\ndf = pd.DataFrame({'A': [10, 20]})\nprint(df['A'].mean())", height=150)
+                    if st.button("🚀 Closed-Loop Ausführung starten", use_container_width=True):
+                        berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005, grund="Sandbox REPL")
+                        with st.spinner("Führe aus & heile Fehler automatisch (0.005 € berechnet)..."):
+                            ergebnis = ausfuehren_in_self_healing_sandbox(user_code)
+                            st.markdown(ergebnis)
+                    aufgabe = None
+
+                elif modus == "🔐 Fernet Verschlüsselter API-Key Vault":
+                    st.markdown("### 🔐 Enterprise Fernet Zero-Knowledge Key Vault *(Gratis)*")
+                    v_service = st.selectbox("Service:", ["OpenAI Key", "Anthropic Key", "Tavily Key", "Replicate Key"])
+                    v_key = st.text_input("API Key:", type="password")
+                    if st.button("🔒 Verschlüsseln & Sichern", use_container_width=True):
+                        if v_key:
+                            enc_key = verschruessle_api_key(v_key)
+                            conn = get_db_connection()
+                            cursor = conn.cursor()
+                            cursor.execute("DELETE FROM workspace_vault WHERE workspace = ? AND service_name = ?", (workspace, v_service))
+                            cursor.execute("INSERT INTO workspace_vault (workspace, service_name, encrypted_key) VALUES (?, ?, ?)", (workspace, v_service, enc_key))
+                            conn.commit()
+                            conn.close()
+                            st.success("API Key banksicher mit Fernet verschlüsselt!")
+                    aufgabe = None
+
+                elif modus == "📚 Vektor-DB & RAG (Wissens-Archiv)":
+                    st.markdown("### 📚 FAISS Vektor-DB & RAG Wissens-Archiv *(Standard: 0.005 €)*")
+                    rag_titel = st.text_input("Dokument Titel:")
+                    rag_inhalt = st.text_area("Inhalt:")
+                    if st.button("📥 In FAISS DB indizieren", use_container_width=True):
+                        if rag_titel and rag_inhalt:
+                            berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005, grund="RAG Indexing")
                             conn = get_db_connection()
                             cursor = conn.cursor()
                             cursor.execute("INSERT INTO rag_documents (titel, inhalt, vektor_metadaten) VALUES (?, ?, ?)", 
-                                           (f"OCR: {uploaded_doc.name}", analysis, "FAISS-v1"))
+                                           (rag_titel, rag_inhalt, "FAISS-v2"))
                             conn.commit()
                             conn.close()
-                            st.success("Dokument in FAISS-RAG-DB indiziert!")
-                            st.markdown(analysis)
-                aufgabe = None
+                            st.success("Erfolgreich indiziert (0.005 € berechnet)!")
+                    aufgabe = None
 
-            elif modus == "📊 Analytics & P&L Break-Even Rechner":
-                st.markdown("### 📊 P&L-Break-Even & Margin Calculator *(Standard: 0.005 €)*")
-                st.markdown("Berechne sofort finanzielle Kennzahlen für maximale unternehmerische Kontrolle:")
-                 
-                p_fix = st.number_input("Monatliche Fixkosten (€):", value=15000.0, step=1000.0)
-                p_preis = st.number_input("Verkaufspreis pro Stück (€):", value=150.0, step=10.0)
-                p_var = st.number_input("Variable Kosten pro Stück (€):", value=50.0, step=5.0)
-                 
-                if st.button("💰 P&L-Break-Even berechnen", use_container_width=True):
-                    berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005, grund="P&L Rechner")
-                    pl_ergebnis = berechne_pl_break_even(p_fix, p_preis, p_var)
-                    st.markdown(pl_ergebnis)
-                aufgabe = None
+                elif modus == "🔔 Event Webhooks & Live-Trigger":
+                    st.markdown("### 🔔 Event-gesteuerte Webhooks (FastAPI) *(Standard: 0.005 €)*")
+                    st.info("FastAPI Gateway aktiv unter `http://127.0.0.1:8000/webhook/inbound`")
+                    event_kanal = st.selectbox("Kanal:", ["WhatsApp Webhook", "IMAP Trigger", "CRM Hook"])
+                    event_text = st.text_area("Payload:")
+                    if st.button("⚡ Verarbeiten", use_container_width=True):
+                        if event_text:
+                            berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005, grund="Event Webhook")
+                            with st.spinner("Verarbeite (0.005 € berechnet)..."):
+                                ki_antwort = selbstevaluierender_lern_agent("Event Bot", f"Event auf {event_kanal}: {event_text}")
+                                conn = get_db_connection()
+                                cursor = conn.cursor()
+                                cursor.execute("INSERT INTO event_webhooks (zeit, kanal, nachricht, ki_reaktion) VALUES (datetime('now', 'localtime'), ?, ?, ?)",
+                                               (event_kanal, event_text, ki_antwort))
+                                conn.commit()
+                                conn.close()
+                                st.success("Protokolliert:")
+                                st.markdown(ki_antwort)
+                    aufgabe = None
 
-            elif modus == "🛠️ Recursive Tool Creator & Git-Ops":
-                st.markdown("### 🛠️ Recursive Tool Creator & Git-Commit Agent *(Schwer: 0.05 €)*")
-                tool_idee = st.text_area("Tool-Beschreibung:", placeholder="Z.B.: Ein Tool, das Börsenkurse abruft.")
-                if st.button("✨ Tool autonom generieren & als Git-Commit sichern", use_container_width=True):
-                    if tool_idee:
-                        berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.05, grund="Recursive Tool Creator")
-                        with st.spinner("Agent schreibt, testet und commited sein Tool (0.05 € berechnet)..."):
-                            tool_ergebnis = erzeuge_rekursives_tool(tool_idee)
-                            git_res = simuliere_git_commit(f"Added custom tool: {tool_idee[:30]}")
-                            st.markdown(tool_ergebnis)
-                            st.success(git_res)
-                aufgabe = None
+                elif modus == "🧬 Selbstlern-Gedächtnis (Meta-Memory)":
+                    st.markdown("### 🧠 Autonomes Meta-Learning Gedächtnis *(Gratis)*")
+                    conn = get_db_connection()
+                    cursor = conn.cursor()
+                    cursor.execute("SELECT id, zeit, aufgabe_typ, erkenntnis FROM agent_memory ORDER BY id DESC")
+                    erfahrungen = cursor.fetchall()
+                    conn.close()
+                    if erfahrungen:
+                        for eid, zeit, typ, erk in erfahrungen:
+                            st.info(f"**[{zeit}] Typ: {typ} (ID: {eid})**\n\n🧬 **Learning:** {erk}")
+                    else:
+                        st.warning("Keine Learnings vorhanden.")
+                    aufgabe = None
 
-            elif modus == "🎯 Autonomer Deep Web-Scraper & Lead-Gen":
-                st.markdown("### 🎯 Pydantic-gesteuerter Lead-Generator & Scraper *(Schwer: 0.05 €)*")
-                c_branche = st.text_input("Branche:", placeholder="Z.B.: Handwerksbetriebe")
-                c_region = st.text_input("Region:", placeholder="Z.B.: Erfurt")
-                 
-                if st.button("🚀 Pydantic Scraper starten", use_container_width=True):
-                    if c_branche and c_region:
-                        berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.05, grund="Lead Scraper")
-                        with st.spinner("Scraper crawlt Leads und validiert Schemata (0.05 € berechnet)..."):
-                            res_leads = ausfuehren_deep_lead_scraper(c_branche, c_region)
-                            st.success(res_leads)
-                             
-                            conn = get_db_connection()
-                            cursor = conn.cursor()
-                            cursor.execute("SELECT firma, geschaeftsfuehrer, website, design_status, akquise_mail FROM lead_gen_vault ORDER BY id DESC LIMIT 3")
-                            saved_leads = cursor.fetchall()
-                            conn.close()
-                             
-                            for f, gf, web, des, mail in saved_leads:
-                                st.info(f"**Firma:** {f} (GF: {gf})\n- Website: `{web}`\n- Design: `{des}`\n\n**Mail:**\n{mail}")
-                aufgabe = None
+                elif modus == "📊 Konkurrenten SWOT-Analyzer":
+                    st.markdown("### 📊 One-Click Competitor SWOT-Analyzer *(Schwer: 0.05 €)*")
+                    konkurrent_input = st.text_input("Name oder Website des Mitbewerbers:", placeholder="Z.B.: Mitbewerber GmbH")
+                    if st.button("🚀 SWOT-Analyse starten", use_container_width=True):
+                        if konkurrent_input:
+                            berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.05, grund="SWOT Analyzer")
+                            with st.spinner("Analysiere Marktposition & Web-Daten (0.05 € berechnet)..."):
+                                swot_bericht = starte_swot_analyse(konkurrent_input)
+                                st.success("SWOT-Analyse erfolgreich erstellt:")
+                                st.markdown(swot_bericht)
+                    aufgabe = None
 
-            elif modus == "🧪 Automatisiertes Self-Testing & QA-Agent":
-                st.markdown("### 🧪 Automatisiertes Self-Testing & QA-Agent (Pytest) *(Schwer: 0.05 €)*")
-                qa_ziel = st.text_input("Funktions-Ziel:", placeholder="Z.B.: Schreibe Funktion zur Validierung von IBAN-Nummern")
-                if st.button("🚀 QA-Testsuite ausführen", use_container_width=True):
-                    if qa_ziel:
-                        berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.05, grund="QA Agent")
-                        with st.spinner("QA-Agent generiert Code, Unit-Tests und testet in Sandbox (0.05 € berechnet)..."):
-                            qa_bericht = generiere_und_teste_code_mit_qa(qa_ziel)
-                            st.markdown(qa_bericht)
-                aufgabe = None
-
-            elif modus == "🔄 Asynchrone Task-Queue (Hintergrund-Schwarm)":
-                st.markdown("### 🔄 Asynchrone ThreadPool Task-Queue *(Standard: 0.005 €)*")
-                t_agent = st.selectbox("Agenten-Typ:", ["Vertriebs-Agent", "Compliance-Prüfer", "Support-Autoresponder", "Finanz-Analyst"])
-                t_ziel = st.text_area("Aufgabe für den Hintergrund-Agenten:")
-                if st.button("🚀 In Task-Queue einreihen", use_container_width=True):
-                    if t_ziel:
-                        berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005, grund="Task Queue")
-                        conn = get_db_connection()
-                        cursor = conn.cursor()
-                        cursor.execute("INSERT INTO async_task_queue (zeit, agent_typ, task_ziel, status, ergebnis) VALUES (datetime('now', 'localtime'), ?, ?, 'Offen', 'Wartet...')",
-                                       (t_agent, t_ziel))
-                        conn.commit()
-                        conn.close()
-                        st.success("Task im Hintergrund-Schwarm eingereiht (0.005 € berechnet)!")
-                aufgabe = None
-
-            elif modus == "🛠️ Closed-Loop Self-Healing Sandbox (REPL)":
-                st.markdown("### 🛠️ Closed-Loop Self-Healing Code-Interpreter *(Standard: 0.005 €)*")
-                user_code = st.text_area("Python Code:", value="import pandas as pd\ndf = pd.DataFrame({'A': [10, 20]})\nprint(df['A'].mean())", height=150)
-                if st.button("🚀 Closed-Loop Ausführung starten", use_container_width=True):
-                    berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005, grund="Sandbox REPL")
-                    with st.spinner("Führe aus & heile Fehler automatisch (0.005 € berechnet)..."):
-                        ergebnis = ausfuehren_in_self_healing_sandbox(user_code)
-                        st.markdown(ergebnis)
-                aufgabe = None
-
-            elif modus == "🔐 Fernet Verschlüsselter API-Key Vault":
-                st.markdown("### 🔐 Enterprise Fernet Zero-Knowledge Key Vault *(Gratis)*")
-                v_service = st.selectbox("Service:", ["OpenAI Key", "Anthropic Key", "Tavily Key", "Replicate Key"])
-                v_key = st.text_input("API Key:", type="password")
-                if st.button("🔒 Verschlüsseln & Sichern", use_container_width=True):
-                    if v_key:
-                        enc_key = verschruessle_api_key(v_key)
-                        conn = get_db_connection()
-                        cursor = conn.cursor()
-                        cursor.execute("DELETE FROM workspace_vault WHERE workspace = ? AND service_name = ?", (workspace, v_service))
-                        cursor.execute("INSERT INTO workspace_vault (workspace, service_name, encrypted_key) VALUES (?, ?, ?)", (workspace, v_service, enc_key))
-                        conn.commit()
-                        conn.close()
-                        st.success("API Key banksicher mit Fernet verschlüsselt!")
-                aufgabe = None
-
-            elif modus == "📚 Vektor-DB & RAG (Wissens-Archiv)":
-                st.markdown("### 📚 FAISS Vektor-DB & RAG Wissens-Archiv *(Standard: 0.005 €)*")
-                rag_titel = st.text_input("Dokument Titel:")
-                rag_inhalt = st.text_area("Inhalt:")
-                if st.button("📥 In FAISS DB indizieren", use_container_width=True):
-                    if rag_titel and rag_inhalt:
-                        berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005, grund="RAG Indexing")
-                        conn = get_db_connection()
-                        cursor = conn.cursor()
-                        cursor.execute("INSERT INTO rag_documents (titel, inhalt, vektor_metadaten) VALUES (?, ?, ?)", 
-                                       (rag_titel, rag_inhalt, "FAISS-v2"))
-                        conn.commit()
-                        conn.close()
-                        st.success("Erfolgreich indiziert (0.005 € berechnet)!")
-                aufgabe = None
-
-            elif modus == "🔔 Event Webhooks & Live-Trigger":
-                st.markdown("### 🔔 Event-gesteuerte Webhooks (FastAPI) *(Standard: 0.005 €)*")
-                st.info("FastAPI Gateway aktiv unter `http://127.0.0.1:8000/webhook/inbound`")
-                event_kanal = st.selectbox("Kanal:", ["WhatsApp Webhook", "IMAP Trigger", "CRM Hook"])
-                event_text = st.text_area("Payload:")
-                if st.button("⚡ Verarbeiten", use_container_width=True):
-                    if event_text:
-                        berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005, grund="Event Webhook")
-                        with st.spinner("Verarbeite (0.005 € berechnet)..."):
-                            ki_antwort = selbstevaluierender_lern_agent("Event Bot", f"Event auf {event_kanal}: {event_text}")
-                            conn = get_db_connection()
-                            cursor = conn.cursor()
-                            cursor.execute("INSERT INTO event_webhooks (zeit, kanal, nachricht, ki_reaktion) VALUES (datetime('now', 'localtime'), ?, ?, ?)",
-                                           (event_kanal, event_text, ki_antwort))
-                            conn.commit()
-                            conn.close()
-                            st.success("Protokolliert:")
-                            st.markdown(ki_antwort)
-                aufgabe = None
-
-            elif modus == "🧬 Selbstlern-Gedächtnis (Meta-Memory)":
-                st.markdown("### 🧠 Autonomes Meta-Learning Gedächtnis *(Gratis)*")
-                conn = get_db_connection()
-                cursor = conn.cursor()
-                cursor.execute("SELECT id, zeit, aufgabe_typ, erkenntnis FROM agent_memory ORDER BY id DESC")
-                erfahrungen = cursor.fetchall()
-                conn.close()
-                if erfahrungen:
-                    for eid, zeit, typ, erk in erfahrungen:
-                        st.info(f"**[{zeit}] Typ: {typ} (ID: {eid})**\n\n🧬 **Learning:** {erk}")
-                else:
-                    st.warning("Keine Learnings vorhanden.")
-                aufgabe = None
-
-            elif modus == "📊 Konkurrenten SWOT-Analyzer":
-                st.markdown("### 📊 One-Click Competitor SWOT-Analyzer *(Schwer: 0.05 €)*")
-                konkurrent_input = st.text_input("Name oder Website des Mitbewerbers:", placeholder="Z.B.: Mitbewerber GmbH")
-                if st.button("🚀 SWOT-Analyse starten", use_container_width=True):
-                    if konkurrent_input:
-                        berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.05, grund="SWOT Analyzer")
-                        with st.spinner("Analysiere Marktposition & Web-Daten (0.05 € berechnet)..."):
-                            swot_bericht = starte_swot_analyse(konkurrent_input)
-                            st.success("SWOT-Analyse erfolgreich erstellt:")
-                            st.markdown(swot_bericht)
-                aufgabe = None
-
-            elif modus == "Visueller React Flow Node-Canvas":
-                st.markdown("### 🧩 Interaktiver React Flow Node-Canvas *(Standard: 0.005 €)*")
-                canvas_html = """
-                <div style="width:100%; height:320px; background:#0f172a; border-radius:12px; padding:20px; color:white; font-family:sans-serif; position:relative; overflow:hidden;">
-                    <div style="position:absolute; top:30px; left:40px; background:#334155; padding:12px 20px; border-radius:8px; border:2px solid #38bdf8;">
-                        <b>🕸️ P&L & SWOT Node</b><br/><span style="font-size:11px; color:#94a3b8;">Strategic Control</span>
+                elif modus == "Visueller React Flow Node-Canvas":
+                    st.markdown("### 🧩 Interaktiver React Flow Node-Canvas *(Standard: 0.005 €)*")
+                    canvas_html = """
+                    <div style="width:100%; height:320px; background:#0f172a; border-radius:12px; padding:20px; color:white; font-family:sans-serif; position:relative; overflow:hidden;">
+                        <div style="position:absolute; top:30px; left:40px; background:#334155; padding:12px 20px; border-radius:8px; border:2px solid #38bdf8;">
+                            <b>🕸️ P&L & SWOT Node</b><br/><span style="font-size:11px; color:#94a3b8;">Strategic Control</span>
+                        </div>
+                        <div style="position:absolute; top:130px; left:220px; background:#334155; padding:12px 20px; border-radius:8px; border:2px solid #a855f7;">
+                            <b>🟢 Zero-Cloud LiteLLM</b><br/><span style="font-size:11px; color:#94a3b8;">Sovereign Routing</span>
+                        </div>
+                        <div style="position:absolute; top:220px; left:420px; background:#334155; padding:12px 20px; border-radius:8px; border:2px solid #22c55e;">
+                            <b>🚀 Git-Ops & Sandbox</b><br/><span style="font-size:11px; color:#94a3b8;">Self-Healing Closed-Loop</span>
+                        </div>
+                        <svg style="position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none;">
+                            <path d="M 150 55 Q 200 55, 220 140" stroke="#38bdf8" stroke-width="3" fill="none" stroke-dasharray="5,5"/>
+                            <path d="M 370 165 Q 400 165, 420 240" stroke="#a855f7" stroke-width="3" fill="none"/>
+                        </svg>
                     </div>
-                    <div style="position:absolute; top:130px; left:220px; background:#334155; padding:12px 20px; border-radius:8px; border:2px solid #a855f7;">
-                        <b>🟢 Zero-Cloud LiteLLM</b><br/><span style="font-size:11px; color:#94a3b8;">Sovereign Routing</span>
-                    </div>
-                    <div style="position:absolute; top:220px; left:420px; background:#334155; padding:12px 20px; border-radius:8px; border:2px solid #22c55e;">
-                        <b>🚀 Git-Ops & Sandbox</b><br/><span style="font-size:11px; color:#94a3b8;">Self-Healing Closed-Loop</span>
-                    </div>
-                    <svg style="position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none;">
-                        <path d="M 150 55 Q 200 55, 220 140" stroke="#38bdf8" stroke-width="3" fill="none" stroke-dasharray="5,5"/>
-                        <path d="M 370 165 Q 400 165, 420 240" stroke="#a855f7" stroke-width="3" fill="none"/>
-                    </svg>
-                </div>
-                """
-                st.components.v1.html(canvas_html, height=340)
-                flow_befehl = st.text_input("Workflow:", placeholder="Z.B.: Starte Pipeline...")
-                if st.button("🚀 Canvas ausführen", use_container_width=True):
-                    berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005, grund="Node-Canvas")
-                    aufgabe = flow_befehl
+                    """
+                    st.components.v1.html(canvas_html, height=340)
+                    flow_befehl = st.text_input("Workflow:", placeholder="Z.B.: Starte Pipeline...")
+                    if st.button("🚀 Canvas ausführen", use_container_width=True):
+                        berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005, grund="Node-Canvas")
+                        aufgabe = flow_befehl
+                    else:
+                        aufgabe = None
+
+                elif modus == "Echtes WebRTC Realtime Audio":
+                    st.markdown("### 🎙️ Bidirektionales WebRTC Audio-Streaming *(Standard: 0.005 €)*")
+                    if st.button("🔴 WebRTC Session verbinden", use_container_width=True):
+                        berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005, grund="WebRTC Audio")
+                        st.success("WebRTC Audio aktiv (0.005 € berechnet)!")
+                        st.audio("https://actions.google.com/sounds/v1/ambiences/office_ambience.ogg", format="audio/mp3", autoplay=True)
+                    aufgabe = None
+
+                elif modus == "MCP Server Dashboard":
+                    st.markdown("### 🔌 Model Context Protocol (MCP) Server *(Gratis)*")
+                    mcp_res = lade_mcp_ressourcen()
+                    for sname, uri, stat in mcp_res:
+                        st.success(f"**{sname}** — URI: `{uri}` — Status: `{stat}`")
+                    aufgabe = None
+
+                elif modus == "E-Mail & WhatsApp Postfach Assistent":
+                    st.markdown("### ✉️📱 Postfach Scanner & Sentiment Autoresponder *(Standard: 0.005 €)*")
+                    tab_mail, tab_wa = st.tabs(["E-Mail & Sentiment", "WhatsApp"])
+                    with tab_mail:
+                        if st.button("📥 E-Mails abrufen & analysieren", use_container_width=True):
+                            berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005, grund="Postfach Scanner")
+                            with st.spinner("Lese IMAP & bewerte Sentiment (0.005 € berechnet)..."):
+                                mails = lade_letzte_emails(eingeloggter_kunde)
+                                st.success("Postfach nach Sentiment geclustert:")
+                                st.markdown(mails)
+                        z_empf = st.text_input("Empfänger:")
+                        m_betreff = st.text_input("Betreff:")
+                        m_befehl = st.text_area("Thema:")
+                        if st.button("✉️ E-Mail senden", use_container_width=True):
+                            if z_empf and m_befehl:
+                                berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005, grund="E-Mail Versand")
+                                ki_ant = selbstevaluierender_lern_agent("Mail Assistent", m_befehl)
+                                res = sende_email(eingeloggter_kunde, z_empf, m_betreff, ki_ant)
+                                st.success(res)
+                    with tab_wa:
+                        wa_nr = st.text_input("Handynummer (+49...):")
+                        wa_text = st.text_area("Nachricht:")
+                        if st.button("💬 WhatsApp senden", use_container_width=True):
+                            if wa_nr and wa_text:
+                                berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005, grund="WhatsApp Versand")
+                                wa_res = sende_whatsapp(eingeloggter_kunde, wa_nr, wa_text)
+                                st.success(wa_res)
+                    aufgabe = None
+
+                elif modus == "Multi-Agenten-Debatte (LangGraph)":
+                    st.markdown("### 👥 LangGraph Multi-Agenten-Rollenspiel *(Schwer: 0.05 €)*")
+                    debatten_ziel = st.text_input("Thema:", placeholder="Z.B.: Strategische Expansion")
+                    if st.button("🚀 Debatte starten", use_container_width=True):
+                        berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.05, grund="Multi-Agenten Debatte")
+                        aufgabe = debatten_ziel
+                    else:
+                        aufgabe = None
+                     
+                elif modus == "Computer-Use Browser-Operator":
+                    st.markdown("### 🌐 Computer-Use Browser-Operator *(Schwer: 0.05 €)*")
+                    url_ziel = st.text_input("Ziel-URL:", placeholder="https://example.com")
+                    rpa_aktion = st.text_area("RPA-Aktion:", placeholder="Z.B.: Klicke Login, fülle Formular aus")
+                    if st.button("🚀 Computer-Use starten", use_container_width=True):
+                        berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.05, grund="Computer-Use")
+                        aufgabe = rpa_aktion
+                    else:
+                        aufgabe = None
                 else:
                     aufgabe = None
 
-            elif modus == "Echtes WebRTC Realtime Audio":
-                st.markdown("### 🎙️ Bidirektionales WebRTC Audio-Streaming *(Standard: 0.005 €)*")
-                if st.button("🔴 WebRTC Session verbinden", use_container_width=True):
-                    berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005, grund="WebRTC Audio")
-                    st.success("WebRTC Audio aktiv (0.005 € berechnet)!")
-                    st.audio("https://actions.google.com/sounds/v1/ambiences/office_ambience.ogg", format="audio/mp3", autoplay=True)
-                aufgabe = None
-
-            elif modus == "MCP Server Dashboard":
-                st.markdown("### 🔌 Model Context Protocol (MCP) Server *(Gratis)*")
-                mcp_res = lade_mcp_ressourcen()
-                for sname, uri, stat in mcp_res:
-                    st.success(f"**{sname}** — URI: `{uri}` — Status: `{stat}`")
-                aufgabe = None
-
-            elif modus == "E-Mail & WhatsApp Postfach Assistent":
-                st.markdown("### ✉️📱 Postfach Scanner & Sentiment Autoresponder *(Standard: 0.005 €)*")
-                tab_mail, tab_wa = st.tabs(["E-Mail & Sentiment", "WhatsApp"])
-                with tab_mail:
-                    if st.button("📥 E-Mails abrufen & analysieren", use_container_width=True):
-                        berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005, grund="Postfach Scanner")
-                        with st.spinner("Lese IMAP & bewerte Sentiment (0.005 € berechnet)..."):
-                            mails = lade_letzte_emails(eingeloggter_kunde)
-                            st.success("Postfach nach Sentiment geclustert:")
-                            st.markdown(mails)
-                    z_empf = st.text_input("Empfänger:")
-                    m_betreff = st.text_input("Betreff:")
-                    m_befehl = st.text_area("Thema:")
-                    if st.button("✉️ E-Mail senden", use_container_width=True):
-                        if z_empf and m_befehl:
-                            berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005, grund="E-Mail Versand")
-                            ki_ant = selbstevaluierender_lern_agent("Mail Assistent", m_befehl)
-                            res = sende_email(eingeloggter_kunde, z_empf, m_betreff, ki_ant)
-                            st.success(res)
-                with tab_wa:
-                    wa_nr = st.text_input("Handynummer (+49...):")
-                    wa_text = st.text_area("Nachricht:")
-                    if st.button("💬 WhatsApp senden", use_container_width=True):
-                        if wa_nr and wa_text:
-                            berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005, grund="WhatsApp Versand")
-                            wa_res = sende_whatsapp(eingeloggter_kunde, wa_nr, wa_text)
-                            st.success(wa_res)
-                aufgabe = None
-
-            elif modus == "Multi-Agenten-Debatte (LangGraph)":
-                st.markdown("### 👥 LangGraph Multi-Agenten-Rollenspiel *(Schwer: 0.05 €)*")
-                debatten_ziel = st.text_input("Thema:", placeholder="Z.B.: Strategische Expansion")
-                if st.button("🚀 Debatte starten", use_container_width=True):
-                    berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.05, grund="Multi-Agenten Debatte")
-                    aufgabe = debatten_ziel
-                else:
-                    aufgabe = None
-                 
-            elif modus == "Computer-Use Browser-Operator":
-                st.markdown("### 🌐 Computer-Use Browser-Operator *(Schwer: 0.05 €)*")
-                url_ziel = st.text_input("Ziel-URL:", placeholder="https://example.com")
-                rpa_aktion = st.text_area("RPA-Aktion:", placeholder="Z.B.: Klicke Login, fülle Formular aus")
-                if st.button("🚀 Computer-Use starten", use_container_width=True):
-                    berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.05, grund="Computer-Use")
-                    aufgabe = rpa_aktion
-                else:
-                    aufgabe = None
-            else:
-                aufgabe = None
-
-            if aufgabe and modus not in [
-                "Proaktiver System-Monitor & Outbound", "E-Mail & WhatsApp Postfach Assistent", 
-                "Echtes WebRTC Realtime Audio", "MCP Server Dashboard", "🧬 Selbstlern-Gedächtnis (Meta-Memory)", 
-                "📚 Vektor-DB & RAG (Wissens-Archiv)", "🛠️ Closed-Loop Self-Healing Sandbox (REPL)", "🔔 Event Webhooks & Live-Trigger",
-                "🔄 Asynchrone Task-Queue (Hintergrund-Schwarm)", "🔐 Fernet Verschlüsselter API-Key Vault",
-                "📄 Deep Document OCR & PDF-Parser", "📊 Analytics & P&L Break-Even Rechner", "🛠️ Recursive Tool Creator & Git-Ops",
-                "🕸️ LangGraph Schwarm (Durable Checkpoints)", "🖥️ Live-Terminal & Realtime Stream", "🟢 Lokaler Ollama Fallback (Zero-Cloud)",
-                "🎯 Autonomer Deep Web-Scraper & Lead-Gen", "🧪 Automatisiertes Self-Testing & QA-Agent", "📊 Konkurrenten SWOT-Analyzer", "Computer-Use Browser-Operator"
-            ]:
-                berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005, grund="Chat & Webrecherche")
-                 
-                try:
-                    if modus == "Intelligenter Chat & Live-Webrecherche":
-                        st.session_state.chats[current_chat].append({"role": "user", "content": aufgabe})
-                        with st.chat_message("user"):
-                            st.markdown(aufgabe)
-                            if uploaded_screenshot:
-                                st.image(uploaded_screenshot, width=300)
-                         
-                        with st.spinner("🧠 Agent verarbeitet mit souveränem LiteLLM Router & FAISS RAG (0.005 € berechnet)..."):
-                            client_vis = OpenAI(api_key=MASTER_OPENAI_KEY)
-                            vision_text = ""
-                            if uploaded_screenshot:
-                                base64_image = base64.b64encode(uploaded_screenshot.read()).decode('utf-8')
-                                vision_res = client_vis.chat.completions.create(
-                                    model="gpt-4o-mini",
-                                    messages=[{
-                                        "role": "user",
-                                        "content": [
-                                            {"type": "text", "text": "Analysiere diesen Screenshot."},
-                                            {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
-                                        ]
-                                    }]
-                                ).choices[0].message.content
-                                vision_text = f"\n[Screenshot]:\n{vision_res}\n"
-
-                            web_daten = echte_deep_web_recherche(aufgabe)
-                            komplett_input = f"{vision_text}\nUser-Aufgabe: {aufgabe}\nWebdaten: {web_daten}"
+                if aufgabe and modus not in [
+                    "Proaktiver System-Monitor & Outbound", "E-Mail & WhatsApp Postfach Assistent", 
+                    "Echtes WebRTC Realtime Audio", "MCP Server Dashboard", "🧬 Selbstlern-Gedächtnis (Meta-Memory)", 
+                    "📚 Vektor-DB & RAG (Wissens-Archiv)", "🛠️ Closed-Loop Self-Healing Sandbox (REPL)", "🔔 Event Webhooks & Live-Trigger",
+                    "🔄 Asynchrone Task-Queue (Hintergrund-Schwarm)", "🔐 Fernet Verschlüsselter API-Key Vault",
+                    "📄 Deep Document OCR & PDF-Parser", "📊 Analytics & P&L Break-Even Rechner", "🛠️ Recursive Tool Creator & Git-Ops",
+                    "🕸️ LangGraph Schwarm (Durable Checkpoints)", "🖥️ Live-Terminal & Realtime Stream", "🟢 Lokaler Ollama Fallback (Zero-Cloud)",
+                    "🎯 Autonomer Deep Web-Scraper & Lead-Gen", "🧪 Automatisiertes Self-Testing & QA-Agent", "📊 Konkurrenten SWOT-Analyzer", "Computer-Use Browser-Operator"
+                ]:
+                    berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005, grund="Chat & Webrecherche")
+                     
+                    try:
+                        if modus == "Intelligenter Chat & Live-Webrecherche":
+                            st.session_state.chats[current_chat].append({"role": "user", "content": aufgabe})
+                            with st.chat_message("user"):
+                                st.markdown(aufgabe)
+                                if uploaded_screenshot:
+                                    st.image(uploaded_screenshot, width=300)
                              
-                            antwort = selbstevaluierender_lern_agent(f"Du bist AGI Master Assistant für {eingeloggter_kunde} (Rolle: {rolle}, Workspace: {workspace}).", komplett_input)
-                             
-                        st.session_state.chats[current_chat].append({"role": "assistant", "content": antwort})
-                        with st.chat_message("assistant"):
-                            st.markdown(antwort)
-                             
-                    elif modus == "Multi-Agenten-Debatte (LangGraph)":
-                        with st.spinner("👥 LangGraph Team debattiert (0.05 € berechnet)..."):
-                            antwort = langgraph_vorstands_schwarm(aufgabe)
-                            st.success("Konsens:")
-                            st.markdown(antwort)
+                            with st.spinner("🧠 Agent verarbeitet mit souveränem LiteLLM Router & FAISS RAG (0.005 € berechnet)..."):
+                                client_vis = OpenAI(api_key=MASTER_OPENAI_KEY)
+                                vision_text = ""
+                                if uploaded_screenshot:
+                                    base64_image = base64.b64encode(uploaded_screenshot.read()).decode('utf-8')
+                                    vision_res = client_vis.chat.completions.create(
+                                        model="gpt-4o-mini",
+                                        messages=[{
+                                            "role": "user",
+                                            "content": [
+                                                {"type": "text", "text": "Analysiere diesen Screenshot."},
+                                                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
+                                            ]
+                                        }]
+                                    ).choices[0].message.content
+                                    vision_text = f"\n[Screenshot]:\n{vision_res}\n"
 
-                    elif modus == "Visueller React Flow Node-Canvas":
-                        with st.spinner("Führe Workflow aus (0.005 € berechnet)..."):
-                            time.sleep(1.0)
-                            workflow_ergebnis = selbstevaluierender_lern_agent("Canvas Orchestrator", aufgabe)
-                            st.success("Erfolgreich:")
-                            st.markdown(workflow_ergebnis)
-                             
-                    elif modus == "Computer-Use Browser-Operator":
-                        with st.spinner("🖥️ Computer-Use Agent steuert Browser (0.05 € berechnet)..."):
-                            titel, screenshot = echter_playwright_browser_operator(url_ziel, aufgabe)
-                            st.success(f"Titel: **{titel}**")
-                            if screenshot:
-                                st.image(screenshot, caption="Computer-Use Feedback", use_container_width=True)
-                            st.markdown(selbstevaluierender_lern_agent("Computer-Use Expert", f"Analysiere URL {url_ziel} mit Titel '{titel}'."))
-                except Exception as e:
-                    if SENTRY_AVAILABLE:
-                        sentry_sdk.capture_exception(e)
-                    st.error(f"Fehler: {e}")
+                                web_daten = echte_deep_web_recherche(aufgabe)
+                                komplett_input = f"{vision_text}\nUser-Aufgabe: {aufgabe}\nWebdaten: {web_daten}"
+                                 
+                                antwort = selbstevaluierender_lern_agent(f"Du bist AGI Master Assistant für {eingeloggter_kunde} (Rolle: {rolle}, Workspace: {workspace}).", komplett_input)
+                                 
+                            st.session_state.chats[current_chat].append({"role": "assistant", "content": antwort})
+                            with st.chat_message("assistant"):
+                                st.markdown(antwort)
+                                 
+                        elif modus == "Multi-Agenten-Debatte (LangGraph)":
+                            with st.spinner("👥 LangGraph Team debattiert (0.05 € berechnet)..."):
+                                antwort = langgraph_vorstands_schwarm(aufgabe)
+                                st.success("Konsens:")
+                                st.markdown(antwort)
+
+                        elif modus == "Visueller React Flow Node-Canvas":
+                            with st.spinner("Führe Workflow aus (0.005 € berechnet)..."):
+                                time.sleep(1.0)
+                                workflow_ergebnis = selbstevaluierender_lern_agent("Canvas Orchestrator", aufgabe)
+                                st.success("Erfolgreich:")
+                                st.markdown(workflow_ergebnis)
+                                 
+                        elif modus == "Computer-Use Browser-Operator":
+                            with st.spinner("🖥️ Computer-Use Agent steuert Browser (0.05 € berechnet)..."):
+                                titel, screenshot = echter_playwright_browser_operator(url_ziel, aufgabe)
+                                st.success(f"Titel: **{titel}**")
+                                if screenshot:
+                                    st.image(screenshot, caption="Computer-Use Feedback", use_container_width=True)
+                                st.markdown(selbstevaluierender_lern_agent("Computer-Use Expert", f"Analysiere URL {url_ziel} mit Titel '{titel}'."))
+                    except Exception as e:
+                        if SENTRY_AVAILABLE:
+                            sentry_sdk.capture_exception(e)
+                        st.error(f"Fehler: {e}")
 
             if modus == "Proaktiver System-Monitor & Outbound":
                 st.markdown("### 🛡️ 24/7 Daemon, SQLite & FastAPI Gateway")
