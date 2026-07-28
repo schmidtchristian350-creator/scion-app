@@ -72,7 +72,7 @@ try:
 except ImportError:
     FASTAPI_AVAILABLE = False
 
-st.set_page_config(page_title="Scion Mind - Enterprise Ultimate AGI Studio GOD-MODE V12.22", layout="wide")
+st.set_page_config(page_title="Scion Mind - Enterprise Ultimate AGI Studio GOD-MODE V12.23", layout="wide")
 
 # ROBUSTES DARK/LIGHT-MODE CSS
 st.markdown("""
@@ -88,7 +88,7 @@ st.markdown("""
 
 st.title("Scion-Mind - Ultimate Studio (Vollständige Enterprise Edition)")
 st.markdown("*designed by Christian Schmidt*") 
-st.markdown("*Powered by Autonomer Auto-Router, Admin-Zentrale, Episodischem Memory & Multi-Format Export*")
+st.markdown("*Powered by Autonomer Auto-Router, Admin-Zentrale, Mail/WhatsApp-Verknüpfung & Multi-Format Export*")
 st.write("---")
 
 MASTER_OPENAI_KEY = st.secrets["OPENAI_API_KEY"]
@@ -354,7 +354,7 @@ with st.sidebar:
         st.caption(f"🛡️ Rolle: **{rolle}** | Workspace: `{workspace}`")
         st.caption(f"💰 Guthaben: **{guthaben:.2f} €**")
         
-        # VOLLSTÄNDIG WIEDERHERGESTELLTE ADMIN-ZENTRALE IN DER SEITENLEISTE
+        # ADMIN-ZENTRALE
         if eingeloggter_kunde == ADMIN_NAME:
             with st.expander("👑 Admin-Zentrale (Guthaben & Audit)", expanded=True):
                 st.markdown("#### Nutzer verwalten:")
@@ -409,6 +409,40 @@ with st.sidebar:
                     conn.close()
                     st.success("Generierter Schlüssel:")
                     st.code(neuer_schluessel)
+
+        # VOLLSTÄNDIG WIEDERHERGESTELLTER E-MAIL-ZUGANG
+        st.write("---")
+        st.markdown("### ✉️ E-Mail-Postfach")
+        with st.expander("Konfigurieren", expanded=False):
+            mail_adr = st.text_input("E-Mail Adresse:", placeholder="name@domain.de")
+            mail_pwd = st.text_input("Passwort (App-Passwort):", type="password")
+            imap_s = st.text_input("IMAP-Server:", value="imap.gmail.com")
+            smtp_s = st.text_input("SMTP-Server:", value="smtp.gmail.com")
+            if st.button("E-Mail-Zugang speichern"):
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                cursor.execute("DELETE FROM email_config WHERE username = ?", (eingeloggter_kunde,))
+                cursor.execute("INSERT INTO email_config (username, imap_server, smtp_server, email_adresse, email_passwort) VALUES (?, ?, ?, ?, ?)",
+                               (eingeloggter_kunde, imap_s, smtp_s, mail_adr, mail_pwd))
+                conn.commit()
+                conn.close()
+                st.success("E-Mail-Zugang gesichert!")
+
+        # VOLLSTÄNDIG WIEDERHERGESTELLTE WHATSAPP-VERKNÜPFUNG
+        st.markdown("### 📱 WhatsApp Business")
+        with st.expander("Verknüpfen", expanded=False):
+            wa_provider = st.selectbox("API-Provider:", ["Meta Cloud API", "Twilio API"])
+            wa_token = st.text_input("API Token / Auth Token:", type="password")
+            wa_phone_id = st.text_input("Phone Number ID / Account SID:")
+            if st.button("WhatsApp-Verbindung speichern"):
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                cursor.execute("DELETE FROM whatsapp_config WHERE username = ?", (eingeloggter_kunde,))
+                cursor.execute("INSERT INTO whatsapp_config (username, provider, api_token, phone_id) VALUES (?, ?, ?, ?)",
+                               (eingeloggter_kunde, wa_provider, wa_token, wa_phone_id))
+                conn.commit()
+                conn.close()
+                st.success("WhatsApp verknüpft!")
 
         st.write("---")
         st.markdown("### 💬 Deine Chats")
