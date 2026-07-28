@@ -26,6 +26,19 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image as RL
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 
+# DOCX & XLSX EXPORT BIBLIOTHEKEN
+try:
+    from docx import Document
+    DOCX_AVAILABLE = True
+except ImportError:
+    DOCX_AVAILABLE = False
+
+try:
+    import openpyxl
+    OPENPYXL_AVAILABLE = True
+except ImportError:
+    OPENPYXL_AVAILABLE = False
+
 # PYDANTIC FÜR TYP-SICHERE DATENVALIDIERUNG
 try:
     from pydantic import BaseModel, Field
@@ -66,24 +79,17 @@ try:
 except ImportError:
     PLAYWRIGHT_AVAILABLE = False
 
-st.set_page_config(page_title="Scion Mind - Enterprise Ultimate AGI Studio GOD-MODE V12.14", layout="wide")
+st.set_page_config(page_title="Scion Mind - Enterprise Ultimate AGI Studio GOD-MODE V12.15", layout="wide")
 
 # ROBUSTES DARK/LIGHT-MODE CSS (GARANTIERT LESBARE SCHRIFTEN)
 st.markdown("""
     <style>
-    /* Allgemeine Text- und Label-Sicherheit für den Dark Mode */
     .stApp { background-color: var(--background-color); color: var(--text-color); }
-    
     [data-testid="stSidebar"] { background-color: #1e293b; color: #ffffff !important; }
     [data-testid="stSidebar"] label, [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3, [data-testid="stSidebar"] p, [data-testid="stSidebar"] span { color: #ffffff !important; }
-    
-    /* Buttons einheitlich stylen */
     .stButton button { background-color: #0f172a; color: white; border-radius: 8px; border: none; font-weight: bold; width: 100%; }
     .stButton button:hover { background-color: #334155; color: white; }
-    
-    /* Eingabefelder und Dropdowns lesbar machen */
     input, textarea, [data-baseweb="input"] div, [data-baseweb="base-input"] { border-radius: 8px !important; }
-    
     [data-testid="stStatusWidget"] svg, [data-testid="stSpinner"] svg {
         width: 40px !important;
         height: 40px !important;
@@ -91,8 +97,8 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("Scion Mind - Enterprise Ultimate AGI Studio (GOD-MODE V12.14)")
-st.markdown("*designed by Christian Schmidt | Powered by Dark-Mode UI Fix & Wertbasiertem Credit-System*")
+st.title("Scion Mind - Enterprise Ultimate AGI Studio (GOD-MODE V12.15)")
+st.markdown("*designed by Christian Schmidt | Powered by Universal Multi-Format Export & Dark-Mode Core*")
 st.write("---")
 
 MASTER_OPENAI_KEY = st.secrets["OPENAI_API_KEY"]
@@ -105,7 +111,7 @@ ADMIN_NAME = "Christian"
 ADMIN_PASS = "ScionMind#2026!Secured"
 
 # -------------------------------------------------------------
-# SQLITE PERSISTENCE & V12.14 TABELLEN
+# SQLITE PERSISTENCE & V12.15 TABELLEN
 # -------------------------------------------------------------
 def init_db():
     conn = sqlite3.connect("scion_mind_enterprise.db", check_same_thread=False)
@@ -136,7 +142,6 @@ def init_db():
             eingeloest_von TEXT
         )
     """)
-
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS daemon_logs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -270,7 +275,7 @@ def get_db_connection():
     return sqlite3.connect("scion_mind_enterprise.db", check_same_thread=False)
 
 # -------------------------------------------------------------
-# WERTBASIERTE CREDIT-ABBUCHUNG (HILFSFUNKTION)
+# WERTBASIERTE CREDIT-ABBUCHUNG & EXPORT-HILFSFUNKTIONEN
 # -------------------------------------------------------------
 def berechne_und_ziehe_credits_ab(username, kosten):
     if username == ADMIN_NAME:
@@ -280,6 +285,42 @@ def berechne_und_ziehe_credits_ab(username, kosten):
     cursor.execute("UPDATE kunden SET guthaben = MAX(0.0, guthaben - ?) WHERE username = ?", (kosten, username))
     conn.commit()
     conn.close()
+
+def exportiere_zu_docx(titel, text_inhalt):
+    if not DOCX_AVAILABLE:
+        return None
+    doc = Document()
+    doc.add_heading(titel, level=1)
+    doc.add_paragraph(text_inhalt)
+    io_buf = BytesIO()
+    doc.save(io_buf)
+    io_buf.seek(0)
+    return io_buf
+
+def exportiere_zu_xlsx(titel, text_inhalt):
+    if not OPENPYXL_AVAILABLE:
+        return None
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Ausarbeitung"
+    ws.append(["Titel", titel])
+    ws.append(["Inhalt", text_inhalt])
+    io_buf = BytesIO()
+    wb.save(io_buf)
+    io_buf.seek(0)
+    return io_buf
+
+def exportiere_zu_pdf(titel, text_inhalt):
+    pdf_io = BytesIO()
+    doc = SimpleDocTemplate(pdf_io, pagesize=A4, rightMargin=40, leftMargin=40, topMargin=40, bottomMargin=40)
+    styles = getSampleStyleSheet()
+    story = [
+        Paragraph(titel, ParagraphStyle('T', parent=styles['Heading1'], fontName='Helvetica-Bold', fontSize=20, textColor=colors.HexColor('#0f172a'), spaceAfter=15)),
+        Paragraph(text_inhalt.replace('\n', '<br/>'), ParagraphStyle('B', parent=styles['Normal'], fontName='Helvetica', fontSize=12, textColor=colors.HexColor('#1e293b'), leading=16, spaceAfter=15))
+    ]
+    doc.build(story)
+    pdf_io.seek(0)
+    return pdf_io
 
 # -------------------------------------------------------------
 # FASTAPI MICROSERVICE FÜR ECHTE WEBHOOKS (PORT 8000)
@@ -575,7 +616,7 @@ with st.sidebar:
             st.rerun()
 
 # -------------------------------------------------------------
-# CORE ENGINES V12.14 (Inkl. Wertbasiertem Credit-System)
+# CORE ENGINES V12.15 (Inkl. Multi-Format Export)
 # -------------------------------------------------------------
 
 def verschruessle_api_key(api_key):
@@ -1111,7 +1152,7 @@ def selbstevaluierender_lern_agent(system_prompt, initial_input, use_local=False
     reflektion_res = ausfuehren_mit_ollama_fallback("Du bist Meta-Learning Optimizer.", f"Aufgabe: {initial_input}\nErgebnis: {ergebnis}", use_local=use_local)
     
     speichere_agenten_lernen("Chat-Optimierung", reflektion_res, dynamischer_prompt)
-    return wende_guardrails_an(ergebnis + f"\n\n---\n🧬 *[Scion Mind V12.14 Sovereign Core]: Dark-Mode UI Fix aktiv.*")
+    return wende_guardrails_an(ergebnis + f"\n\n---\n🧬 *[Scion Mind V12.15 Sovereign Core]: Multi-Format Export aktiv.*")
 
 def generiere_replicate_bild_mit_selbstcheck(prompt):
     for versuch in range(2):
@@ -1184,7 +1225,7 @@ else:
         spalte_links, spalte_rechts = st.columns([1.1, 0.9])
 
         with spalte_links:
-            st.subheader("🤖 Autonomer KI-Agent (GOD-MODE V12.14)")
+            st.subheader("🤖 Autonomer KI-Agent (GOD-MODE V12.15)")
             modus = st.selectbox(
                 "Agenten-Modus wählen:",
                 [
@@ -1262,7 +1303,7 @@ else:
                     if terminal_befehl:
                         berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005)
                         terminal_box = st.empty()
-                        log_text = "[INFO] Starte Scion Terminal V12.14 (0.005 € abgezogen)...\n"
+                        log_text = "[INFO] Starte Scion Terminal V12.15 (0.005 € abgezogen)...\n"
                         terminal_box.code(log_text, language="bash")
                         time.sleep(0.5)
                         
@@ -1356,7 +1397,7 @@ else:
 
             elif modus == "🧪 Automatisiertes Self-Testing & QA-Agent":
                 st.markdown("### 🧪 Automatisiertes Self-Testing & QA-Agent (Pytest) *(Schwer: 0.05 €)*")
-                qa_ziel = st.text_area("Funktions-Ziel:", placeholder="Z.B.: Schreibe Funktion zur Validierung von IBAN-Nummern")
+                qa_ziel = st.text_input("Funktions-Ziel:", placeholder="Z.B.: Schreibe Funktion zur Validierung von IBAN-Nummern")
                 if st.button("🚀 QA-Testsuite ausführen", use_container_width=True):
                     if qa_ziel:
                         berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.05)
@@ -1730,12 +1771,50 @@ else:
                             st.image(slide["bild_url"], use_container_width=True)
 
                 st.write("---")
-                format_wahl = st.radio("Exportformat:", ["PowerPoint (.pptx)", "PDF (.pdf)"], horizontal=True)
+                format_wahl = st.radio("Präsentations-Exportformat:", ["PowerPoint (.pptx)", "PDF (.pdf)"], horizontal=True)
 
                 if "PowerPoint" in format_wahl:
                     st.download_button(label="📥 PowerPoint (.pptx)", data=erstelle_pptx_aus_session(), file_name="Scion_Mind_Praesentation.pptx", mime="application/vnd.openxmlformats-officedocument.presentationml.presentation", use_container_width=True)
                 else:
-                    st.download_button(label="📥 PDF-Dokument (.pdf)", data=erstelle_pdf_aus_session(), file_name="Scion_Mind_Praesentation.pdf", mime="application/pdf", use_container_width=True)
+                    st.download_button(label="📥 PDF-Präsentation (.pdf)", data=erstelle_pdf_aus_session(), file_name="Scion_Mind_Praesentation.pdf", mime="application/pdf", use_container_width=True)
+
+            # UNIVERSAL EXPORT STUDIO FÜR ALLE TEXTE & AUSARBEITUNGEN
+            with st.expander("📥 Universal Multi-Format Text-Export", expanded=True):
+                st.markdown("### 📄 Ausarbeitung exportieren")
+                export_titel = st.text_input("Dokumenten-Titel:", value="Scion_Mind_Ausarbeitung")
+                
+                # Letzte Chatnachricht oder generierter Text als Exportquelle
+                aktueller_export_text = "Kein Text verfügbar."
+                if st.session_state.chats[current_chat]:
+                    for msg in reversed(st.session_state.chats[current_chat]):
+                        if msg["role"] == "assistant":
+                            aktueller_export_text = msg["content"]
+                            break
+                
+                export_text_input = st.text_area("Inhalt zum Exportieren:", value=aktueller_export_text, height=120)
+                
+                ex_col1, ex_col2 = st.columns(2)
+                with ex_col1:
+                    # PDF Export
+                    pdf_data = exportiere_zu_pdf(export_titel, export_text_input)
+                    st.download_button(label="📥 Als PDF", data=pdf_data, file_name=f"{export_titel}.pdf", mime="application/pdf", use_container_width=True)
+                    
+                    # TXT Export
+                    st.download_button(label="📥 Als TXT", data=export_text_input.encode('utf-8'), file_name=f"{export_titel}.txt", mime="text/plain", use_container_width=True)
+                with ex_col2:
+                    # DOCX Export
+                    docx_data = exportiere_zu_docx(export_titel, export_text_input)
+                    if docx_data:
+                        st.download_button(label="📥 Als Word (.docx)", data=docx_data, file_name=f"{export_titel}.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document", use_container_width=True)
+                    else:
+                        st.caption("Word (python-docx fehlt)")
+
+                    # XLSX Export
+                    xlsx_data = exportiere_zu_xlsx(export_titel, export_text_input)
+                    if xlsx_data:
+                        st.download_button(label="📥 Als Excel (.xlsx)", data=xlsx_data, file_name=f"{export_titel}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
+                    else:
+                        st.caption("Excel (openpyxl fehlt)")
 
             with st.expander("🪄 AI Prompt Optimizer", expanded=False):
                 st.markdown("### 🎯 Master-Prompt-Generator *(Standard: 0.005 €)*")
