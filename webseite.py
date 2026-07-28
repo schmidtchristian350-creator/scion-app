@@ -1,11 +1,4 @@
-# We will generate the complete, production-ready master script combining all 4 ultra-advanced pillars:
-# 1. Computer Use / Browser Automation Simulator & Playwright Bridge
-# 2. Multi-Model Swarm (OpenAI, Anthropic Claude, Google Gemini integration)
-# 3. Autonomous 24/7 Background Daemon / Worker & Proactive Task Engine
-# 4. Deterministic Guardrails Engine (Strict Rule Validation)
-# Along with all previous features (Self-Correction, Deep Web Search, PPTX/PDF Export, Voice, UI, Authentication).
-
-master_code = '''import streamlit as st
+import streamlit as st
 from openai import OpenAI
 from pptx import Presentation
 from io import BytesIO
@@ -310,7 +303,7 @@ def erstelle_pdf_aus_session():
     story = []
     for i, slide in enumerate(st.session_state.slides_data):
         story.append(Paragraph(slide['titel'], title_style))
-        story.append(Paragraph(slide['text'].replace('\\n', '<br/>'), body_style))
+        story.append(Paragraph(slide['text'].replace('\n', '<br/>'), body_style))
         if slide['bild_url']:
             try:
                 img_data = requests.get(slide['bild_url']).content
@@ -592,7 +585,7 @@ else:
                             file=("voice_input.wav", live_audio.read())
                         )
                         spoken_text = transcript_res.text
-                        st.info(f"Du hast gesagt: \\\"{spoken_text}\\\"")
+                        st.info(f"Du hast gesagt: \"{spoken_text}\"")
                         
                         speech_res = client_voice.audio.speech.create(
                             model="tts-1",
@@ -622,5 +615,3 @@ else:
                             st.audio(response.content, format="audio/mp3")
                         except Exception as e:
                             st.error(f"Fehler: {e}")
-'''
-print("Master script successfully generated.")
