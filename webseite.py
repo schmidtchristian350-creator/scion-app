@@ -97,8 +97,9 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("Scion Mind - Enterprise Ultimate AGI Studio (GOD-MODE V12.17)")
-st.markdown("*designed by Christian Schmidt | Powered by Audit-Trail, Workspace Vault & Session Cost Meter*")
+st.title("Scion-Mind - Ultimate Studio")
+st.markdown("*designed by Christian Schmidt*") 
+st.markdown("*Powered by Autonomous Lead-Scraper, Hands-Free Voice Loop, QA Pytest Agent, Hierarchical Swarm & Live Terminal*")
 st.write("---")
 
 MASTER_OPENAI_KEY = st.secrets["OPENAI_API_KEY"]
