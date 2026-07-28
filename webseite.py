@@ -140,13 +140,6 @@ with st.sidebar:
             st.session_state.aktiver_chat = chat_name
             st.rerun()
 
-def bereinige_text(text):
-    text = re.sub(r'\*\*', '', text)
-    text = re.sub(r'___+', '', text)
-    text = re.sub(r'---+', '', text)
-    text = text.replace('###', '')
-    return text.strip()
-
 def generiere_replicate_bild(prompt):
     try:
         headers = {
@@ -266,6 +259,9 @@ else:
         st.markdown("### ⚡ 1. Vollautomatischer Autopilot (Agent)")
         auto_thema = st.text_input("Thema für automatische Komplett-Präsentation:", placeholder="Z.B.: Strategische Quartalsplanung 2026")
         
+        # NEU: Regler für die gewünschte Anzahl der Folien
+        anzahl_folien = st.slider("Anzahl der gewünschten Folien:", min_value=2, max_value=10, value=4)
+        
         if st.button("🚀 Vollständige Präsentation automatisch erstellen", use_container_width=True):
             if not auto_thema:
                 st.warning("Bitte gib ein Thema ein.")
@@ -273,33 +269,43 @@ else:
                 if eingeloggter_kunde != ADMIN_NAME:
                     st.session_state.kunden_daten[eingeloggter_kunde]["guthaben"] -= 2.00
                 
-                with st.spinner("🦫 Der Agent erstellt die Präsentations-Struktur und High-End Bilder..."):
+                with st.spinner(f"🦫 Der Agent erstellt {anzahl_folien} Folien inklusive High-End Bildern..."):
                     try:
                         client = OpenAI(api_key=MASTER_OPENAI_KEY)
+                        system_instruction = (
+                            f"You are a professional presentation designer. Create exactly {anzahl_folien} slides. "
+                            "Format each slide strictly as 'TITLE: [Title]|||TEXT: [Bullet points]|||PROMPT: [English visual image prompt]'. "
+                            "Separate slides with '###'."
+                        )
+                        
                         completion = client.chat.completions.create(
                             model="gpt-4o-mini",
                             messages=[
-                                {"role": "system", "content": "You are a professional presentation designer. Create exactly 3 slides. Format each slide strictly as 'TITLE: [Title]|||TEXT: [Bullet points]|||PROMPT: [English visual image prompt]'. Separate slides with '###'."},
+                                {"role": "system", "content": system_instruction},
                                 {"role": "user", "content": auto_thema}
                             ]
                         )
-                        # Korrigierter, robuster Zugriff auf den Antwort-Text
                         roh_text = completion.choices[0].message.content
                         roh_folien = roh_text.split("###")
                         
                         neue_slides = []
                         for f in roh_folien:
                             if "TITLE:" in f:
-                                t_part = f.split("TITLE:")[1].split("|||")[0].strip()
-                                txt_part = f.split("TEXT:")[1].split("|||")[0].strip() if "TEXT:" in f else ""
-                                p_part = f.split("PROMPT:")[1].strip() if "PROMPT:" in f else "Professional business background"
-                                
-                                bild_url = generiere_replicate_bild(p_part)
-                                neue_slides.append({"titel": t_part, "text": txt_part, "prompt": p_part, "bild_url": bild_url})
+                                try:
+                                    t_part = f.split("TITLE:")[1].split("|||")[0].strip()
+                                    txt_part = f.split("TEXT:")[1].split("|||")[0].strip() if "TEXT:" in f else ""
+                                    p_part = f.split("PROMPT:")[1].strip() if "PROMPT:" in f else "Professional business background"
+                                    
+                                    # Bild über Replicate generieren
+                                    bild_url = generiere_replicate_bild(p_part)
+                                    neue_slides.append({"titel": t_part, "text": txt_part, "prompt": p_part, "bild_url": bild_url})
+                                except Exception:
+                                    continue
                         
                         if neue_slides:
+                            # Automatische Übernahme in die Session, damit sie in der manuellen Bearbeitung sofort bereitstehen
                             st.session_state.slides_data = neue_slides
-                            st.success("Komplette Präsentation erfolgreich automatisch erstellt!")
+                            st.success("Komplette Präsentation automatisch erstellt und in die manuelle Bearbeitung übernommen!")
                             st.rerun()
                         else:
                             st.error("Fehler bei der automatischen Generierung.")
@@ -308,7 +314,7 @@ else:
 
         st.write("---")
         st.markdown("### 🎨 2. Folien-Studio & Vorschau (Manuell & Erweitert)")
-        st.markdown("Füge neue Folien hinzu, bearbeite Titel/Text und sieh dir die generierten Profi-Bilder im Voraus an:")
+        st.markdown("Hier kannst du alle automatisch generierten Folien einzeln einsehen, den Text anpassen, neue Folien hinzufügen oder löschen:")
 
         if st.button("➕ Neue Folie hinzufügen"):
             st.session_state.slides_data.append({
@@ -335,7 +341,7 @@ else:
 
                 col_b1, col_b2 = st.columns(2)
                 with col_b1:
-                    if st.button(f"🖼️ Bild für Folie {idx+1} generieren", key=f"gen_img_{idx}"):
+                    if st.button(f"🖼️ Bild für Folie {idx+1} neu generieren", key=f"gen_img_{idx}"):
                         if eingeloggter_kunde != ADMIN_NAME:
                             st.session_state.kunden_daten[eingeloggter_kunde]["guthaben"] -= 0.10
                         with st.spinner("Generiere Bild..."):
