@@ -264,9 +264,9 @@ else:
                         "Prefer": "respond-async"
                     }
                     
-                    # Nutzung des offiziellen, stabilen Video-Modellpfads bei Replicate
+                    # Hier übergeben wir den offiziellen Version-Hash für ein stabiles Video-Modell auf Replicate
                     data = {
-                        "model": "minimax/video-01",
+                        "version": "9f747673945c62801b13b84701c7d39fd9ef1aef31e27c4b68aac70b13a5fced",
                         "input": {"prompt": video_prompt}
                     }
                     
