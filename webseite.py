@@ -174,7 +174,7 @@ else:
         st.subheader("🤖 KI-Arbeitsbereich")
         modus = st.selectbox(
             "Was möchtest du erstellen lassen?",
-            ["Text-Recherche & Chat", "Präsentations-Struktur & Folien", "Video-Skript & Storyboard", "🎥 KI-Video Generierung"]
+            ["Text-Recherche & Chat", "Präsentations-Struktur & Folien", "Video-Skript & Storyboard", "🎥 KI-Video Prompt-Optimierung"]
         )
         
         current_chat = st.session_state.aktiver_chat
@@ -207,7 +207,7 @@ else:
                     "Text-Recherche & Chat": "Du bist ein präziser, professioneller KI-Assistent. Antworte immer auf Deutsch.",
                     "Präsentations-Struktur & Folien": "Du bist ein Experte für Business-Präsentationen. Erstelle eine saubere Präsentation, bei der jede Folie mit 'Folie X: [Titel]' beginnt, gefolgt von prägnanten Stichpunkten.",
                     "Video-Skript & Storyboard": "Du bist ein professioneller Videoproduzent. Erstelle ein detailliertes Video-Skript mit Szenenbeschreibung und Sprechtext auf Deutsch.",
-                    "🎥 KI-Video Generierung": "Du bist ein Regisseur für KI-Videos. Erstelle ein kinoreifes, detailliertes Szenen-Prompt auf Englisch, optimiert für moderne Video-KIs."
+                    "🎥 KI-Video Prompt-Optimierung": "Du bist ein Regisseur für High-End-Videoproduktionen. Optimiere die folgende Szene für professionelle Video-KIs zu einem perfekten englischen Prompt."
                 }
                 
                 messages_payload = [{"role": "system", "content": system_prompts.get(modus, "Du bist ein hilfreicher Assistent.")}]
@@ -220,7 +220,7 @@ else:
                     )
                     antwort = response.choices[0].message.content
                     
-                    st.session_state.chats[current_chat].append({"role": "assistant", "content":antwort})
+                    st.session_state.chats[current_chat].append({"role": "assistant", "content": antwort})
                     with st.chat_message("assistant"):
                         st.markdown(antwort)
                         
@@ -239,37 +239,31 @@ else:
                 st.error(f"Ein Fehler ist aufgetreten: {e}")
 
     with spalte_rechts:
-        # Neuer Reiter für direkte Video-Erstellung im rechten Bereich
-        st.subheader("🎥 KI-Video Generator")
-        video_prompt = st.text_area("Videobeschreibung (Was soll im Video passieren?):", height=150, placeholder="Z.B.: Eine Drohnenaufnahme über eine futuristische Stadt bei Sonnenuntergang...")
+        st.subheader("🎥 KI-Video Regie-Assistent")
+        video_prompt = st.text_area("Szene für das Video beschreiben:", height=150, placeholder="Füge hier deine Skript-Szene ein...")
         
-        if st.button("🎬 Video generieren", use_container_width=True):
+        if st.button("🎬 Perfekten Video-Prompt generieren", use_container_width=True):
             if not video_prompt:
-                st.warning("Bitte gib eine Beschreibung für das Video ein.")
+                st.warning("Bitte gib eine Szenenbeschreibung ein.")
             else:
                 if eingeloggter_kunde != ADMIN_NAME:
-                    st.session_state.kunden_daten[eingeloggter_kunde]["guthaben"] -= 0.50 # Höherer Preis für Video-Generierung
-                
-                with st.spinner("Generiere Video-Szene (dies kann einen Moment dauern)..."):
+                    st.session_state.kunden_daten[eingeloggter_kunde]["guthaben"] -= 0.05
+                with st.spinner("Optimiere für Video-KI..."):
                     try:
                         client = OpenAI(api_key=MASTER_OPENAI_KEY)
-                        
-                        # Wir nutzen das Sora-/Bild-zu-Video-Schnittstellenmodell, um professionelle Ergebnisse zu erzielen
-                        response = client.images.generate(
-                            model="dall-e-3",
-                            prompt=f"Cinematic high-resolution video frame, professional lighting, 4k: {video_prompt}",
-                            size="1024x1024",
-                            quality="standard",
-                            n=1,
+                        response = client.chat.completions.create(
+                            model="gpt-4o-mini",
+                            messages=[
+                                {"role": "system", "content": "Du bist ein Experte für Video-KIs wie Sora und Runway. Erstelle aus der Beschreibung einen kinoreifen, englischen Prompt für die Videogenerierung."},
+                                {"role": "user", "content": video_prompt}
+                            ]
                         )
-                        image_url = response.data[0].url
-                        
-                        st.success("Video-Keyframe & Animation erfolgreich erstellt!")
-                        st.image(image_url, caption="Generiertes Videobild / Storyboard-Keyframe", use_column_width=True)
-                        st.info("💡 Tipp: Nutze dieses Keyframe in Tools wie Runway Gen-2 oder Sora, um es in ein volles Bewegtbild-Video zu verwandeln.")
+                        regie_ergebnis = response.choices[0].message.content
+                        st.success("Video-Prompt erfolgreich optimiert!")
+                        st.code(regie_ergebnis, language="text")
                         st.rerun()
                     except Exception as e:
-                        st.error(f"Video-Fehler: {e}")
+                        st.error(f"Fehler: {e}")
 
         st.write("---")
         st.subheader("🎧 Text vorlesen lassen")
