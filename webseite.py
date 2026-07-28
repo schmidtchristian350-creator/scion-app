@@ -282,13 +282,12 @@ else:
                         "Prefer": "respond-async"
                     }
                     
-                    # Offizieller und stabiler Versions-Hash für Stable Video Diffusion auf Replicate
+                    # Modernster direkter Endpunkt für MiniMax Video über das offizielle Modell-Deployment
                     data = {
-                        "version": "3383276bc11985e50569a03c34af79cc23e4291880949d211245b78ff72074f4",
                         "input": {"prompt": clean_prompt}
                     }
                     
-                    response = requests.post("https://api.replicate.com/v1/predictions", json=data, headers=headers)
+                    response = requests.post("https://api.replicate.com/v1/models/minimax/video-01/predictions", json=data, headers=headers)
                     res_json = response.json()
                     
                     if "error" in res_json and res_json["error"] is not None:
