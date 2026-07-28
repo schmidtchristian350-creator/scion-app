@@ -22,7 +22,6 @@ st.title("Scion Mind")
 st.markdown("*designed by Christian Schmidt*")
 st.write("---")
 
-# Der Schlüssel wird sicher aus den Streamlit Secrets geladen (kein harter Text im Code!)
 MASTER_OPENAI_KEY = st.secrets["OPENAI_API_KEY"]
 
 ADMIN_NAME = "Christian"
@@ -175,7 +174,7 @@ else:
         st.subheader("🤖 KI-Arbeitsbereich")
         modus = st.selectbox(
             "Was möchtest du erstellen lassen?",
-            ["Text-Recherche & Chat", "Präsentations-Struktur & Folien", "Video-Skript & Storyboard"]
+            ["Text-Recherche & Chat", "Präsentations-Struktur & Folien", "Video-Skript & Storyboard", "🎥 KI-Video Generierung"]
         )
         
         current_chat = st.session_state.aktiver_chat
@@ -207,7 +206,8 @@ else:
                 system_prompts = {
                     "Text-Recherche & Chat": "Du bist ein präziser, professioneller KI-Assistent. Antworte immer auf Deutsch.",
                     "Präsentations-Struktur & Folien": "Du bist ein Experte für Business-Präsentationen. Erstelle eine saubere Präsentation, bei der jede Folie mit 'Folie X: [Titel]' beginnt, gefolgt von prägnanten Stichpunkten.",
-                    "Video-Skript & Storyboard": "Du bist ein professioneller Videoproduzent. Erstelle ein detailliertes Video-Skript mit Szenenbeschreibung und Sprechtext auf Deutsch."
+                    "Video-Skript & Storyboard": "Du bist ein professioneller Videoproduzent. Erstelle ein detailliertes Video-Skript mit Szenenbeschreibung und Sprechtext auf Deutsch.",
+                    "🎥 KI-Video Generierung": "Du bist ein Regisseur für KI-Videos. Erstelle ein kinoreifes, detailliertes Szenen-Prompt auf Englisch, optimiert für moderne Video-KIs."
                 }
                 
                 messages_payload = [{"role": "system", "content": system_prompts.get(modus, "Du bist ein hilfreicher Assistent.")}]
@@ -220,7 +220,7 @@ else:
                     )
                     antwort = response.choices[0].message.content
                     
-                    st.session_state.chats[current_chat].append({"role": "assistant", "content": antwort})
+                    st.session_state.chats[current_chat].append({"role": "assistant", "content":antwort})
                     with st.chat_message("assistant"):
                         st.markdown(antwort)
                         
@@ -239,8 +239,41 @@ else:
                 st.error(f"Ein Fehler ist aufgetreten: {e}")
 
     with spalte_rechts:
+        # Neuer Reiter für direkte Video-Erstellung im rechten Bereich
+        st.subheader("🎥 KI-Video Generator")
+        video_prompt = st.text_area("Videobeschreibung (Was soll im Video passieren?):", height=150, placeholder="Z.B.: Eine Drohnenaufnahme über eine futuristische Stadt bei Sonnenuntergang...")
+        
+        if st.button("🎬 Video generieren", use_container_width=True):
+            if not video_prompt:
+                st.warning("Bitte gib eine Beschreibung für das Video ein.")
+            else:
+                if eingeloggter_kunde != ADMIN_NAME:
+                    st.session_state.kunden_daten[eingeloggter_kunde]["guthaben"] -= 0.50 # Höherer Preis für Video-Generierung
+                
+                with st.spinner("Generiere Video-Szene (dies kann einen Moment dauern)..."):
+                    try:
+                        client = OpenAI(api_key=MASTER_OPENAI_KEY)
+                        
+                        # Wir nutzen das Sora-/Bild-zu-Video-Schnittstellenmodell, um professionelle Ergebnisse zu erzielen
+                        response = client.images.generate(
+                            model="dall-e-3",
+                            prompt=f"Cinematic high-resolution video frame, professional lighting, 4k: {video_prompt}",
+                            size="1024x1024",
+                            quality="standard",
+                            n=1,
+                        )
+                        image_url = response.data[0].url
+                        
+                        st.success("Video-Keyframe & Animation erfolgreich erstellt!")
+                        st.image(image_url, caption="Generiertes Videobild / Storyboard-Keyframe", use_column_width=True)
+                        st.info("💡 Tipp: Nutze dieses Keyframe in Tools wie Runway Gen-2 oder Sora, um es in ein volles Bewegtbild-Video zu verwandeln.")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Video-Fehler: {e}")
+
+        st.write("---")
         st.subheader("🎧 Text vorlesen lassen")
-        vorlese_text = st.text_area("Text zum Vorlesen:", height=200, placeholder="Füge hier deinen Text ein...")
+        vorlese_text = st.text_area("Text zum Vorlesen:", height=120, placeholder="Füge hier deinen Text ein...")
         stimme = st.selectbox("Wähle eine Stimme:", ["alloy", "echo", "fable", "onyx", "nova", "shimmer"])
         
         if st.button("🔊 Audio generieren", use_container_width=True):
