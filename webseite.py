@@ -99,7 +99,7 @@ st.markdown("""
 
 st.title("Scion-Mind - Ultimate Studio")
 st.markdown("*designed by Christian Schmidt*") 
-st.markdown("*Powered by Autonomous Lead-Scraper, Hands-Free Voice Loop, QA Pytest Agent, Hierarchical Swarm & Live Terminal*")
+st.markdown("*Powered by Hierarchical Swarm Board, Live-Terminal Streaming, Ollama Local Fallback, OCR, Analytics & Self-Coding*")
 st.write("---")
 
 MASTER_OPENAI_KEY = st.secrets["OPENAI_API_KEY"]
