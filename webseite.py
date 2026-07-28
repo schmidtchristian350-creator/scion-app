@@ -282,10 +282,10 @@ else:
                         "Prefer": "respond-async"
                     }
                     
-                    # Wir nutzen hier Stable Video Diffusion, da es extrem stabil und zügig rendert
+                    # Nutzung des offiziellen Stable Video Diffusion Pfads ohne fehleranfällige Hashes
                     data = {
-                        "version": "9f747673945c62801b13b84701c7d39fd9ef1aef31e27c4b68aac70b13a5fced",
-                        "input": {"input_text": clean_prompt}
+                        "model": "stability-ai/stable-video-diffusion",
+                        "input": {"prompt": clean_prompt}
                     }
                     
                     response = requests.post("https://api.replicate.com/v1/predictions", json=data, headers=headers)
@@ -298,7 +298,6 @@ else:
                     else:
                         get_url = res_json["urls"]["get"]
                         
-                        # Wir erhöhen die Schleife auf 60 Durchläufe (= bis zu 5 Minuten Puffer)
                         erfolgreich = False
                         for i in range(60):
                             status_res = requests.get(get_url, headers={"Authorization": f"Bearer {VIDEO_API_KEY}"}).json()
