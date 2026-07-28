@@ -5,6 +5,7 @@ from io import BytesIO
 import re
 import requests
 import time
+from weasyprint import HTML
 
 st.set_page_config(page_title="Scion Mind", layout="wide")
 
@@ -181,6 +182,40 @@ def erstelle_pptx_aus_session():
     pptx_io.seek(0)
     return pptx_io
 
+def erstelle_pdf_aus_session():
+    html_content = """
+    <!DOCTYPE html>
+    <html>
+    <head>
+    <meta charset="utf-8">
+    <style>
+        @page { size: A4 landscape; margin: 20mm; background-color: #ffffff; }
+        body { font-family: Helvetica, Arial, sans-serif; color: #1e293b; margin: 0; padding: 0; }
+        .slide { page-break-after: always; height: 100vh; display: flex; flex-direction: column; justify-content: center; padding: 20px; }
+        h1 { color: #0f172a; font-size: 28px; border-bottom: 2px solid #cbd5e1; padding-bottom: 10px; }
+        p { font-size: 16px; line-height: 1.6; white-space: pre-line; }
+        img { max-width: 100%; height: auto; border-radius: 8px; margin-top: 15px; }
+    </style>
+    </head>
+    <body>
+    """
+    for slide in st.session_state.slides_data:
+        html_content += f"""
+        <div class="slide">
+            <h1>{slide['titel']}</h1>
+            <p>{slide['text']}</p>
+        """
+        if slide['bild_url']:
+            html_content += f"""<img src="{slide['bild_url']}">"""
+        html_content += "</div>"
+        
+    html_content += "</body></html>"
+    
+    pdf_io = BytesIO()
+    HTML(string=html_content).write_pdf(pdf_io)
+    pdf_io.seek(0)
+    return pdf_io
+
 # Hauptbereich-Prüfung
 if not eingeloggter_kunde or eingeloggter_kunde not in st.session_state.kunden_daten:
     st.warning("👈 Bitte melde dich links an oder registriere dich, um den Service zu nutzen.")
@@ -259,7 +294,6 @@ else:
         st.markdown("### ⚡ 1. Vollautomatischer Autopilot (Agent)")
         auto_thema = st.text_input("Thema für automatische Komplett-Präsentation:", placeholder="Z.B.: Strategische Quartalsplanung 2026")
         
-        # NEU: Regler für die gewünschte Anzahl der Folien
         anzahl_folien = st.slider("Anzahl der gewünschten Folien:", min_value=2, max_value=10, value=4)
         
         if st.button("🚀 Vollständige Präsentation automatisch erstellen", use_container_width=True):
@@ -296,14 +330,12 @@ else:
                                     txt_part = f.split("TEXT:")[1].split("|||")[0].strip() if "TEXT:" in f else ""
                                     p_part = f.split("PROMPT:")[1].strip() if "PROMPT:" in f else "Professional business background"
                                     
-                                    # Bild über Replicate generieren
                                     bild_url = generiere_replicate_bild(p_part)
                                     neue_slides.append({"titel": t_part, "text": txt_part, "prompt": p_part, "bild_url": bild_url})
                                 except Exception:
                                     continue
                         
                         if neue_slides:
-                            # Automatische Übernahme in die Session, damit sie in der manuellen Bearbeitung sofort bereitstehen
                             st.session_state.slides_data = neue_slides
                             st.success("Komplette Präsentation automatisch erstellt und in die manuelle Bearbeitung übernommen!")
                             st.rerun()
@@ -314,7 +346,7 @@ else:
 
         st.write("---")
         st.markdown("### 🎨 2. Folien-Studio & Vorschau (Manuell & Erweitert)")
-        st.markdown("Hier kannst du alle automatisch generierten Folien einzeln einsehen, den Text anpassen, neue Folien hinzufügen oder löschen:")
+        st.markdown("Passe hier die Inhalte an oder füge Folien hinzu:")
 
         if st.button("➕ Neue Folie hinzufügen"):
             st.session_state.slides_data.append({
@@ -362,11 +394,24 @@ else:
                     st.info("Noch kein Bild für diese Folie generiert.")
 
         st.write("---")
-        pptx_datei = erstelle_pptx_aus_session()
-        st.download_button(
-            label="📥 Vollständige Präsentation (.pptx) herunterladen",
-            data=pptx_datei,
-            file_name="Scion_Mind_Profi_Praesentation.pptx",
-            mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
-            use_container_width=True
-        )
+        # NEU: Format-Auswahl vor dem Download
+        export_format = st.radio("Wähle das Ausgabeformat:", ["PowerPoint (.pptx)", "PDF-Dokument (.pdf)"], horizontal=True)
+
+        if "PowerPoint" in export_format:
+            pptx_datei = erstelle_pptx_aus_session()
+            st.download_button(
+                label="📥 Präsentation als PowerPoint (.pptx) herunterladen",
+                data=pptx_datei,
+                file_name="Scion_Mind_Profi_Praesentation.pptx",
+                mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                use_container_width=True
+            )
+        else:
+            pdf_datei = erstelle_pdf_aus_session()
+            st.download_button(
+                label="📥 Präsentation als PDF (.pdf) herunterladen",
+                data=pdf_datei,
+                file_name="Scion_Mind_Profi_Praesentation.pdf",
+                mime="application/pdf",
+                use_container_width=True
+            )
