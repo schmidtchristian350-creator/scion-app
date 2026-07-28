@@ -285,14 +285,13 @@ else:
                 st.error(f"Ein Fehler ist aufgetreten: {e}")
 
     with spalte_rechts:
-        # BEIDE EXPANDER LIEGEN JETZT SAUBER ÜBEREINANDER IN DER RECHTEN SPALTE
-        
+        # 1. EXPANDER: Präsentations- & Dokumenten-Studio (mit Multi-Agenten-Orchestrierung A2A)
         with st.expander("📊 Autonomes Präsentations- & Dokumenten-Studio öffnen", expanded=False):
-            st.markdown("### ⚡ 1. Vollautomatischer Agenten-Autopilot")
-            auto_thema = st.text_input("Ziel / Thema für die Präsentation:", placeholder="Z.B.: SWOT Analyse für Sales Akademie Berlin")
+            st.markdown("### ⚡ Multi-Agenten-Autopilot (A2A)")
+            auto_thema = st.text_input("Ziel / Thema für die Präsentation:", placeholder="Z.B.: Marktanalyse & Strategie 2026")
             anzahl_folien = st.slider("Autonome Anzahl der Folien:", min_value=2, max_value=10, value=4)
             
-            if st.button("🚀 Agenten-Workflow komplett starten", use_container_width=True):
+            if st.button("🚀 A2A-Workflow komplett starten", use_container_width=True):
                 if not auto_thema:
                     st.warning("Bitte gib ein Thema ein.")
                 else:
@@ -305,11 +304,24 @@ else:
                     try:
                         client = OpenAI(api_key=MASTER_OPENAI_KEY)
                         
-                        status_box.text(" Schritt 1/3: Agent analysiert Ziel & plant Struktur...")
+                        # Schritt 1: Agent 1 (Recherche & Fakten)
+                        status_box.text(" Agent 1/3 (Recherche): Analysiert Fakten & Marktstatus...")
                         progress_bar.progress(20)
                         
+                        recherche_prompt = client.chat.completions.create(
+                            model="gpt-4o-mini",
+                            messages=[
+                                {"role": "system", "content": "Du bist ein führender Recherche-Agent. Sammle alle relevanten Kernfakten, Trends und Daten zum Thema."},
+                                {"role": "user", "content": auto_thema}
+                            ]
+                        ).choices[0].message.content
+
+                        # Schritt 2: Agent 2 (Strukturierung & Folien-Design)
+                        status_box.text(" Agent 2/3 (Struktur): Baut das digitale Folien-Fließband auf...")
+                        progress_bar.progress(50)
+                        
                         system_instruction = (
-                            f"You are an autonomous presentation agent. Analyze the user goal and create exactly {anzahl_folien} structured slides. "
+                            f"You are a presentation structuring agent. Based on these research facts: '{recherche_prompt}', create exactly {anzahl_folien} structured slides. "
                             "Format each slide strictly as 'TITLE: [Title]|||TEXT: [Bullet points]|||PROMPT: [English visual image prompt]'. "
                             "Separate slides with '###'."
                         )
@@ -324,8 +336,9 @@ else:
                         roh_text = completion.choices[0].message.content
                         roh_folien = roh_text.split("###")
                         
-                        status_box.text(" Schritt 2/3: Agent ruft Grafik-Tools auf & prüft Ergebnisse...")
-                        progress_bar.progress(50)
+                        # Schritt 3: Agent 3 (Grafik-Generator & Qualitäts-Prüfer)
+                        status_box.text(" Agent 3/3 (Grafik & Qualität): Generiert High-End Bilder und prüft das Ergebnis...")
+                        progress_bar.progress(80)
                         
                         neue_slides = []
                         for f in roh_folien:
@@ -342,17 +355,17 @@ else:
                         
                         if neue_slides:
                             progress_bar.progress(100)
-                            status_box.text(" Schritt 3/3: Ziel erreicht! In manuelle Bearbeitung übernommen.")
+                            status_box.text(" A2A-Fließband erfolgreich durchgelaufen!")
                             st.session_state.slides_data = neue_slides
-                            st.success("Komplette Präsentation autonom erstellt!")
+                            st.success("Komplette Präsentation vollautomatisch erstellt!")
                             st.rerun()
                         else:
-                            st.error("Agenten-Fehler bei der Generierung.")
+                            st.error("Fließband-Fehler bei der Generierung.")
                     except Exception as e:
                         st.error(f"Fehler: {e}")
 
             st.write("---")
-            st.markdown("### 🎨 2. Manuelle Kontrolle & Feinjustierung")
+            st.markdown("### 🎨 Manuelle Kontrolle & Feinjustierung")
 
             if st.button("➕ Neue Folie hinzufügen", use_container_width=True):
                 st.session_state.slides_data.append({
@@ -422,7 +435,7 @@ else:
                     use_container_width=True
                 )
 
-        # Zweiter Expander direkt darunter in der rechten Spalte
+        # 2. EXPANDER: Audio-Generator (Sprachausgabe)
         with st.expander("🎧 Text in Sprache umwandeln (Audio-Generator)", expanded=False):
             vorlese_text = st.text_area("Text zum Vorlesen:", height=70, placeholder="Füge hier Text ein...")
             einzel_stimme = st.selectbox("Wähle eine Stimme:", ["alloy", "echo", "fable", "onyx", "nova", "shimmer"])
