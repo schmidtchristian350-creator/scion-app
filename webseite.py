@@ -284,31 +284,10 @@ else:
             except Exception as e:
                 st.error(f"Ein Fehler ist aufgetreten: {e}")
 
-        st.write("---")
-        
-        with st.expander("🎧 Text in Sprache umwandeln (Audio-Generator)"):
-            vorlese_text = st.text_area("Text zum Vorlesen:", height=70, placeholder="Füge hier Text ein...")
-            einzel_stimme = st.selectbox("Wähle eine Stimme:", ["alloy", "echo", "fable", "onyx", "nova", "shimmer"])
-            
-            if st.button("🔊 Audio generieren", use_container_width=True):
-                if not vorlese_text:
-                    st.warning("Bitte gib einen Text ein.")
-                else:
-                    if eingeloggter_kunde != ADMIN_NAME:
-                        st.session_state.kunden_daten[eingeloggter_kunde]["guthaben"] -= 0.02
-                    with st.spinner("Erstelle Sprachdatei..."):
-                        try:
-                            client = OpenAI(api_key=MASTER_OPENAI_KEY)
-                            response = client.audio.speech.create(model="tts-1", voice=einzel_stimme, input=vorlese_text)
-                            st.success("Audio erfolgreich generiert!")
-                            st.audio(response.content, format="audio/mp3")
-                        except Exception as e:
-                            st.error(f"Fehler: {e}")
-
     with spalte_rechts:
-        # NEU: Das komplette Präsentations-Studio in einen sauberen Expander verpackt
-        with st.expander("📊 Autonomes Präsentations- & Dokumenten-Studio öffnen", expanded=True):
-            
+        # BEIDE EXPANDER LIEGEN JETZT SAUBER ÜBEREINANDER IN DER RECHTEN SPALTE
+        
+        with st.expander("📊 Autonomes Präsentations- & Dokumenten-Studio öffnen", expanded=False):
             st.markdown("### ⚡ 1. Vollautomatischer Agenten-Autopilot")
             auto_thema = st.text_input("Ziel / Thema für die Präsentation:", placeholder="Z.B.: SWOT Analyse für Sales Akademie Berlin")
             anzahl_folien = st.slider("Autonome Anzahl der Folien:", min_value=2, max_value=10, value=4)
@@ -442,3 +421,23 @@ else:
                     mime="application/pdf",
                     use_container_width=True
                 )
+
+        # Zweiter Expander direkt darunter in der rechten Spalte
+        with st.expander("🎧 Text in Sprache umwandeln (Audio-Generator)", expanded=False):
+            vorlese_text = st.text_area("Text zum Vorlesen:", height=70, placeholder="Füge hier Text ein...")
+            einzel_stimme = st.selectbox("Wähle eine Stimme:", ["alloy", "echo", "fable", "onyx", "nova", "shimmer"])
+            
+            if st.button("🔊 Audio generieren", use_container_width=True):
+                if not vorlese_text:
+                    st.warning("Bitte gib einen Text ein.")
+                else:
+                    if eingeloggter_kunde != ADMIN_NAME:
+                        st.session_state.kunden_daten[eingeloggter_kunde]["guthaben"] -= 0.02
+                    with st.spinner("Erstelle Sprachdatei..."):
+                        try:
+                            client = OpenAI(api_key=MASTER_OPENAI_KEY)
+                            response = client.audio.speech.create(model="tts-1", voice=einzel_stimme, input=vorlese_text)
+                            st.success("Audio erfolgreich generiert!")
+                            st.audio(response.content, format="audio/mp3")
+                        except Exception as e:
+                            st.error(f"Fehler: {e}")
