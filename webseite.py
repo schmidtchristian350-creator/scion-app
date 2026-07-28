@@ -178,16 +178,16 @@ else:
     spalte_links, spalte_rechts = st.columns([1.2, 0.8])
 
     with spalte_links:
-        st.subheader("🤖 KI-Arbeitsbereich (Skripte & Prompts)")
+        st.subheader("🤖 KI-Arbeitsbereich (Skripte & Medien)")
         modus = st.selectbox(
             "Was möchtest du erstellen lassen?",
-            ["Text-Recherche & Chat", "Präsentations-Struktur & Folien", "Video-Skript & Storyboard"]
+            ["Text-Recherche & Chat", "Präsentations-Struktur & Folien", "Video-Skript & Storyboard", "Profi-Präsentationsbilder (Replicate)"]
         )
         
         current_chat = st.session_state.aktiver_chat
         st.markdown(f"**Aktiver Chat:** `{current_chat}`")
 
-        if modus == "Text-Recherche & Chat" or modus == "Video-Skript & Storyboard":
+        if modus in ["Text-Recherche & Chat", "Video-Skript & Storyboard"]:
             for message in st.session_state.chats[current_chat]:
                 with st.chat_message(message["role"]):
                     st.markdown(message["content"])
@@ -208,14 +208,14 @@ else:
                 st.error(f"Spracherkennungsfehler: {e}")
                 aufgabe = None
         else:
-            if modus == "Text-Recherche & Chat" or modus == "Video-Skript & Storyboard":
-                aufgabe = st.chat_input("Stelle deine Frage oder lass dir ein Thema für dein Video geben...")
+            if modus in ["Text-Recherche & Chat", "Video-Skript & Storyboard"]:
+                aufgabe = st.chat_input("Stelle deine Frage oder lass dir ein Thema geben...")
             else:
-                aufgabe_input = st.text_area("Deine Beschreibung oder Aufgabe dafür:", height=120)
-                Absenden = st.button("🚀 Aufgabe jetzt ausführen", use_container_width=True)
+                aufgabe_input = st.text_area("Beschreibe das gewünschte Bild für deine Präsentation:", height=120, placeholder="Z.B.: A professional modern corporate office with high-tech dashboard on screens...")
+                Absenden = st.button("🚀 Profi-Bild jetzt generieren", use_container_width=True)
                 aufgabe = aufgabe_input if Absenden else None
 
-        if aufgabe:
+        if aufgabe and modus != "Profi-Präsentationsbilder (Replicate)":
             if eingeloggter_kunde != ADMIN_NAME:
                 st.session_state.kunden_daten[eingeloggter_kunde]["guthaben"] -= 0.05
             
@@ -229,7 +229,7 @@ else:
                 system_prompts = {
                     "Text-Recherche & Chat": "Du bist ein präziser, professioneller KI-Assistent. Antworte immer auf Deutsch.",
                     "Präsentations-Struktur & Folien": "Du bist ein Experte für Business-Präsentationen. Erstelle eine saubere Präsentation, bei der jede Folie mit 'Folie X: [Titel]' beginnt, gefolgt von prägnanten Stichpunkten. Antworte auf Deutsch.",
-                    "Video-Skript & Storyboard": "Du bist ein professioneller Videoproduzent. Erstelle ein detailliertes Video-Skript für ein 60-Sekunden-Video auf Deutsch."
+                    "Video-Skript & Storyboard": "Du bist ein professioneller Videoproduzent. Erstelle ein detailliertes Video-Skript für ein Video auf Deutsch."
                 }
                 
                 messages_payload = [{"role": "system", "content": system_prompts.get(modus, "Du bist ein hilfreicher Assistent. Antworte immer auf Deutsch.")}]
@@ -255,78 +255,87 @@ else:
                                 mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
                                 use_container_width=True
                             )
-                if modus != "Text-Recherche & Chat" and modus != "Video-Skript & Storyboard":
+                if modus == "Präsentations-Struktur & Folien":
                     st.rerun()
                                 
             except Exception as e:
                 st.error(f"Ein Fehler ist aufgetreten: {e}")
 
+        # Direkte Bildgenerierung im linken Arbeitsbereich, wenn gewählt
+        if modus == "Profi-Präsentationsbilder (Replicate)" and aufgabe:
+            if eingeloggter_kunde != ADMIN_NAME:
+                st.session_state.kunden_daten[eingeloggter_kunde]["guthaben"] -= 0.10
+            
+            with st.spinner("🦫 Generiere hochprofessionelles Präsentationsbild..."):
+                try:
+                    headers = {
+                        "Authorization": f"Bearer {VIDEO_API_KEY}",
+                        "Content-Type": "application/json",
+                        "Prefer": "respond-async"
+                    }
+                    # Flux Schnell Modell über Replicate für hochprofessionelle Bilder
+                    data = {"input": {"prompt": aufgabe, "aspect_ratio": "16:9"}}
+                    response = requests.post("https://api.replicate.com/v1/models/black-forest-labs/flux-schnell/predictions", json=data, headers=headers)
+                    res_json = response.json()
+                    
+                    if "urls" in res_json:
+                        get_url = res_json["urls"]["get"]
+                        img_url = None
+                        
+                        for _ in range(30):
+                            s_res = requests.get(get_url, headers={"Authorization": f"Bearer {VIDEO_API_KEY}"}).json()
+                            if s_res.get("status") == "succeeded":
+                                out = s_res["output"]
+                                img_url = out[0] if isinstance(out, list) else out
+                                break
+                            elif s_res.get("status") == "failed":
+                                break
+                            time.sleep(3)
+                            
+                        if img_url:
+                            st.success("Bild erfolgreich erstellt!")
+                            st.image(img_url, caption="Dein professionelles Präsentationsbild", use_container_width=True)
+                            
+                            # Bild-Daten zum Download bereitstellen
+                            img_data = requests.get(img_url).content
+                            st.download_button("📥 Bild herunterladen (für PowerPoint)", data=img_data, file_name="praesentation_bild.jpg", mime="image/jpeg", use_container_width=True)
+                        else:
+                            st.error("Fehler beim Generieren des Bildes.")
+                    else:
+                        st.error("API-Verbindungsfehler zu Replicate.")
+                except Exception as e:
+                    st.error(f"Fehler: {e}")
+
     with spalte_rechts:
-        st.subheader("🎬 Vollautomatisches 60-Sekunden Studio")
+        st.subheader("🎬 5-Sekunden Video-Studio (Replicate)")
         
-        st.markdown("Gib einfach nur dein **Thema** oder deinen **Sprechtext** ein – die KI erstellt vollautomatisch alle Szenen und den Ton im Hintergrund!")
+        st.markdown("Erstelle präzise 5-Sekunden-Videoszenen auf Basis von MiniMax:")
+        video_prompt = st.text_area("Video-Prompt (auf Englisch):", height=100, placeholder="Z.B.: Cinematic drone shot over modern tech city...")
         
-        thema_text = st.text_area("Dein Thema oder vollständiger Text für das Video:", height=120, placeholder="Z.B.: Erstelle ein Werbevideo für unsere neue smarte Kaffeemaschine...")
-        stimme = st.selectbox("Sprecher-Stimme:", ["alloy", "echo", "fable", "onyx", "nova", "shimmer"])
-        
-        if st.button("🚀 Vollautomatisches Video & Audio generieren", use_container_width=True):
-            if not thema_text:
-                st.warning("Bitte gib ein Thema oder einen Text für dein Video ein.")
+        if st.button("🚀 5-Sekunden Video generieren", use_container_width=True):
+            if not video_prompt:
+                st.warning("Bitte gib einen Prompt für das Video ein.")
             else:
                 if eingeloggter_kunde != ADMIN_NAME:
-                    st.session_state.kunden_daten[eingeloggter_kunde]["guthaben"] -= 2.00
+                    st.session_state.kunden_daten[eingeloggter_kunde]["guthaben"] -= 1.00
                 
                 status_text = st.empty()
                 progress_bar = st.progress(0)
                 
                 try:
-                    client_openai = OpenAI(api_key=MASTER_OPENAI_KEY)
-                    
-                    # 1. Automatisches Erstellen von 3 visuellen Prompts basierend auf dem Thema
-                    status_text.text("🦫 Die KI plant die Filmszenen im Hintergrund...")
-                    progress_bar.progress(10)
-                    
-                    prompt_gen = client_openai.chat.completions.create(
-                        model="gpt-4o-mini",
-                        messages=[
-                            {"role": "system", "content": "You are a professional video director. Based on the user's topic, create exactly 3 distinct cinematic English video prompts separated by '|||'."},
-                            {"role": "user", "content": thema_text}
-                        ]
-                    )
-                    prompts = prompt_gen.choices[0].message.content.split("|||")
-                    prompts = [p.strip() for p in prompts if p.strip()]
-                    if not prompts:
-                        prompts = ["Cinematic shot of modern product", "Close-up dynamic view", "Professional closing shot"]
-
-                    # 2. Audiospur erstellen
-                    status_text.text("🦫 Erstelle die professionelle Tonspur...")
-                    progress_bar.progress(25)
-                    audio_response = client_openai.audio.speech.create(
-                        model="tts-1",
-                        voice=stimme,
-                        input=thema_text
-                    )
-                    audio_bytes = audio_response.content
+                    status_text.text("🦫 Generiere 5-Sekunden-Videoszene...")
+                    progress_bar.progress(30)
                     
                     headers = {
                         "Authorization": f"Bearer {VIDEO_API_KEY}",
                         "Content-Type": "application/json",
                         "Prefer": "respond-async"
                     }
+                    data = {"input": {"prompt": video_prompt}}
+                    response = requests.post("https://api.replicate.com/v1/models/minimax/video-01/predictions", json=data, headers=headers)
+                    res_json = response.json()
                     
-                    video_urls = []
-                    # 3. Automatische Generierung der Videoszenen im Hintergrund
-                    for idx, prompt in enumerate(prompts[:3]):
-                        status_text.text(f"🦫 Generiere Filmszene {idx+1} von 3 im Hintergrund...")
-                        progress_bar.progress(40 + int(idx * 15))
-                        
-                        data = {"input": {"prompt": prompt}}
-                        response = requests.post("https://api.replicate.com/v1/models/minimax/video-01/predictions", json=data, headers=headers)
-                        res_json = response.json()
-                        
-                        if "urls" not in res_json:
-                            continue
-                            
+                    if "urls" in res_json:
                         get_url = res_json["urls"]["get"]
                         v_url = None
                         
@@ -341,30 +350,21 @@ else:
                             time.sleep(5)
                             
                         if v_url:
-                            video_urls.append(v_url)
-                    
-                    if video_urls:
-                        progress_bar.progress(100)
-                        status_text.text("✅ Dein automatisches Video-Paket ist fertig!")
-                        
-                        st.success("Die KI hat alles für dich vorbereitet. Spiele erst den Ton ab und lass im Anschluss die Filmszenen nacheinander ablaufen:")
-                        
-                        st.markdown("### 🔊 Synchroner Ton (Gesamtlänge):")
-                        st.audio(audio_bytes, format="audio/mp3")
-                        
-                        st.markdown("### 🎬 Automatisierte Filmszenen (Szene 1 bis 3):")
-                        for i, v_url in enumerate(video_urls):
-                            st.markdown(f"**Szene {i+1}:**")
+                            progress_bar.progress(100)
+                            status_text.text("✅ Fertig!")
+                            st.success("Deine 5-Sekunden-Szene:")
                             st.video(v_url)
+                        else:
+                            st.error("Fehler beim Generieren der Videoszene.")
                     else:
-                        st.error("Fehler beim Generieren der Videoszenen.")
+                        st.error("API-Fehler.")
                         
                 except Exception as e:
                     st.error(f"Fehler im Studio: {e}")
 
         st.write("---")
-        st.subheader("🎧 Einzelner Text vorlesen lassen")
-        vorlese_text = st.text_area("Text zum Vorlesen:", height=80, placeholder="Füge hier deinen Text ein...")
+        st.subheader("🎧 Text als Sprache ausgeben")
+        vorlese_text = st.text_area("Text zum Vorlesen:", height=70, placeholder="Füge hier deinen Text ein...")
         einzel_stimme = st.selectbox("Wähle eine Stimme:", ["alloy", "echo", "fable", "onyx", "nova", "shimmer"], key="einzel_stimme")
         
         if st.button("🔊 Audio generieren", use_container_width=True):
@@ -373,7 +373,7 @@ else:
             else:
                 if eingeloggter_kunde != ADMIN_NAME:
                     st.session_state.kunden_daten[eingeloggter_kunde]["guthaben"] -= 0.02
-                with st.spinner("🦫 Das Arbeitstier erstellt die Sprachdatei..."):
+                with st.spinner("🦫 Erstelle Sprachdatei..."):
                     try:
                         client = OpenAI(api_key=MASTER_OPENAI_KEY)
                         response = client.audio.speech.create(model="tts-1", voice=einzel_stimme, input=vorlese_text)
