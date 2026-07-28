@@ -254,10 +254,24 @@ else:
                 status_text = st.empty()
                 progress_bar = st.progress(0)
                 
-                status_text.text("🔄 Video-Auftrag wird an die KI übermittelt...")
-                progress_bar.progress(10)
+                status_text.text("🤖 Optimiere Text für die Video-KI...")
+                progress_bar.progress(20)
                 
                 try:
+                    # Text vorher kurz von OpenAI in einen sauberen visuellen Prompt übersetzen lassen
+                    client_openai = OpenAI(api_key=MASTER_OPENAI_KEY)
+                    opt_response = client_openai.chat.completions.create(
+                        model="gpt-4o-mini",
+                        messages=[
+                            {"role": "system", "content": "You are a professional video prompt engineer. Convert the user's concept into a vivid, cinematic English video prompt in 1-2 sentences."},
+                            {"role": "user", "content": video_prompt}
+                        ]
+                    )
+                    clean_prompt = opt_response.choices[0].message.content
+                    
+                    status_text.text("🔄 Video-Auftrag wird an Replicate übermittelt...")
+                    progress_bar.progress(50)
+                    
                     headers = {
                         "Authorization": f"Bearer {VIDEO_API_KEY}",
                         "Content-Type": "application/json",
@@ -265,14 +279,17 @@ else:
                     }
                     
                     data = {
-                        "input": {"prompt": video_prompt}
+                        "input": {"prompt": clean_prompt}
                     }
                     
                     response = requests.post("https://api.replicate.com/v1/models/minimax/video-01/predictions", json=data, headers=headers)
                     res_json = response.json()
                     
-                    if "error" in res_json or "urls" not in res_json:
-                        st.error(f"API-Antwort von Replicate: {res_json}")
+                    # Echter Fehler-Check (Prüft ob ein echter Fehlercode vorliegt)
+                    if "error" in res_json and res_json["error"] is not None:
+                        st.error(f"API-Fehler von Replicate: {res_json['error']}")
+                    elif "urls" not in res_json:
+                        st.error(f"Unerwartete Antwort: {res_json}")
                     else:
                         get_url = res_json["urls"]["get"]
                         
@@ -291,8 +308,8 @@ else:
                                 st.video(video_url)
                                 st.success("Dein Video ist fertig und kann oben abgespielt oder heruntergeladen werden!")
                                 break
-                            elif status == "processing":
-                                progress_bar.progress(50)
+                            elif status == "processing" or status == "starting":
+                                progress_bar.progress(75)
                                 status_text.text("⏳ Video wird gerendert (Das kann 1-2 Minuten dauern)...")
                             elif status == "failed":
                                 st.error(f"Die Videogenerierung ist fehlgeschlagen: {status_res.get('error', 'Unbekannter Fehler')}")
