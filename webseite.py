@@ -66,7 +66,7 @@ try:
 except ImportError:
     PLAYWRIGHT_AVAILABLE = False
 
-st.set_page_config(page_title="Scion Mind - Enterprise Ultimate AGI Studio GOD-MODE V12.9", layout="wide")
+st.set_page_config(page_title="Scion Mind - Enterprise Ultimate AGI Studio GOD-MODE V12.10", layout="wide")
 
 st.markdown("""
     <style>
@@ -84,8 +84,8 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("Scion Mind - Enterprise Ultimate AGI Studio (GOD-MODE V12.9)")
-st.markdown("*designed by Christian Schmidt | Powered by Admin User Selector, One-Click Credits & Paywall Core*")
+st.title("Scion Mind - Enterprise Ultimate AGI Studio (GOD-MODE V12.10)")
+st.markdown("*designed by Christian Schmidt | Powered by Stabilized Admin Panel & Sovereign LiteLLM*")
 st.write("---")
 
 MASTER_OPENAI_KEY = st.secrets["OPENAI_API_KEY"]
@@ -98,7 +98,7 @@ ADMIN_NAME = "Christian"
 ADMIN_PASS = "ScionMind#2026!Secured"
 
 # -------------------------------------------------------------
-# SQLITE PERSISTENCE & V12.9 TABELLEN
+# SQLITE PERSISTENCE & V12.10 TABELLEN
 # -------------------------------------------------------------
 def init_db():
     conn = sqlite3.connect("scion_mind_enterprise.db", check_same_thread=False)
@@ -415,8 +415,8 @@ with st.sidebar:
         cursor = conn.cursor()
         cursor.execute("SELECT guthaben, rolle, workspace FROM kunden WHERE username = ?", (eingeloggter_kunde,))
         row = cursor.fetchone()
-        guthaben, rolle, workspace = row if row else (0.0, "Standard", "Default")
         conn.close()
+        guthaben, rolle, workspace = row if row else (0.0, "Standard", "Default")
 
         st.markdown(f"### 👤 {eingeloggter_kunde}")
         st.caption(f"🛡️ Rolle: **{rolle}**\n\n🏢 Workspace: `{workspace}`")
@@ -448,36 +448,39 @@ with st.sidebar:
                         conn.close()
                         st.error("Unbekannter Lizenzschlüssel.")
 
-        # NEU: Exklusives Admin-Panel mit direktem Nutzer-Auswahl-Menü
+        # STABILISIERTES ADMIN-PANEL MIT DROPDOWN-AUSWAHL
         if eingeloggter_kunde == ADMIN_NAME:
-            with st.expander("👑 Admin-Zentrale (Nutzer & Guthaben)", expanded=True):
-                st.markdown("#### 👥 Alle registrierten Nutzer")
+            with st.expander("👑 Admin-Zentrale (Direkt-Guthaben)", expanded=True):
+                st.markdown("#### Nutzer auswählen:")
                 
                 conn = get_db_connection()
                 cursor = conn.cursor()
-                cursor.execute("SELECT username, guthaben, rolle FROM kunden")
-                alle_nutzer = cursor.fetchall()
+                cursor.execute("SELECT username FROM kunden")
+                user_Rows = cursor.fetchall()
                 conn.close()
                 
-                if alle_nutzer:
-                    for u_name, u_guthaben, u_rolle in alle_nutzer:
-                        col_u1, col_u2 = st.columns([1.5, 1])
-                        with col_u1:
-                            st.markdown(f"**{u_name}**\n`{u_guthaben:.2f} €`")
-                        with col_u2:
-                            if st.button(f"+1 € an {u_name.split('.')[0]}", key=f"btn_plus_{u_name}"):
-                                conn = get_db_connection()
-                                cursor = conn.cursor()
-                                cursor.execute("UPDATE kunden SET guthaben = guthaben + 1.0 WHERE username = ?", (u_name,))
-                                conn.commit()
-                                conn.close()
-                                st.success(f"+1 € für {u_name} gebucht!")
-                                st.rerun()
+                user_liste = [u[0] for u in user_Rows] if user_Rows else []
                 
+                if user_liste:
+                    ausgewaehlter_user = st.selectbox("Account wählen:", user_liste)
+                    auflade_betrag = st.number_input("Betrag in €:", value=1.00, step=0.50, key="admin_betrag_input")
+                    
+                    if st.button("Guthaben jetzt gutschreiben", key="btn_admin_direkt_ok"):
+                        if ausgewaehlter_user:
+                            conn = get_db_connection()
+                            cursor = conn.cursor()
+                            cursor.execute("UPDATE kunden SET guthaben = guthaben + ? WHERE username = ?", (auflade_betrag, ausgewaehlter_user))
+                            conn.commit()
+                            conn.close()
+                            st.success(f"Erfolgreich {auflade_betrag:.2f} € an '{ausgewaehlter_user}' gutgeschrieben!")
+                            st.rerun()
+                else:
+                    st.warning("Keine Nutzer in der Datenbank gefunden.")
+
                 st.write("---")
                 st.markdown("#### 🔑 Lizenzschlüssel Generator")
                 key_betrag = st.number_input("Schlüssel-Wert in €:", value=1.00, step=1.00, key="gen_val")
-                if st.button("Einmal-Key generieren"):
+                if st.button("Einmal-Key generieren", key="btn_gen_key"):
                     neuer_schluessel = f"SCION-{secrets.token_hex(4).upper()}-{secrets.token_hex(4).upper()}"
                     conn = get_db_connection()
                     cursor = conn.cursor()
@@ -539,7 +542,7 @@ with st.sidebar:
             st.rerun()
 
 # -------------------------------------------------------------
-# CORE ENGINES V12.9 (Inkl. Paywall-Prüfung)
+# CORE ENGINES V12.10 (Inkl. Paywall-Prüfung)
 # -------------------------------------------------------------
 
 def verschruessle_api_key(api_key):
@@ -1078,7 +1081,7 @@ def selbstevaluierender_lern_agent(system_prompt, initial_input, use_local=False
     reflektion_res = ausfuehren_mit_ollama_fallback("Du bist Meta-Learning Optimizer.", f"Aufgabe: {initial_input}\nErgebnis: {ergebnis}", use_local=use_local)
     
     speichere_agenten_lernen("Chat-Optimierung", reflektion_res, dynamischer_prompt)
-    return wende_guardrails_an(ergebnis + f"\n\n---\n🧬 *[Scion Mind V12.9 Sovereign Core]: Admin-User-Selector & Paywall aktiv.*")
+    return wende_guardrails_an(ergebnis + f"\n\n---\n🧬 *[Scion Mind V12.10 Sovereign Core]: Admin-Selector & Paywall aktiv.*")
 
 def generiere_replicate_bild_mit_selbstcheck(prompt):
     for versuch in range(2):
@@ -1151,7 +1154,7 @@ else:
         spalte_links, spalte_rechts = st.columns([1.1, 0.9])
 
         with spalte_links:
-            st.subheader("🤖 Autonomer KI-Agent (GOD-MODE V12.9)")
+            st.subheader("🤖 Autonomer KI-Agent (GOD-MODE V12.10)")
             modus = st.selectbox(
                 "Agenten-Modus wählen:",
                 [
@@ -1226,7 +1229,7 @@ else:
                 if st.button("⚡ Live Stream ausführen", use_container_width=True):
                     if terminal_befehl:
                         terminal_box = st.empty()
-                        log_text = "[INFO] Starte Scion Terminal V12.9...\n"
+                        log_text = "[INFO] Starte Scion Terminal V12.10...\n"
                         terminal_box.code(log_text, language="bash")
                         time.sleep(0.5)
                         
