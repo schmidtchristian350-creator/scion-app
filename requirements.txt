@@ -1,6 +1,11 @@
 streamlit
 openai
+pandas
+python-docx
+openpyxl
+reportlab
 python-pptx
-moviepy
-weasyprint 
-reportlab 
+cryptography
+faiss-cpu
+numpy
+requests
