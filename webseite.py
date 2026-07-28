@@ -264,15 +264,15 @@ else:
                         "Prefer": "respond-async"
                     }
                     
+                    # Nutzung des offiziellen, stabilen Video-Modellpfads bei Replicate
                     data = {
-                        "version": "57b3261a9f5f0b5a32b236113b2c6df442ab6b345c2f8216cb037cfc23932e65",
+                        "model": "minimax/video-01",
                         "input": {"prompt": video_prompt}
                     }
                     
                     response = requests.post("https://api.replicate.com/v1/predictions", json=data, headers=headers)
                     res_json = response.json()
                     
-                    # Fehlerabfrage, falls Replicate einen Fehlercode oder eine Nachricht sendet
                     if "error" in res_json or "urls" not in res_json:
                         st.error(f"API-Antwort von Replicate: {res_json}")
                     else:
