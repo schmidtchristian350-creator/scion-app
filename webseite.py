@@ -14,6 +14,7 @@ import smtplib
 import traceback
 import sys
 import base64
+import secrets
 import io as python_io
 from email.header import decode_header
 from email.mime.text import MIMEText
@@ -32,7 +33,7 @@ try:
 except ImportError:
     PYDANTIC_AVAILABLE = False
 
-# FERNET CRYPTOGRAPHY FÜR ZERO-KNOWLEDGE KEY VAULT
+# FERNET CRYPTOGRAPHY FÜR ZERO-KNOWLEDGE KEY VAULT & TOKENS
 try:
     from cryptography.fernet import Fernet
     if "FERNET_KEY" not in st.session_state:
@@ -65,7 +66,7 @@ try:
 except ImportError:
     PLAYWRIGHT_AVAILABLE = False
 
-st.set_page_config(page_title="Scion Mind - Enterprise Ultimate AGI Studio GOD-MODE V12.7", layout="wide")
+st.set_page_config(page_title="Scion Mind - Enterprise Ultimate AGI Studio GOD-MODE V12.8", layout="wide")
 
 st.markdown("""
     <style>
@@ -83,8 +84,8 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("Scion Mind - Enterprise Ultimate AGI Studio (GOD-MODE V12.7)")
-st.markdown("*designed by Christian Schmidt | Powered by Strict Paywall, Admin Licensing, P&L Engine & Sovereign LiteLLM*")
+st.title("Scion Mind - Enterprise Ultimate AGI Studio (GOD-MODE V12.8)")
+st.markdown("*designed by Christian Schmidt | Powered by Secure Admin Panel, Single-Use License Tokens & Paywall Core*")
 st.write("---")
 
 MASTER_OPENAI_KEY = st.secrets["OPENAI_API_KEY"]
@@ -95,10 +96,9 @@ GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY", "")
 
 ADMIN_NAME = "Christian"
 ADMIN_PASS = "ScionMind#2026!Secured"
-ADMIN_LICENSE_KEY = "SCION-PAY-2026-SECURED" # Geheimer Code zum Aufladen
 
 # -------------------------------------------------------------
-# SQLITE PERSISTENCE & V12.7 TABELLEN
+# SQLITE PERSISTENCE & V12.8 TABELLEN (INKL. LIZENZ-KEYS)
 # -------------------------------------------------------------
 def init_db():
     conn = sqlite3.connect("scion_mind_enterprise.db", check_same_thread=False)
@@ -118,6 +118,18 @@ def init_db():
         cursor.execute("ALTER TABLE kunden ADD COLUMN rolle TEXT DEFAULT 'Standard'")
     if "workspace" not in columns:
         cursor.execute("ALTER TABLE kunden ADD COLUMN workspace TEXT DEFAULT 'Default-Hub'")
+
+    # NEU: Tabelle für fälschungssichere Einmal-Lizenzschlüssel
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS lizenz_schluessel (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            schluessel TEXT UNIQUE,
+            betrag REAL,
+            status TEXT DEFAULT 'Unbenutzt',
+            erstellt_am TEXT,
+            eingeloest_von TEXT
+        )
+    """)
 
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS daemon_logs (
@@ -243,7 +255,7 @@ def init_db():
     else:
         cursor.execute("UPDATE kunden SET rolle = ?, workspace = ? WHERE username = ?", ("Administrator", "Global-Executive", ADMIN_NAME))
 
-    # Steffi Guthaben sofort auf 0.00 € zurücksetzen wie gewünscht
+    # Steffi Guthaben auf 0.00 € halten
     cursor.execute("UPDATE kunden SET guthaben = 0.0 WHERE username = 'Steffi.1302'", ())
 
     cursor.execute("SELECT COUNT(*) FROM mcp_registry")
@@ -406,7 +418,6 @@ with st.sidebar:
                     if cursor.fetchone():
                         st.error("Dieser Benutzername ist bereits vergeben.")
                     else:
-                        # NEU: Startguthaben strikt auf 0.0 € gesetzt!
                         cursor.execute("INSERT INTO kunden VALUES (?, ?, ?, ?, ?)", (reg_name, reg_pass, 0.0, reg_rolle, reg_workspace))
                         conn.commit()
                         st.session_state.aktueller_user = reg_name
@@ -425,20 +436,65 @@ with st.sidebar:
         st.caption(f"🛡️ Rolle: **{rolle}**\n\n🏢 Workspace: `{workspace}`")
         st.caption(f"💰 Guthaben: **{guthaben:.2f} €**")
         
-        # NEU: Echter Lizenzschlüssel / Bezahl-Modus statt Gratis-Klick
-        with st.expander("💳 Guthaben aufladen (Paywall)", expanded=False):
-            license_input = st.text_input("Lizenzschlüssel eingeben:", type="password", placeholder="SCION-...")
-            if st.button("Guthaben freischalten (10 €)"):
-                if license_input == ADMIN_LICENSE_KEY or eingeloggter_kunde == ADMIN_NAME:
+        # NEU: Einmal-Lizenzschlüssel einlösen für normale User
+        with st.expander("💳 Guthaben mit Einmal-Key aufladen", expanded=False):
+            key_input = st.text_input("Lizenzschlüssel eingeben:", type="password", placeholder="SCION-KEY-...")
+            if st.button("Schlüssel einlösen"):
+                if key_input:
                     conn = get_db_connection()
                     cursor = conn.cursor()
-                    cursor.execute("UPDATE kunden SET guthaben = guthaben + 10.0 WHERE username = ?", (eingeloggter_kunde,))
+                    cursor.execute("SELECT id, betrag, status FROM lizenz_schluessel WHERE schluessel = ?", (key_input,))
+                    key_row = cursor.fetchone()
+                    
+                    if key_row:
+                        kid, kbetrag, kstatus = key_row
+                        if kstatus == "Unbenutzt":
+                            cursor.execute("UPDATE lizenz_schluessel SET status = 'Eingelöst', eingeloest_von = ? WHERE id = ?", (eingeloggter_kunde, kid))
+                            cursor.execute("UPDATE kunden SET guthaben = guthaben + ? WHERE username = ?", (kbetrag, eingeloggter_kunde))
+                            conn.commit()
+                            conn.close()
+                            st.success(f"Erfolgreich! {kbetrag:.2f} € wurden deinem Konto gutgeschrieben.")
+                            st.rerun()
+                        else:
+                            conn.close()
+                            st.error("Dieser Lizenzschlüssel wurde bereits verwendet (Einmal-Schlüssel ungültig).")
+                    else:
+                        conn.close()
+                        st.error("Unbekannter Lizenzschlüssel.")
+
+        # NEU: Exklusives Admin-Panel für Christian (Direktgutschrift & Key-Generator)
+        if eingeloggter_kunde == ADMIN_NAME:
+            with st.expander("👑 Admin-Zentrale (Guthaben & Keys)", expanded=True):
+                st.markdown("#### 1. Direktgutschrift")
+                ziel_user = st.text_input("Benutzername:", value="Steffi.1302")
+                direkt_betrag = st.number_input("Betrag in €:", value=1.00, step=0.50)
+                if st.button("Guthaben direkt gutschreiben"):
+                    conn = get_db_connection()
+                    cursor = conn.cursor()
+                    cursor.execute("SELECT username FROM kunden WHERE username = ?", (ziel_user,))
+                    if cursor.fetchone():
+                        cursor.execute("UPDATE kunden SET guthaben = guthaben + ? WHERE username = ?", (direkt_betrag, ziel_user))
+                        conn.commit()
+                        conn.close()
+                        st.success(f"{direkt_betrag:.2f} € an {ziel_user} gutgeschrieben!")
+                        st.rerun()
+                    else:
+                        conn.close()
+                        st.error("Benutzer nicht gefunden.")
+
+                st.write("---")
+                st.markdown("#### 2. Einmal-Lizenzschlüssel erstellen")
+                key_betrag = st.number_input("Schlüssel-Wert in €:", value=1.00, step=1.00, key="gen_val")
+                if st.button("Generieren"):
+                    neuer_schluessel = f"SCION-{secrets.token_hex(4).upper()}-{secrets.token_hex(4).upper()}"
+                    conn = get_db_connection()
+                    cursor = conn.cursor()
+                    cursor.execute("INSERT INTO lizenz_schluessel (schluessel, betrag, status, erstellt_am) VALUES (?, ?, 'Unbenutzt', datetime('now', 'localtime'))",
+                                   (neuer_schluessel, key_betrag))
                     conn.commit()
                     conn.close()
-                    st.success("10 € erfolgreich aufgeladen!")
-                    st.rerun()
-                else:
-                    st.error("Ungültiger Lizenzschlüssel. Bitte bezahle zuerst oder frage den Administrator.")
+                    st.success("Neuer Einmal-Schlüssel erstellt:")
+                    st.code(neuer_schluessel)
 
         st.write("---")
         st.markdown("### ✉️ E-Mail-Postfach")
@@ -491,7 +547,7 @@ with st.sidebar:
             st.rerun()
 
 # -------------------------------------------------------------
-# CORE ENGINES V12.7 (Inkl. Paywall-Prüfung)
+# CORE ENGINES V12.8 (Inkl. Paywall-Prüfung)
 # -------------------------------------------------------------
 
 def verschruessle_api_key(api_key):
@@ -1030,7 +1086,7 @@ def selbstevaluierender_lern_agent(system_prompt, initial_input, use_local=False
     reflektion_res = ausfuehren_mit_ollama_fallback("Du bist Meta-Learning Optimizer.", f"Aufgabe: {initial_input}\nErgebnis: {ergebnis}", use_local=use_local)
     
     speichere_agenten_lernen("Chat-Optimierung", reflektion_res, dynamischer_prompt)
-    return wende_guardrails_an(ergebnis + f"\n\n---\n🧬 *[Scion Mind V12.7 Paywall Core]: Guthaben-Abrechnung & Lizenzprüfung aktiv.*")
+    return wende_guardrails_an(ergebnis + f"\n\n---\n🧬 *[Scion Mind V12.8 Sovereign Core]: Einmal-Lizenz Token & Paywall aktiv.*")
 
 def generiere_replicate_bild_mit_selbstcheck(prompt):
     for versuch in range(2):
@@ -1089,7 +1145,7 @@ def erstelle_pdf_aus_session():
 if not eingeloggter_kunde:
     st.warning("👈 Bitte melde dich links an oder registriere dich.")
 else:
-    # NEU: Strenger Paywall-Check für alle User außer Admin Christian
+    # Strenger Paywall-Check für alle User außer Admin Christian
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT guthaben, rolle, workspace FROM kunden WHERE username = ?", (eingeloggter_kunde,))
@@ -1098,12 +1154,12 @@ else:
     guthaben, rolle, workspace = row if row else (0.0, "Standard", "Default")
 
     if eingeloggter_kunde != ADMIN_NAME and guthaben <= 0.0:
-        st.error("🛑 **PAYWALL AKTIV:** Dein Guthaben ist aufgebraucht (0.00 €). Bitte lade in der linken Seitenleiste über den Lizenzschlüssel Guthaben auf, um den KI-Agenten nutzen zu können.")
+        st.error("🛑 **PAYWALL AKTIV:** Dein Guthaben ist aufgebraucht (0.00 €). Bitte löse in der linken Seitenleiste einen Einmal-Lizenzschlüssel ein, um den KI-Agenten nutzen zu können.")
     else:
         spalte_links, spalte_rechts = st.columns([1.1, 0.9])
 
         with spalte_links:
-            st.subheader("🤖 Autonomer KI-Agent (GOD-MODE V12.7)")
+            st.subheader("🤖 Autonomer KI-Agent (GOD-MODE V12.8)")
             modus = st.selectbox(
                 "Agenten-Modus wählen:",
                 [
@@ -1178,7 +1234,7 @@ else:
                 if st.button("⚡ Live Stream ausführen", use_container_width=True):
                     if terminal_befehl:
                         terminal_box = st.empty()
-                        log_text = "[INFO] Starte Scion Terminal V12.7...\n"
+                        log_text = "[INFO] Starte Scion Terminal V12.8...\n"
                         terminal_box.code(log_text, language="bash")
                         time.sleep(0.5)
                         
@@ -1332,7 +1388,7 @@ else:
 
             elif modus == "🔔 Event Webhooks & Live-Trigger":
                 st.markdown("### 🔔 Event-gesteuerte Webhooks (FastAPI)")
-                st.info("FastAPI Gateway aktiv under `http://127.0.0.1:8000/webhook/inbound`")
+                st.info("FastAPI Gateway aktiv unter `http://127.0.0.1:8000/webhook/inbound`")
                 event_kanal = st.selectbox("Kanal:", ["WhatsApp Webhook", "IMAP Trigger", "CRM Hook"])
                 event_text = st.text_area("Payload:")
                 if st.button("⚡ Verarbeiten", use_container_width=True):
@@ -1401,7 +1457,7 @@ else:
                 st.markdown("### 🎙️ Bidirektionales WebRTC Audio-Streaming")
                 if st.button("🔴 WebRTC Session verbinden", use_container_width=True):
                     st.success("WebRTC Audio aktiv!")
-                    st.audio("https://actions.google.com/sounds/v1/ambiences/office_ambience.ogg", format="audio/ogg", autoplay=True)
+                    st.audio("https://actions.google.com/sounds/v1/ambiences/office_ambience.ogg", format="audio/mp3", autoplay=True)
                 aufgabe = None
 
             elif modus == "MCP Server Dashboard":
