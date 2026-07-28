@@ -66,7 +66,7 @@ try:
 except ImportError:
     PLAYWRIGHT_AVAILABLE = False
 
-st.set_page_config(page_title="Scion Mind - Enterprise Ultimate AGI Studio GOD-MODE V12.8", layout="wide")
+st.set_page_config(page_title="Scion Mind - Enterprise Ultimate AGI Studio GOD-MODE V12.9", layout="wide")
 
 st.markdown("""
     <style>
@@ -84,8 +84,8 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("Scion Mind - Enterprise Ultimate AGI Studio (GOD-MODE V12.8)")
-st.markdown("*designed by Christian Schmidt | Powered by Secure Admin Panel, Single-Use License Tokens & Paywall Core*")
+st.title("Scion Mind - Enterprise Ultimate AGI Studio (GOD-MODE V12.9)")
+st.markdown("*designed by Christian Schmidt | Powered by Admin User Selector, One-Click Credits & Paywall Core*")
 st.write("---")
 
 MASTER_OPENAI_KEY = st.secrets["OPENAI_API_KEY"]
@@ -98,7 +98,7 @@ ADMIN_NAME = "Christian"
 ADMIN_PASS = "ScionMind#2026!Secured"
 
 # -------------------------------------------------------------
-# SQLITE PERSISTENCE & V12.8 TABELLEN (INKL. LIZENZ-KEYS)
+# SQLITE PERSISTENCE & V12.9 TABELLEN
 # -------------------------------------------------------------
 def init_db():
     conn = sqlite3.connect("scion_mind_enterprise.db", check_same_thread=False)
@@ -119,7 +119,6 @@ def init_db():
     if "workspace" not in columns:
         cursor.execute("ALTER TABLE kunden ADD COLUMN workspace TEXT DEFAULT 'Default-Hub'")
 
-    # NEU: Tabelle für fälschungssichere Einmal-Lizenzschlüssel
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS lizenz_schluessel (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -254,19 +253,6 @@ def init_db():
         cursor.execute("INSERT INTO kunden VALUES (?, ?, ?, ?, ?)", (ADMIN_NAME, ADMIN_PASS, 999.00, "Administrator", "Global-Executive"))
     else:
         cursor.execute("UPDATE kunden SET rolle = ?, workspace = ? WHERE username = ?", ("Administrator", "Global-Executive", ADMIN_NAME))
-
-    # Steffi Guthaben auf 0.00 € halten
-    cursor.execute("UPDATE kunden SET guthaben = 0.0 WHERE username = 'Steffi.1302'", ())
-
-    cursor.execute("SELECT COUNT(*) FROM mcp_registry")
-    if cursor.fetchone()[0] == 0:
-        cursor.execute("INSERT INTO mcp_registry (server_name, resource_uri, status) VALUES (?, ?, ?)", ("Local Git Repository", "git://local/scion-mind-core", "Aktiv"))
-        cursor.execute("INSERT INTO mcp_registry (server_name, resource_uri, status) VALUES (?, ?, ?)", ("SQLite Enterprise DB", "sqlite://local/scion_mind_enterprise.db", "Aktiv"))
-    
-    cursor.execute("SELECT COUNT(*) FROM rag_documents")
-    if cursor.fetchone()[0] == 0:
-        cursor.execute("INSERT INTO rag_documents (titel, inhalt, vektor_metadaten) VALUES (?, ?, ?)", 
-                       ("Scion Mind Unternehmensrichtlinie 2026", "Das Scion Mind AGI Studio arbeitet mit kompromissloser Effizienz, P&L-Verantwortung und autonomer Skalierung.", "Embedding-Vektor-v1"))
 
     conn.commit()
     conn.close()
@@ -436,7 +422,7 @@ with st.sidebar:
         st.caption(f"🛡️ Rolle: **{rolle}**\n\n🏢 Workspace: `{workspace}`")
         st.caption(f"💰 Guthaben: **{guthaben:.2f} €**")
         
-        # NEU: Einmal-Lizenzschlüssel einlösen für normale User
+        # Einmal-Lizenzschlüssel einlösen für normale User
         with st.expander("💳 Guthaben mit Einmal-Key aufladen", expanded=False):
             key_input = st.text_input("Lizenzschlüssel eingeben:", type="password", placeholder="SCION-KEY-...")
             if st.button("Schlüssel einlösen"):
@@ -457,35 +443,41 @@ with st.sidebar:
                             st.rerun()
                         else:
                             conn.close()
-                            st.error("Dieser Lizenzschlüssel wurde bereits verwendet (Einmal-Schlüssel ungültig).")
+                            st.error("Dieser Lizenzschlüssel wurde bereits verwendet.")
                     else:
                         conn.close()
                         st.error("Unbekannter Lizenzschlüssel.")
 
-        # NEU: Exklusives Admin-Panel für Christian (Direktgutschrift & Key-Generator)
+        # NEU: Exklusives Admin-Panel mit direktem Nutzer-Auswahl-Menü
         if eingeloggter_kunde == ADMIN_NAME:
-            with st.expander("👑 Admin-Zentrale (Guthaben & Keys)", expanded=True):
-                st.markdown("#### 1. Direktgutschrift")
-                ziel_user = st.text_input("Benutzername:", value="Steffi.1302")
-                direkt_betrag = st.number_input("Betrag in €:", value=1.00, step=0.50)
-                if st.button("Guthaben direkt gutschreiben"):
-                    conn = get_db_connection()
-                    cursor = conn.cursor()
-                    cursor.execute("SELECT username FROM kunden WHERE username = ?", (ziel_user,))
-                    if cursor.fetchone():
-                        cursor.execute("UPDATE kunden SET guthaben = guthaben + ? WHERE username = ?", (direkt_betrag, ziel_user))
-                        conn.commit()
-                        conn.close()
-                        st.success(f"{direkt_betrag:.2f} € an {ziel_user} gutgeschrieben!")
-                        st.rerun()
-                    else:
-                        conn.close()
-                        st.error("Benutzer nicht gefunden.")
-
+            with st.expander("👑 Admin-Zentrale (Nutzer & Guthaben)", expanded=True):
+                st.markdown("#### 👥 Alle registrierten Nutzer")
+                
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                cursor.execute("SELECT username, guthaben, rolle FROM kunden")
+                alle_nutzer = cursor.fetchall()
+                conn.close()
+                
+                if alle_nutzer:
+                    for u_name, u_guthaben, u_rolle in alle_nutzer:
+                        col_u1, col_u2 = st.columns([1.5, 1])
+                        with col_u1:
+                            st.markdown(f"**{u_name}**\n`{u_guthaben:.2f} €`")
+                        with col_u2:
+                            if st.button(f"+1 € an {u_name.split('.')[0]}", key=f"btn_plus_{u_name}"):
+                                conn = get_db_connection()
+                                cursor = conn.cursor()
+                                cursor.execute("UPDATE kunden SET guthaben = guthaben + 1.0 WHERE username = ?", (u_name,))
+                                conn.commit()
+                                conn.close()
+                                st.success(f"+1 € für {u_name} gebucht!")
+                                st.rerun()
+                
                 st.write("---")
-                st.markdown("#### 2. Einmal-Lizenzschlüssel erstellen")
+                st.markdown("#### 🔑 Lizenzschlüssel Generator")
                 key_betrag = st.number_input("Schlüssel-Wert in €:", value=1.00, step=1.00, key="gen_val")
-                if st.button("Generieren"):
+                if st.button("Einmal-Key generieren"):
                     neuer_schluessel = f"SCION-{secrets.token_hex(4).upper()}-{secrets.token_hex(4).upper()}"
                     conn = get_db_connection()
                     cursor = conn.cursor()
@@ -493,7 +485,7 @@ with st.sidebar:
                                    (neuer_schluessel, key_betrag))
                     conn.commit()
                     conn.close()
-                    st.success("Neuer Einmal-Schlüssel erstellt:")
+                    st.success("Generiert:")
                     st.code(neuer_schluessel)
 
         st.write("---")
@@ -547,7 +539,7 @@ with st.sidebar:
             st.rerun()
 
 # -------------------------------------------------------------
-# CORE ENGINES V12.8 (Inkl. Paywall-Prüfung)
+# CORE ENGINES V12.9 (Inkl. Paywall-Prüfung)
 # -------------------------------------------------------------
 
 def verschruessle_api_key(api_key):
@@ -1086,7 +1078,7 @@ def selbstevaluierender_lern_agent(system_prompt, initial_input, use_local=False
     reflektion_res = ausfuehren_mit_ollama_fallback("Du bist Meta-Learning Optimizer.", f"Aufgabe: {initial_input}\nErgebnis: {ergebnis}", use_local=use_local)
     
     speichere_agenten_lernen("Chat-Optimierung", reflektion_res, dynamischer_prompt)
-    return wende_guardrails_an(ergebnis + f"\n\n---\n🧬 *[Scion Mind V12.8 Sovereign Core]: Einmal-Lizenz Token & Paywall aktiv.*")
+    return wende_guardrails_an(ergebnis + f"\n\n---\n🧬 *[Scion Mind V12.9 Sovereign Core]: Admin-User-Selector & Paywall aktiv.*")
 
 def generiere_replicate_bild_mit_selbstcheck(prompt):
     for versuch in range(2):
@@ -1159,7 +1151,7 @@ else:
         spalte_links, spalte_rechts = st.columns([1.1, 0.9])
 
         with spalte_links:
-            st.subheader("🤖 Autonomer KI-Agent (GOD-MODE V12.8)")
+            st.subheader("🤖 Autonomer KI-Agent (GOD-MODE V12.9)")
             modus = st.selectbox(
                 "Agenten-Modus wählen:",
                 [
@@ -1234,7 +1226,7 @@ else:
                 if st.button("⚡ Live Stream ausführen", use_container_width=True):
                     if terminal_befehl:
                         terminal_box = st.empty()
-                        log_text = "[INFO] Starte Scion Terminal V12.8...\n"
+                        log_text = "[INFO] Starte Scion Terminal V12.9...\n"
                         terminal_box.code(log_text, language="bash")
                         time.sleep(0.5)
                         
