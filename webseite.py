@@ -144,8 +144,7 @@ with st.sidebar:
             st.rerun()
 
 def generiere_replicate_bild_mit_selbstcheck(prompt):
-    """Autonomes Tool mit automatischer Fehlerkorrektur (Fallback bei Ausfall)"""
-    for versuch in range(2): # Agent unternimmt bis zu 2 Versuche
+    for versuch in range(2):
         try:
             headers = {
                 "Authorization": f"Bearer {IMAGE_API_KEY}",
@@ -167,10 +166,9 @@ def generiere_replicate_bild_mit_selbstcheck(prompt):
                         break
                     time.sleep(2)
         except Exception:
-            time.sleep(1) # Kurze Pause vor dem nächsten Korrekturversuch
+            time.sleep(1)
             pass
             
-    # Fallback-Bild, falls Replicate hakt, damit der Prozess nicht abbricht
     return "https://images.unsplash.com/photo-1557804506-669a67965ba0?w=1200&auto=format&fit=crop&q=80"
 
 def erstelle_pptx_aus_session():
@@ -233,7 +231,7 @@ else:
         st.subheader("🤖 Autonomer KI-Agent (Recherche, Mails & Analyse)")
         modus = st.selectbox(
             "Agenten-Modus wählen:",
-            ["Intelligenter Chat & Recherche", "Büro & E-Mail Generator", "Audio / Sprachausgabe"]
+            ["Intelligenter Chat & Recherche", "Büro & E-Mail Generator"]
         )
         
         current_chat = st.session_state.aktiver_chat
@@ -245,12 +243,10 @@ else:
                     st.markdown(message["content"])
             aufgabe = st.chat_input("Gib dem Agenten eine Aufgabe (z.B. Marktanalyse, Strategie)...")
             
-        elif modus == "Büro & E-Mail Generator":
+        else:
             st.markdown("Lass den Agenten vollautomatisch professionelle Kunden-Mails, Rechnungsprüfungen oder Berichte erstellen:")
             email_thema = st.text_area("Anfrage / Stichpunkte für den Agenten:", placeholder="Z.B.: Antworte professionell auf eine Kundenbeschwerde wegen Lieferverzögerung...")
             aufgabe = email_thema if st.button("✉️ E-Mail / Bericht vom Agenten generieren", use_container_width=True) else None
-        else:
-            aufgabe = None
 
         if aufgabe:
             if eingeloggter_kunde != ADMIN_NAME:
@@ -289,24 +285,26 @@ else:
                 st.error(f"Ein Fehler ist aufgetreten: {e}")
 
         st.write("---")
-        st.subheader("🎧 Text als Sprache ausgeben")
-        vorlese_text = st.text_area("Text zum Vorlesen:", height=70, placeholder="Füge hier Text ein...")
-        einzel_stimme = st.selectbox("Wähle eine Stimme:", ["alloy", "echo", "fable", "onyx", "nova", "shimmer"])
         
-        if st.button("🔊 Audio generieren", use_container_width=True):
-            if not vorlese_text:
-                st.warning("Bitte gib einen Text ein.")
-            else:
-                if eingeloggter_kunde != ADMIN_NAME:
-                    st.session_state.kunden_daten[eingeloggter_kunde]["guthaben"] -= 0.02
-                with st.spinner("Erstelle Sprachdatei..."):
-                    try:
-                        client = OpenAI(api_key=MASTER_OPENAI_KEY)
-                        response = client.audio.speech.create(model="tts-1", voice=einzel_stimme, input=vorlese_text)
-                        st.success("Audio erfolgreich generiert!")
-                        st.audio(response.content, format="audio/mp3")
-                    except Exception as e:
-                        st.error(f"Fehler: {e}")
+        # NEU: Sprachausgabe sauber in ein aufklappbares Feld (Expander) verpackt
+        with st.expander("🎧 Text in Sprache umwandeln (Audio-Generator)"):
+            vorlese_text = st.text_area("Text zum Vorlesen:", height=70, placeholder="Füge hier Text ein...")
+            einzel_stimme = st.selectbox("Wähle eine Stimme:", ["alloy", "echo", "fable", "onyx", "nova", "shimmer"])
+            
+            if st.button("🔊 Audio generieren", use_container_width=True):
+                if not vorlese_text:
+                    st.warning("Bitte gib einen Text ein.")
+                else:
+                    if eingeloggter_kunde != ADMIN_NAME:
+                        st.session_state.kunden_daten[eingeloggter_kunde]["guthaben"] -= 0.02
+                    with st.spinner("Erstelle Sprachdatei..."):
+                        try:
+                            client = OpenAI(api_key=MASTER_OPENAI_KEY)
+                            response = client.audio.speech.create(model="tts-1", voice=einzel_stimme, input=vorlese_text)
+                            st.success("Audio erfolgreich generiert!")
+                            st.audio(response.content, format="audio/mp3")
+                        except Exception as e:
+                            st.error(f"Fehler: {e}")
 
     with spalte_rechts:
         st.subheader("📊 Autonomes Präsentations-Studio")
@@ -358,7 +356,6 @@ else:
                                 txt_part = f.split("TEXT:")[1].split("|||")[0].strip() if "TEXT:" in f else ""
                                 p_part = f.split("PROMPT:")[1].strip() if "PROMPT:" in f else "Professional business background"
                                 
-                                # Autonomer Aufruf mit Selbst-Check und Fehlerkorrektur
                                 bild_url = generiere_replicate_bild_mit_selbstcheck(p_part)
                                 neue_slides.append({"titel": t_part, "text": txt_part, "prompt": p_part, "bild_url": bild_url})
                             except Exception:
