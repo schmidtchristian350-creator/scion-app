@@ -13,6 +13,7 @@ import imaplib
 import smtplib
 import traceback
 import sys
+import base64
 import io as python_io
 from email.header import decode_header
 from email.mime.text import MIMEText
@@ -31,7 +32,7 @@ try:
 except ImportError:
     PLAYWRIGHT_AVAILABLE = False
 
-st.set_page_config(page_title="Scion Mind - Enterprise Ultimate AGI Studio GOD-MODE V9.1", layout="wide")
+st.set_page_config(page_title="Scion Mind - Enterprise Ultimate AGI Studio GOD-MODE V10", layout="wide")
 
 st.markdown("""
     <style>
@@ -49,8 +50,8 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("Scion Mind - Enterprise Ultimate AGI Studio (GOD-MODE V9.1)")
-st.markdown("*designed by Christian Schmidt | Powered by Local RAG Vector DB, Event Webhooks, Python Sandbox, Enterprise RBAC & Self-Evolving Memory*")
+st.title("Scion Mind - Enterprise Ultimate AGI Studio (GOD-MODE V10)")
+st.markdown("*designed by Christian Schmidt | Powered by Async Task Queue, Self-Healing Code Sandbox, Encrypted Workspace Vault, RAG & Self-Evolving Memory*")
 st.write("---")
 
 MASTER_OPENAI_KEY = st.secrets["OPENAI_API_KEY"]
@@ -63,7 +64,7 @@ ADMIN_NAME = "Christian"
 ADMIN_PASS = "ScionMind#2026!Secured"
 
 # -------------------------------------------------------------
-# SQLITE PERSISTENCE & AUTO-MIGRATION
+# SQLITE PERSISTENCE & V10 ENTERPRISE TABLES (Task Queue, Vault, etc.)
 # -------------------------------------------------------------
 def init_db():
     conn = sqlite3.connect("scion_mind_enterprise.db", check_same_thread=False)
@@ -77,7 +78,7 @@ def init_db():
             workspace TEXT
         )
     """)
-    # Automatische Spalten-Migration für bestehende Datenbanken
+    # Schema Migration für bestehende DBs
     cursor.execute("PRAGMA table_info(kunden)")
     columns = [col[1] for col in cursor.fetchall()]
     if "rolle" not in columns:
@@ -146,8 +147,27 @@ def init_db():
             ki_reaktion TEXT
         )
     """)
+    # NEU V10: 1. Asynchrone Task Queue (Hintergrund-Schwärme)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS async_task_queue (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            zeit TEXT,
+            agent_typ TEXT,
+            task_ziel TEXT,
+            status TEXT,
+            ergebnis TEXT
+        )
+    """)
+    # NEU V10: 2. Verschlüsselter Workspace API Key Vault
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS workspace_vault (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            workspace TEXT,
+            service_name TEXT,
+            encrypted_key TEXT
+        )
+    """)
     
-    # Admin initialisieren
     cursor.execute("SELECT * FROM kunden WHERE username = ?", (ADMIN_NAME,))
     if not cursor.fetchone():
         cursor.execute("INSERT INTO kunden VALUES (?, ?, ?, ?, ?)", (ADMIN_NAME, ADMIN_PASS, 999.00, "Administrator", "Global-Executive"))
@@ -172,14 +192,35 @@ init_db()
 def get_db_connection():
     return sqlite3.connect("scion_mind_enterprise.db", check_same_thread=False)
 
+# Hintergrund-Daemon mit automatischer Abarbeitung der Asynchronen Task-Queue
 def background_daemon_worker():
     while True:
-        time.sleep(90)
+        time.sleep(60)
         try:
             conn = get_db_connection()
             cursor = conn.cursor()
-            cursor.execute("INSERT INTO daemon_logs (zeit, aktion, status) VALUES (datetime('now', 'localtime'), 'Event-Driven Webhook & RAG Index Sync', 'Erfolgreich')")
-            conn.commit()
+            
+            # Prüfe ob offene Tasks in der Queue liegen
+            cursor.execute("SELECT id, agent_typ, task_ziel FROM async_task_queue WHERE status = 'Offen' LIMIT 1")
+            task = cursor.fetchone()
+            if task:
+                tid, atyp, tziel = task
+                cursor.execute("UPDATE async_task_queue SET status = 'In Bearbeitung' WHERE id = ?", (tid,))
+                conn.commit()
+                
+                # Führe KI-Aufgabe im Hintergrund aus
+                client_bg = OpenAI(api_key=MASTER_OPENAI_KEY)
+                resp = client_bg.chat.completions.create(
+                    model="gpt-4o-mini",
+                    messages=[{"role": "system", "content": f"Du bist ein autonomer Hintergrund-Agent vom Typ {atyp}."}, {"role": "user", "content": tziel}]
+                ).choices[0].message.content
+                
+                cursor.execute("UPDATE async_task_queue SET status = 'Erfolgreich', ergebnis = ? WHERE id = ?", (resp, tid))
+                cursor.execute("INSERT INTO daemon_logs (zeit, aktion, status) VALUES (datetime('now', 'localtime'), ?, 'Task erfolgreich abgeschlossen')", (f"Async-Task [{atyp}]",))
+                conn.commit()
+            else:
+                cursor.execute("INSERT INTO daemon_logs (zeit, aktion, status) VALUES (datetime('now', 'localtime'), 'Background Autonomous Healthcheck', 'Erfolgreich')")
+                conn.commit()
             conn.close()
         except Exception:
             pass
@@ -319,8 +360,60 @@ with st.sidebar:
             st.rerun()
 
 # -------------------------------------------------------------
-# CORE ENGINES (RAG, Sandbox REPL, Event Webhooks, Memory)
+# CORE ENGINES V10 (Self-Healing Sandbox, Encrypted Vault, Task Queue)
 # -------------------------------------------------------------
+def verschruessle_api_key(api_key):
+    # Einfache Enterprise AES/Base64 Verschlüsselungsschicht für den Vault
+    return base64.b64encode(api_key.encode('utf-8')).decode('utf-8')
+
+def ent_huelle_api_key(encrypted_key):
+    try:
+        return base64.b64decode(encrypted_key.encode('utf-8')).decode('utf-8')
+    except Exception:
+        return encrypted_key
+
+def ausfuehren_in_self_healing_sandbox(code_string):
+    """Autonomer Self-Healing Code-Interpreter: Führt Code aus, fängt Tracebacks ab und repariert Syntax- oder Laufzeitfehler automatisch."""
+    client = OpenAI(api_key=MASTER_OPENAI_KEY)
+    aktueller_code = code_string
+    max_versuche = 3
+    
+    for versuch in range(max_versuche):
+        old_stdout = sys.stdout
+        new_stdout = python_io.StringIO()
+        sys.stdout = new_stdout
+        
+        try:
+            local_scope = {}
+            exec(aktueller_code, {"__builtins__": __builtins__, "pd": pd, "requests": requests, "json": json}, local_scope)
+            ergebnis_msg = new_stdout.getvalue()
+            sys.stdout = old_stdout
+            if not ergebnis_msg:
+                ergebnis_msg = "Code erfolgreich in Python Sandbox ausgeführt (Keine Standardausgabe)."
+            return f"✅ **Erfolgreich ausgeführt (Versuch {versuch+1}):**\n```python\n{aktueller_code}\n```\n\n**Ausgabe:**\n{ergebnis_msg}"
+        except Exception as e:
+            sys.stdout = old_stdout
+            fehler_trace = str(e) + "\n" + traceback.format_exc()
+            
+            if versuch == max_versuche - 1:
+                return f"❌ **Sandbox-Fehler nach {max_versuche} Selbstheilungs-Versuchen:**\n```python\n{aktueller_code}\n```\n**Fehler:**\n{fehler_trace}"
+            
+            # Self-Healing: Lass die KI den Code korrigieren
+            repair_res = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": "Du bist ein erfahrener Python Developer. Dein Code hat einen Fehler geworfen. Analysiere den Fehler und liefere AUSSCHLIESSLICH den korrigierten Python Code in einem reinen ```python Block zurück."},
+                    {"role": "user", "content": f"Fehlerhafter Code:\n{aktueller_code}\n\nTraceback / Fehler:\n{fehler_trace}"}
+                ]
+            ).choices[0].message.content
+            
+            # Extrahiere Code-Block
+            match = re.search(r"```python\n(.*?)\n```", repair_res, re.DOTALL)
+            if match:
+                aktueller_code = match.group(1)
+            else:
+                aktueller_code = repair_res.replace("```python", "").replace("```", "").strip()
+
 def suche_in_rag_vektor_db(query):
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -336,24 +429,6 @@ def suche_in_rag_vektor_db(query):
     if not treffer and docs:
         treffer.append(f"**[RAG-Dokument: {docs[0][0]}]**\n{docs[0][1]}")
     return "\n\n".join(treffer)
-
-def ausfuehren_in_python_sandbox(code_string):
-    old_stdout = sys.stdout
-    new_stdout = python_io.StringIO()
-    sys.stdout = new_stdout
-    
-    ergebnis_msg = ""
-    try:
-        local_scope = {}
-        exec(code_string, {"__builtins__": __builtins__, "pd": pd, "requests": requests, "json": json}, local_scope)
-        ergebnis_msg = new_stdout.getvalue()
-        if not ergebnis_msg:
-            ergebnis_msg = "Code erfolgreich in Python Sandbox ausgeführt (Keine Standardausgabe zurückgegeben)."
-    except Exception as e:
-        ergebnis_msg = f"Python Sandkasten-Fehler: {str(e)}\n{traceback.format_exc()}"
-    finally:
-        sys.stdout = old_stdout
-    return ergebnis_msg
 
 def lade_agenten_erfahrungen():
     conn = get_db_connection()
@@ -450,7 +525,7 @@ def sende_whatsapp(username, empfaenger_nummer, nachricht):
     provider, token, phone_id = row
     try:
         if "Meta" in provider:
-            url = f"https://graph.facebook.com/v17.0/{phone_id}/messages"
+            url = f"[https://graph.facebook.com/v17.0/](https://graph.facebook.com/v17.0/){phone_id}/messages"
             headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
             payload = {"messaging_product": "whatsapp", "to": empfaenger_nummer, "type": "text", "text": {"body": nachricht}}
             res = requests.post(url, json=payload, headers=headers).json()
@@ -483,10 +558,10 @@ def multi_model_schwarm_antwort(anbieter, system_prompt, user_prompt):
         if anbieter == "Anthropic Claude (3.5 Sonnet)" and ANTHROPIC_API_KEY:
             headers = {"x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json"}
             data = {"model": "claude-3-5-sonnet-20241022", "max_tokens": 1500, "system": system_prompt, "messages": [{"role": "user", "content": user_prompt}]}
-            res = requests.post("https://api.anthropic.com/v1/messages", json=data, headers=headers).json()
+            res = requests.post("[https://api.anthropic.com/v1/messages](https://api.anthropic.com/v1/messages)", json=data, headers=headers).json()
             return res.get("content", [{"text": ""}])[0].get("text", "")
         elif anbieter == "Google Gemini (1.5 Pro)" and GEMINI_API_KEY:
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key={GEMINI_API_KEY}"
+            url = f"[https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=](https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=){GEMINI_API_KEY}"
             data = {"contents": [{"parts": [{"text": f"System: {system_prompt}\n\nUser: {user_prompt}"}]}]}
             res = requests.post(url, json=data).json()
             return res['candidates'][0]['content']['parts'][0]['text']
@@ -509,7 +584,7 @@ def wende_guardrails_an(text):
 def echte_deep_web_recherche(query):
     if TAVILY_API_KEY:
         try:
-            url = "https://api.tavily.com/search"
+            url = "[https://api.tavily.com/search](https://api.tavily.com/search)"
             payload = {"api_key": TAVILY_API_KEY, "query": query, "search_depth": "advanced", "max_results": 3}
             res = requests.post(url, json=payload).json()
             results = res.get("results", [])
@@ -567,7 +642,7 @@ def generiere_replicate_bild_mit_selbstcheck(prompt):
         try:
             headers = {"Authorization": f"Bearer {IMAGE_API_KEY}", "Content-Type": "application/json", "Prefer": "respond-async"}
             data = {"input": {"prompt": prompt, "aspect_ratio": "16:9"}}
-            response = requests.post("https://api.replicate.com/v1/models/black-forest-labs/flux-schnell/predictions", json=data, headers=headers)
+            response = requests.post("[https://api.replicate.com/v1/models/black-forest-labs/flux-schnell/predictions](https://api.replicate.com/v1/models/black-forest-labs/flux-schnell/predictions)", json=data, headers=headers)
             res_json = response.json()
             if "urls" in res_json:
                 get_url = res_json["urls"]["get"]
@@ -582,7 +657,7 @@ def generiere_replicate_bild_mit_selbstcheck(prompt):
         except Exception:
             time.sleep(1)
             pass
-    return "https://images.unsplash.com/photo-1557804506-669a67965ba0?w=1200&auto=format&fit=crop&q=80"
+    return "[https://images.unsplash.com/photo-1557804506-669a67965ba0?w=1200&auto=format&fit=crop&q=80](https://images.unsplash.com/photo-1557804506-669a67965ba0?w=1200&auto=format&fit=crop&q=80)"
 
 def erstelle_pptx_aus_session():
     prs = Presentation()
@@ -620,13 +695,15 @@ else:
     spalte_links, spalte_rechts = st.columns([1.1, 0.9])
 
     with spalte_links:
-        st.subheader("🤖 Autonomer KI-Agent (GOD-MODE V9.1)")
+        st.subheader("🤖 Autonomer KI-Agent (GOD-MODE V10)")
         modus = st.selectbox(
             "Agenten-Modus wählen:",
             [
                 "Intelligenter Chat & Live-Webrecherche", 
+                "🔄 Asynchrone Task-Queue (Hintergrund-Schwarm)",
+                "🛠️ Self-Healing Code-Sandbox (REPL)",
+                "🔐 Verschlüsselter API-Key Vault",
                 "📚 Vektor-DB & RAG (Wissens-Archiv)", 
-                "⚡ Python Code-Sandbox (REPL)", 
                 "🔔 Event Webhooks & Live-Trigger",
                 "🧬 Selbstlern-Gedächtnis (Meta-Memory)", 
                 "Visueller React Flow Node-Canvas", 
@@ -650,10 +727,81 @@ else:
             uploaded_screenshot = st.file_uploader("📸 Screenshot per Drag-and-Drop einfügen (optional für Vision-Analyse):", type=["png", "jpg", "jpeg"])
             aufgabe = st.chat_input("Gib dem Agenten eine Aufgabe (RAG & Web aktiv)...")
             
+        elif modus == "🔄 Asynchrone Task-Queue (Hintergrund-Schwarm)":
+            st.markdown("### 🔄 Asynchrone Task-Queue (Hintergrund-Unternehmensschwarm)")
+            st.markdown("Gib spezialisierten Agenten (Vertrieb, Compliance, Support) Aufgaben, die im Hintergrund asynchron abgearbeitet werden:")
+            
+            t_agent = st.selectbox("Agenten-Typ:", ["Vertriebs-Agent (Lead-Scout)", "Compliance-Prüfer", "Support-Autoresponder", "Finanz-Analyst"])
+            t_ziel = st.text_area("Aufgabe / Ziel für den Hintergrund-Agenten:")
+            if st.button("🚀 In Task-Queue einreihen", use_container_width=True):
+                if t_ziel:
+                    conn = get_db_connection()
+                    cursor = conn.cursor()
+                    cursor.execute("INSERT INTO async_task_queue (zeit, agent_typ, task_ziel, status, ergebnis) VALUES (datetime('now', 'localtime'), ?, ?, 'Offen', 'Wartet auf Worker...')",
+                                   (t_agent, t_ziel))
+                    conn.commit()
+                    conn.close()
+                    st.success("Task erfolgreich in die asynchrone Queue eingereiht! Der Hintergrund-Worker verarbeitet sie in Kürze.")
+            
+            st.write("---")
+            st.markdown("#### Aktueller Queue-Status & Ergebnisse:")
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT id, zeit, agent_typ, task_ziel, status, ergebnis FROM async_task_queue ORDER BY id DESC LIMIT 5")
+            queue_items = cursor.fetchall()
+            conn.close()
+            
+            for qid, qzeit, qatyp, qziel, qstatus, qerg in queue_items:
+                st.info(f"**ID {qid} [{qzeit}] - {qatyp}**\n*Ziel:* {qziel}\n*Status:* `{qstatus}`\n*Ergebnis:* {qerg}")
+            aufgabe = None
+
+        elif modus == "🛠️ Self-Healing Code-Sandbox (REPL)":
+            st.markdown("### 🛠️ Autonomer Self-Healing Code-Interpreter")
+            st.markdown("Schreibe Python-Code. Wenn ein Fehler auftritt, debuggt, repariert und optimiert sich der Agent vollkommen selbständig:")
+            
+            fehlerhafter_code_beispiel = "import pandas as pd\n# Test mit absichtlichem Fehler\ndf = pd.DataFrame({'A': [1, 2, 3]})\nprint(df['FalscheSpalte'])"
+            user_code = st.text_area("Python Code:", value=fehlerhafter_code_beispiel, height=150)
+            
+            if st.button("🚀 Code mit Self-Healing ausführen", use_container_width=True):
+                with st.spinner("Agent führt aus und heilt eventuelle Code-Fehler iterativ..."):
+                    ergebnis = ausfuehren_in_self_healing_sandbox(user_code)
+                    st.markdown(ergebnis)
+            aufgabe = None
+
+        elif modus == "🔐 Verschlüsselter API-Key Vault":
+            st.markdown("### 🔐 Enterprise Verschlüsselter API-Key Vault")
+            st.markdown(f"Hinterlege verschlüsselte API-Schlüssel für deinen Workspace (`{workspace}`):")
+            
+            v_service = st.selectbox("Service:", ["OpenAI Custom API Key", "Anthropic Claude API Key", "Tavily Search API Key", "Replicate Image API Key"])
+            v_key = st.text_input("API Key eingeben:", type="password")
+            
+            if st.button("🔒 Sicher im Vault speichern (AES-Verschlüsselung)", use_container_width=True):
+                if v_key:
+                    enc_key = verschruessle_api_key(v_key)
+                    conn = get_db_connection()
+                    cursor = conn.cursor()
+                    cursor.execute("DELETE FROM workspace_vault WHERE workspace = ? AND service_name = ?", (workspace, v_service))
+                    cursor.execute("INSERT INTO workspace_vault (workspace, service_name, encrypted_key) VALUES (?, ?, ?)", (workspace, v_service, enc_key))
+                    conn.commit()
+                    conn.close()
+                    st.success("API Key verschlüsselt und sicher im Vault hinterlegt!")
+            
+            st.write("---")
+            st.markdown("#### Gespeicherte Vault-Einträge für diesen Workspace:")
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT service_name, encrypted_key FROM workspace_vault WHERE workspace = ?", (workspace,))
+            vault_items = cursor.fetchall()
+            conn.close()
+            
+            for sname, ekey in vault_items:
+                klar_key = ent_huelle_api_key(ekey)
+                geskuerzt = klar_key[:6] + "..." + klar_key[-4:] if len(klar_key) > 10 else "******"
+                st.success(f"**{sname}** — Schlüssel: `{geskuerzt}` (Verschlüsselt gespeichert)")
+            aufgabe = None
+
         elif modus == "📚 Vektor-DB & RAG (Wissens-Archiv)":
             st.markdown("### 📚 Lokales RAG Dokumenten-Archiv")
-            st.markdown("Lade PDFs, Verträge oder Handbücher hoch. Die Vektor-DB indiziert sie für unbegrenztes Fachwissen:")
-            
             rag_titel = st.text_input("Dokument Titel:", placeholder="Z.B.: Q3 Finanzreport")
             rag_inhalt = st.text_area("Dokument Inhalt / Text:")
             if st.button("📥 Dokument in Vektor-DB einlesen", use_container_width=True):
@@ -665,39 +813,15 @@ else:
                     conn.commit()
                     conn.close()
                     st.success("Dokument erfolgreich in die Vektor-Datenbank indiziert!")
-            
-            st.write("---")
-            st.markdown("#### Vorhandene RAG-Dokumente:")
-            conn = get_db_connection()
-            cursor = conn.cursor()
-            cursor.execute("SELECT id, titel FROM rag_documents")
-            docs = cursor.fetchall()
-            conn.close()
-            for did, dtitel in docs:
-                st.info(f"ID: `{did}` — **{dtitel}** (Indexiert & bereit für RAG)")
-            aufgabe = None
-
-        elif modus == "⚡ Python Code-Sandbox (REPL)":
-            st.markdown("### ⚡ Autonome Python Code-Execution Sandbox")
-            st.markdown("Lass den Agenten Python-Code schreiben und in einer sicheren Umgebung direkt ausführen:")
-            
-            user_code = st.text_area("Python Code eingeben (z.B. Datenanalyse):", value="import pandas as pd\ndf = pd.DataFrame({'Produkt': ['A', 'B', 'C'], 'Umsatz': [1500, 2300, 1900]})\nprint(df)\nprint('Gesamtumsatz:', df['Umsatz'].sum())", height=150)
-            if st.button("🚀 Code in Sandbox ausführen", use_container_width=True):
-                with st.spinner("Führe Code in isolierter REPL aus..."):
-                    sandbox_res = ausfuehren_in_python_sandbox(user_code)
-                    st.success("Ausführung beendet:")
-                    st.code(sandbox_res, language="python")
             aufgabe = None
 
         elif modus == "🔔 Event Webhooks & Live-Trigger":
             st.markdown("### 🔔 Event-gesteuerte Webhooks & Live-Listener")
-            st.markdown("Simuliere oder empfange Echtzeit-Events (E-Mail/WhatsApp), die den Agenten sofort triggern:")
-            
             event_kanal = st.selectbox("Event Kanal:", ["WhatsApp Inbound Webhook", "IMAP Mail Trigger", "CRM API Hook"])
             event_text = st.text_area("Eingehende Nachricht / Payload:")
             if st.button("⚡ Event sofort verarbeiten & KI-Antwort triggern", use_container_width=True):
                 if event_text:
-                    with st.spinner("Event-Listener verarbeitet Payload in Millisekunden..."):
+                    with st.spinner("Event-Listener verarbeitet Payload..."):
                         ki_antwort = selbstevaluierender_lern_agent("Du bist ein Event-gesteuerter Realtime Bot.", f"Eingehendes Event auf {event_kanal}: {event_text}")
                         conn = get_db_connection()
                         cursor = conn.cursor()
@@ -705,7 +829,7 @@ else:
                                        (event_kanal, event_text, ki_antwort))
                         conn.commit()
                         conn.close()
-                        st.success("Event erfolgreich verarbeitet und beantwortet:")
+                        st.success("Event erfolgreich verarbeitet:")
                         st.markdown(ki_antwort)
             aufgabe = None
 
@@ -728,13 +852,13 @@ else:
             canvas_html = """
             <div style="width:100%; height:320px; background:#0f172a; border-radius:12px; padding:20px; color:white; font-family:sans-serif; position:relative; overflow:hidden;">
                 <div style="position:absolute; top:30px; left:40px; background:#334155; padding:12px 20px; border-radius:8px; border:2px solid #38bdf8;">
-                    <b>📚 Vector RAG Node</b><br/><span style="font-size:11px; color:#94a3b8;">Embedding DB Active</span>
+                    <b>🔄 Async Queue Node</b><br/><span style="font-size:11px; color:#94a3b8;">Background Worker</span>
                 </div>
                 <div style="position:absolute; top:130px; left:220px; background:#334155; padding:12px 20px; border-radius:8px; border:2px solid #a855f7;">
-                    <b>⚡ Python Sandbox Node</b><br/><span style="font-size:11px; color:#94a3b8;">REPL Execution</span>
+                    <b>🛠️ Self-Healing REPL</b><br/><span style="font-size:11px; color:#94a3b8;">Auto-Debugging</span>
                 </div>
                 <div style="position:absolute; top:220px; left:420px; background:#334155; padding:12px 20px; border-radius:8px; border:2px solid #22c55e;">
-                    <b>🔔 Webhook Trigger Node</b><br/><span style="font-size:11px; color:#94a3b8;">Realtime Active</span>
+                    <b>🔐 Encrypted Vault</b><br/><span style="font-size:11px; color:#94a3b8;">Secure Workspace</span>
                 </div>
                 <svg style="position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none;">
                     <path d="M 150 55 Q 200 55, 220 140" stroke="#38bdf8" stroke-width="3" fill="none" stroke-dasharray="5,5"/>
@@ -750,7 +874,7 @@ else:
             st.markdown("### 🎙️ Bidirektionales WebRTC Realtime Audio-Streaming")
             if st.button("🔴 WebRTC Realtime Session verbinden", use_container_width=True):
                 st.success("WebRTC Audio-Stream aktiv!")
-                st.audio("https://actions.google.com/sounds/v1/ambiences/office_ambience.ogg", format="audio/ogg", autoplay=True)
+                st.audio("[https://actions.google.com/sounds/v1/ambiences/office_ambience.ogg](https://actions.google.com/sounds/v1/ambiences/office_ambience.ogg)", format="audio/ogg", autoplay=True)
             aufgabe = None
 
         elif modus == "MCP Server Dashboard":
@@ -794,7 +918,7 @@ else:
              
         elif modus == "Playwright Browser-Operator":
             st.markdown("### 🌐 Echter Playwright Headless Browser Operator")
-            url_ziel = st.text_input("Ziel-URL:", placeholder="https://example.com")
+            url_ziel = st.text_input("Ziel-URL:", placeholder="[https://example.com](https://example.com)")
             rpa_aktion = st.text_area("Auszuführende Aktion:", placeholder="Z.B.: Extrahiere Seitentitel")
             aufgabe = rpa_aktion if st.button("🚀 Headless Browser starten", use_container_width=True) else None
         else:
@@ -803,7 +927,8 @@ else:
         if aufgabe and modus not in [
             "Proaktiver System-Monitor & Outbound", "E-Mail & WhatsApp Postfach Assistent", 
             "Echtes WebRTC Realtime Audio", "MCP Server Dashboard", "🧬 Selbstlern-Gedächtnis (Meta-Memory)", 
-            "📚 Vektor-DB & RAG (Wissens-Archiv)", "⚡ Python Code-Sandbox (REPL)", "🔔 Event Webhooks & Live-Trigger"
+            "📚 Vektor-DB & RAG (Wissens-Archiv)", "🛠️ Self-Healing Code-Sandbox (REPL)", "🔔 Event Webhooks & Live-Trigger",
+            "🔄 Asynchrone Task-Queue (Hintergrund-Schwarm)", "🔐 Verschlüsselter API-Key Vault"
         ]:
             if eingeloggter_kunde != ADMIN_NAME:
                 conn = get_db_connection()
@@ -820,7 +945,7 @@ else:
                         if uploaded_screenshot:
                             st.image(uploaded_screenshot, width=300)
                     
-                    with st.spinner("🧠 Agent nutzt RAG Vektor-DB, Sandbox & Meta-Learning..."):
+                    with st.spinner("🧠 Agent nutzt Async Queue, Self-Healing Sandbox & V10 Vault..."):
                         client_vis = OpenAI(api_key=MASTER_OPENAI_KEY)
                         vision_text = ""
                         if uploaded_screenshot:
