@@ -66,7 +66,7 @@ try:
 except ImportError:
     PLAYWRIGHT_AVAILABLE = False
 
-st.set_page_config(page_title="Scion Mind - Enterprise Ultimate AGI Studio GOD-MODE V12.11", layout="wide")
+st.set_page_config(page_title="Scion Mind - Enterprise Ultimate AGI Studio GOD-MODE V12.12", layout="wide")
 
 st.markdown("""
     <style>
@@ -84,8 +84,8 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("Scion Mind - Enterprise Ultimate AGI Studio (GOD-MODE V12.11)")
-st.markdown("*designed by Christian Schmidt | Powered by Admin Guthaben-Manager & Sovereign Paywall Core*")
+st.title("Scion Mind - Enterprise Ultimate AGI Studio (GOD-MODE V12.12)")
+st.markdown("*designed by Christian Schmidt | Powered by Instant-Sync Admin Panel & Sovereign Paywall Core*")
 st.write("---")
 
 MASTER_OPENAI_KEY = st.secrets["OPENAI_API_KEY"]
@@ -98,7 +98,7 @@ ADMIN_NAME = "Christian"
 ADMIN_PASS = "ScionMind#2026!Secured"
 
 # -------------------------------------------------------------
-# SQLITE PERSISTENCE & V12.11 TABELLEN
+# SQLITE PERSISTENCE & V12.12 TABELLEN
 # -------------------------------------------------------------
 def init_db():
     conn = sqlite3.connect("scion_mind_enterprise.db", check_same_thread=False)
@@ -448,7 +448,7 @@ with st.sidebar:
                         conn.close()
                         st.error("Unbekannter Lizenzschlüssel.")
 
-        # ADMIN-PANEL: GUTHABEN VERGEBEN & EINZIEHEN
+        # ADMIN-PANEL: GUTHABEN VERGEBEN & EINZIEHEN (MIT SOFORT-REFRESH)
         if eingeloggter_kunde == ADMIN_NAME:
             with st.expander("👑 Admin-Zentrale (Guthaben Verwalten)", expanded=True):
                 st.markdown("#### Nutzer auswählen:")
@@ -474,7 +474,8 @@ with st.sidebar:
                                 cursor.execute("UPDATE kunden SET guthaben = guthaben + ? WHERE username = ?", (betrag_input, ausgewaehlter_user))
                                 conn.commit()
                                 conn.close()
-                                st.success(f"+{betrag_input:.2f} € für '{ausgewaehlter_user}'!")
+                                st.success(f"Sofort gutgeschrieben: +{betrag_input:.2f} € für '{ausgewaehlter_user}'!")
+                                time.sleep(0.3)
                                 st.rerun()
                     with col_a2:
                         if st.button("➖ Einziehen", key="btn_admin_minus"):
@@ -484,7 +485,8 @@ with st.sidebar:
                                 cursor.execute("UPDATE kunden SET guthaben = MAX(0.0, guthaben - ?) WHERE username = ?", (betrag_input, ausgewaehlter_user))
                                 conn.commit()
                                 conn.close()
-                                st.warning(f"-{betrag_input:.2f} € von '{ausgewaehlter_user}' eingezogen!")
+                                st.warning(f"Sofort eingezogen: -{betrag_input:.2f} € von '{ausgewaehlter_user}'!")
+                                time.sleep(0.3)
                                 st.rerun()
                 else:
                     st.warning("Keine Nutzer in der Datenbank gefunden.")
@@ -554,7 +556,7 @@ with st.sidebar:
             st.rerun()
 
 # -------------------------------------------------------------
-# CORE ENGINES V12.11 (Inkl. Paywall-Prüfung)
+# CORE ENGINES V12.12 (Inkl. Paywall-Prüfung)
 # -------------------------------------------------------------
 
 def verschruessle_api_key(api_key):
@@ -1093,7 +1095,7 @@ def selbstevaluierender_lern_agent(system_prompt, initial_input, use_local=False
     reflektion_res = ausfuehren_mit_ollama_fallback("Du bist Meta-Learning Optimizer.", f"Aufgabe: {initial_input}\nErgebnis: {ergebnis}", use_local=use_local)
     
     speichere_agenten_lernen("Chat-Optimierung", reflektion_res, dynamischer_prompt)
-    return wende_guardrails_an(ergebnis + f"\n\n---\n🧬 *[Scion Mind V12.11 Sovereign Core]: Admin Guthaben Manager aktiv.*")
+    return wende_guardrails_an(ergebnis + f"\n\n---\n🧬 *[Scion Mind V12.12 Sovereign Core]: Instant-Sync Admin Panel aktiv.*")
 
 def generiere_replicate_bild_mit_selbstcheck(prompt):
     for versuch in range(2):
@@ -1166,7 +1168,7 @@ else:
         spalte_links, spalte_rechts = st.columns([1.1, 0.9])
 
         with spalte_links:
-            st.subheader("🤖 Autonomer KI-Agent (GOD-MODE V12.11)")
+            st.subheader("🤖 Autonomer KI-Agent (GOD-MODE V12.12)")
             modus = st.selectbox(
                 "Agenten-Modus wählen:",
                 [
@@ -1241,7 +1243,7 @@ else:
                 if st.button("⚡ Live Stream ausführen", use_container_width=True):
                     if terminal_befehl:
                         terminal_box = st.empty()
-                        log_text = "[INFO] Starte Scion Terminal V12.11...\n"
+                        log_text = "[INFO] Starte Scion Terminal V12.12...\n"
                         terminal_box.code(log_text, language="bash")
                         time.sleep(0.5)
                         
