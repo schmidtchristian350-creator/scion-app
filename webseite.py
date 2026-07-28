@@ -29,7 +29,7 @@ st.markdown("*designed by Christian Schmidt*")
 st.write("---")
 
 MASTER_OPENAI_KEY = st.secrets["OPENAI_API_KEY"]
-VIDEO_API_KEY = st.secrets.get("VIDEO_API_KEY", MASTER_OPENAI_KEY)
+IMAGE_API_KEY = st.secrets.get("VIDEO_API_KEY", MASTER_OPENAI_KEY)
 
 ADMIN_NAME = "Christian"
 ADMIN_PASS = "ScionMind#2026!Secured"
@@ -39,6 +39,12 @@ if "kunden_daten" not in st.session_state:
         ADMIN_NAME: {"passwort": ADMIN_PASS, "guthaben": 999.00},
         "kunde1": {"passwort": "123", "guthaben": 5.00}
     }
+
+# Session State für das Multi-Slide Studio
+if "slides_data" not in st.session_state:
+    st.session_state.slides_data = [
+        {"titel": "Folie 1: Willkommen", "text": "Hier steht der Text für Folie 1...", "prompt": "Professional corporate presentation slide background, modern clean style", "bild_url": None}
+    ]
 
 with st.sidebar:
     st.header("🔑 Konto & Login")
@@ -141,28 +147,41 @@ def bereinige_text(text):
     text = text.replace('###', '')
     return text.strip()
 
-def erstelle_saubere_pptx(textinhalt):
+def generiere_replicate_bild(prompt):
+    try:
+        headers = {
+            "Authorization": f"Bearer {IMAGE_API_KEY}",
+            "Content-Type": "application/json",
+            "Prefer": "respond-async"
+        }
+        data = {"input": {"prompt": prompt, "aspect_ratio": "16:9"}}
+        response = requests.post("https://api.replicate.com/v1/models/black-forest-labs/flux-schnell/predictions", json=data, headers=headers)
+        res_json = response.json()
+        
+        if "urls" in res_json:
+            get_url = res_json["urls"]["get"]
+            for _ in range(30):
+                s_res = requests.get(get_url, headers={"Authorization": f"Bearer {IMAGE_API_KEY}"}).json()
+                if s_res.get("status") == "succeeded":
+                    out = s_res["output"]
+                    return out[0] if isinstance(out, list) else out
+                elif s_res.get("status") == "failed":
+                    break
+                time.sleep(2)
+    except Exception:
+        pass
+    return None
+
+def erstelle_pptx_aus_session():
     prs = Presentation()
-    folien_teile = textinhalt.split("Folie")
-    for f_text in folien_teile:
-        if not f_text.strip():
-            continue
+    for slide_info in st.session_state.slides_data:
         slide_layout = prs.slide_layouts[1]
         slide = prs.slides.add_slide(slide_layout)
         title_shape = slide.shapes.title
         body_shape = slide.placeholders[1]
         
-        zeilen = f_text.strip().split("\n")
-        titel = bereinige_text(zeilen[0].replace(":", ""))
-        title_shape.text = titel if titel else "Präsentation"
-        
-        inhalt_zeilen = []
-        for z in zeilen[1:]:
-            b = bereinige_text(z)
-            if b:
-                inhalt_zeilen.append(b)
-                
-        body_shape.text = "\n".join(inhalt_zeilen)
+        title_shape.text = slide_info["titel"]
+        body_shape.text = slide_info["text"]
         
     pptx_io = BytesIO()
     prs.save(pptx_io)
@@ -175,67 +194,39 @@ if not eingeloggter_kunde or eingeloggter_kunde not in st.session_state.kunden_d
 elif eingeloggter_kunde != ADMIN_NAME and st.session_state.kunden_daten[eingeloggter_kunde]["guthaben"] <= 0:
     st.error("Dein Guthaben ist aufgebraucht. Bitte lade über das Menü links dein Konto auf.")
 else:
-    spalte_links, spalte_rechts = st.columns([1.2, 0.8])
+    spalte_links, spalte_rechts = st.columns([1.1, 0.9])
 
     with spalte_links:
-        st.subheader("🤖 KI-Arbeitsbereich (Skripte & Medien)")
+        st.subheader("🤖 KI-Agent & Text-Recherche")
         modus = st.selectbox(
-            "Was möchtest du erstellen lassen?",
-            ["Text-Recherche & Chat", "Präsentations-Struktur & Folien", "Video-Skript & Storyboard", "Profi-Präsentationsbilder (Replicate)"]
+            "Was möchtest du tun?",
+            ["Text-Recherche & Chat", "Audio / Sprachausgabe"]
         )
         
         current_chat = st.session_state.aktiver_chat
         st.markdown(f"**Aktiver Chat:** `{current_chat}`")
 
-        if modus in ["Text-Recherche & Chat", "Video-Skript & Storyboard"]:
-            for message in st.session_state.chats[current_chat]:
-                with st.chat_message(message["role"]):
-                    st.markdown(message["content"])
+        for message in st.session_state.chats[current_chat]:
+            with st.chat_message(message["role"]):
+                st.markdown(message["content"])
 
-        st.markdown("🎤 **Oder per Spracheingabe steuern:**")
-        Sprach_eingabe_chat = st.audio_input("Sprachnachricht aufnehmen", key="audio_chat")
-        
-        if Sprach_eingabe_chat is not None:
-            try:
-                client_stt = OpenAI(api_key=MASTER_OPENAI_KEY)
-                transcript = client_stt.audio.transcriptions.create(
-                    model="whisper-1",
-                    file=("audio.wav", Sprach_eingabe_chat.read())
-                )
-                aufgabe = transcript.text
-                st.info(f"Erkannter Text: \"{aufgabe}\"")
-            except Exception as e:
-                st.error(f"Spracherkennungsfehler: {e}")
-                aufgabe = None
-        else:
-            if modus in ["Text-Recherche & Chat", "Video-Skript & Storyboard"]:
-                aufgabe = st.chat_input("Stelle deine Frage oder lass dir ein Thema geben...")
-            else:
-                aufgabe_input = st.text_area("Beschreibe das gewünschte Bild für deine Präsentation:", height=120, placeholder="Z.B.: A professional modern corporate office with high-tech dashboard on screens...")
-                Absenden = st.button("🚀 Profi-Bild jetzt generieren", use_container_width=True)
-                aufgabe = aufgabe_input if Absenden else None
+        aufgabe = st.chat_input("Stelle deine Frage oder lass den Agenten für dich arbeiten...")
 
-        if aufgabe and modus != "Profi-Präsentationsbilder (Replicate)":
+        if aufgabe:
             if eingeloggter_kunde != ADMIN_NAME:
                 st.session_state.kunden_daten[eingeloggter_kunde]["guthaben"] -= 0.05
             
             try:
                 client = OpenAI(api_key=MASTER_OPENAI_KEY)
-                
                 st.session_state.chats[current_chat].append({"role": "user", "content": aufgabe})
                 with st.chat_message("user"):
                     st.markdown(aufgabe)
 
-                system_prompts = {
-                    "Text-Recherche & Chat": "Du bist ein präziser, professioneller KI-Assistent. Antworte immer auf Deutsch.",
-                    "Präsentations-Struktur & Folien": "Du bist ein Experte für Business-Präsentationen. Erstelle eine saubere Präsentation, bei der jede Folie mit 'Folie X: [Titel]' beginnt, gefolgt von prägnanten Stichpunkten. Antworte auf Deutsch.",
-                    "Video-Skript & Storyboard": "Du bist ein professioneller Videoproduzent. Erstelle ein detailliertes Video-Skript für ein Video auf Deutsch."
-                }
-                
-                messages_payload = [{"role": "system", "content": system_prompts.get(modus, "Du bist ein hilfreicher Assistent. Antworte immer auf Deutsch.")}]
+                system_prompt = "Du bist ein präziser, professioneller KI-Assistent und Business-Experte. Antworte immer auf Deutsch."
+                messages_payload = [{"role": "system", "content": system_prompt}]
                 messages_payload.extend(st.session_state.chats[current_chat])
 
-                with st.spinner("🦫 Das Arbeitstier schuftet im Hintergrund..."):
+                with st.spinner("🦫 Der KI-Agent arbeitet..."):
                     response = client.chat.completions.create(
                         model="gpt-4o-mini",
                         messages=messages_payload
@@ -245,135 +236,22 @@ else:
                     st.session_state.chats[current_chat].append({"role": "assistant", "content": antwort})
                     with st.chat_message("assistant"):
                         st.markdown(antwort)
-                        
-                        if modus == "Präsentations-Struktur & Folien":
-                            pptx_datei = erstelle_saubere_pptx(antwort)
-                            st.download_button(
-                                label="📥 PowerPoint (.pptx) herunterladen",
-                                data=pptx_datei,
-                                file_name="Scion_Mind_Praesentation.pptx",
-                                mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
-                                use_container_width=True
-                            )
-                if modus == "Präsentations-Struktur & Folien":
-                    st.rerun()
                                 
             except Exception as e:
                 st.error(f"Ein Fehler ist aufgetreten: {e}")
 
-        # Direkte Bildgenerierung im linken Arbeitsbereich, wenn gewählt
-        if modus == "Profi-Präsentationsbilder (Replicate)" and aufgabe:
-            if eingeloggter_kunde != ADMIN_NAME:
-                st.session_state.kunden_daten[eingeloggter_kunde]["guthaben"] -= 0.10
-            
-            with st.spinner("🦫 Generiere hochprofessionelles Präsentationsbild..."):
-                try:
-                    headers = {
-                        "Authorization": f"Bearer {VIDEO_API_KEY}",
-                        "Content-Type": "application/json",
-                        "Prefer": "respond-async"
-                    }
-                    # Flux Schnell Modell über Replicate für hochprofessionelle Bilder
-                    data = {"input": {"prompt": aufgabe, "aspect_ratio": "16:9"}}
-                    response = requests.post("https://api.replicate.com/v1/models/black-forest-labs/flux-schnell/predictions", json=data, headers=headers)
-                    res_json = response.json()
-                    
-                    if "urls" in res_json:
-                        get_url = res_json["urls"]["get"]
-                        img_url = None
-                        
-                        for _ in range(30):
-                            s_res = requests.get(get_url, headers={"Authorization": f"Bearer {VIDEO_API_KEY}"}).json()
-                            if s_res.get("status") == "succeeded":
-                                out = s_res["output"]
-                                img_url = out[0] if isinstance(out, list) else out
-                                break
-                            elif s_res.get("status") == "failed":
-                                break
-                            time.sleep(3)
-                            
-                        if img_url:
-                            st.success("Bild erfolgreich erstellt!")
-                            st.image(img_url, caption="Dein professionelles Präsentationsbild", use_container_width=True)
-                            
-                            # Bild-Daten zum Download bereitstellen
-                            img_data = requests.get(img_url).content
-                            st.download_button("📥 Bild herunterladen (für PowerPoint)", data=img_data, file_name="praesentation_bild.jpg", mime="image/jpeg", use_container_width=True)
-                        else:
-                            st.error("Fehler beim Generieren des Bildes.")
-                    else:
-                        st.error("API-Verbindungsfehler zu Replicate.")
-                except Exception as e:
-                    st.error(f"Fehler: {e}")
-
-    with spalte_rechts:
-        st.subheader("🎬 5-Sekunden Video-Studio (Replicate)")
-        
-        st.markdown("Erstelle präzise 5-Sekunden-Videoszenen auf Basis von MiniMax:")
-        video_prompt = st.text_area("Video-Prompt (auf Englisch):", height=100, placeholder="Z.B.: Cinematic drone shot over modern tech city...")
-        
-        if st.button("🚀 5-Sekunden Video generieren", use_container_width=True):
-            if not video_prompt:
-                st.warning("Bitte gib einen Prompt für das Video ein.")
-            else:
-                if eingeloggter_kunde != ADMIN_NAME:
-                    st.session_state.kunden_daten[eingeloggter_kunde]["guthaben"] -= 1.00
-                
-                status_text = st.empty()
-                progress_bar = st.progress(0)
-                
-                try:
-                    status_text.text("🦫 Generiere 5-Sekunden-Videoszene...")
-                    progress_bar.progress(30)
-                    
-                    headers = {
-                        "Authorization": f"Bearer {VIDEO_API_KEY}",
-                        "Content-Type": "application/json",
-                        "Prefer": "respond-async"
-                    }
-                    data = {"input": {"prompt": video_prompt}}
-                    response = requests.post("https://api.replicate.com/v1/models/minimax/video-01/predictions", json=data, headers=headers)
-                    res_json = response.json()
-                    
-                    if "urls" in res_json:
-                        get_url = res_json["urls"]["get"]
-                        v_url = None
-                        
-                        for _ in range(60):
-                            s_res = requests.get(get_url, headers={"Authorization": f"Bearer {VIDEO_API_KEY}"}).json()
-                            if s_res.get("status") == "succeeded":
-                                out = s_res["output"]
-                                v_url = out[0] if isinstance(out, list) else out
-                                break
-                            elif s_res.get("status") == "failed":
-                                break
-                            time.sleep(5)
-                            
-                        if v_url:
-                            progress_bar.progress(100)
-                            status_text.text("✅ Fertig!")
-                            st.success("Deine 5-Sekunden-Szene:")
-                            st.video(v_url)
-                        else:
-                            st.error("Fehler beim Generieren der Videoszene.")
-                    else:
-                        st.error("API-Fehler.")
-                        
-                except Exception as e:
-                    st.error(f"Fehler im Studio: {e}")
-
         st.write("---")
         st.subheader("🎧 Text als Sprache ausgeben")
-        vorlese_text = st.text_area("Text zum Vorlesen:", height=70, placeholder="Füge hier deinen Text ein...")
-        einzel_stimme = st.selectbox("Wähle eine Stimme:", ["alloy", "echo", "fable", "onyx", "nova", "shimmer"], key="einzel_stimme")
+        vorlese_text = st.text_area("Text zum Vorlesen:", height=70, placeholder="Füge hier Text ein...")
+        einzel_stimme = st.selectbox("Wähle eine Stimme:", ["alloy", "echo", "fable", "onyx", "nova", "shimmer"])
         
         if st.button("🔊 Audio generieren", use_container_width=True):
             if not vorlese_text:
-                st.warning("Bitte gib einen Text zum Vorlesen ein.")
+                st.warning("Bitte gib einen Text ein.")
             else:
                 if eingeloggter_kunde != ADMIN_NAME:
                     st.session_state.kunden_daten[eingeloggter_kunde]["guthaben"] -= 0.02
-                with st.spinner("🦫 Erstelle Sprachdatei..."):
+                with st.spinner("Erstelle Sprachdatei..."):
                     try:
                         client = OpenAI(api_key=MASTER_OPENAI_KEY)
                         response = client.audio.speech.create(model="tts-1", voice=einzel_stimme, input=vorlese_text)
@@ -381,3 +259,114 @@ else:
                         st.audio(response.content, format="audio/mp3")
                     except Exception as e:
                         st.error(f"Fehler: {e}")
+
+    with spalte_rechts:
+        st.subheader("📊 Profi-Präsentations-Studio")
+        
+        st.markdown("### ⚡ 1. Vollautomatischer Autopilot (Agent)")
+        auto_thema = st.text_input("Thema für automatische Komplett-Präsentation:", placeholder="Z.B.: Strategische Quartalsplanung 2026")
+        
+        if st.button("🚀 Vollständige Präsentation automatisch erstellen", use_container_width=True):
+            if not auto_thema:
+                st.warning("Bitte gib ein Thema ein.")
+            else:
+                if eingeloggter_kunde != ADMIN_NAME:
+                    st.session_state.kunden_daten[eingeloggter_kunde]["guthaben"] -= 2.00
+                
+                with st.spinner("🦫 Der Agent erstellt die Präsentations-Struktur und High-End Bilder..."):
+                    try:
+                        client = OpenAI(api_key=MASTER_OPENAI_KEY)
+                        # Generiere 3 professionelle Folien im JSON-artigen Textstil
+                        completion = client.chat.completions.create(
+                            model="gpt-4o-mini",
+                            messages=[
+                                {"role": "system", "content": "You are a professional presentation designer. Create exactly 3 slides. Format each slide as 'TITLE: [Title]|||TEXT: [Bullet points]|||PROMPT: [English visual image prompt]'. Separate slides with '###'."},
+                                {"role": "user", "content": auto_thema}
+                            ]
+                        )
+                        roh_text = completion.choices.message.content if hasattr(completion.choices[0], 'message') else completion.choices[0].message.content
+                        roh_folien = roh_text.split("###")
+                        
+                        neue_slides = []
+                        for f in roh_folien:
+                            if "TITLE:" in f:
+                                t_part = f.split("TITLE:")[1].split("|||")[0].strip()
+                                txt_part = f.split("TEXT:")[1].split("|||")[0].strip() if "TEXT:" in f else ""
+                                p_part = f.split("PROMPT:")[1].strip() if "PROMPT:" in f else "Professional business background"
+                                
+                                # Bild direkt über Replicate generieren
+                                bild_url = generiere_replicate_bild(p_part)
+                                neue_slides.append({"titel": t_part, "text": txt_part, "prompt": p_part, "bild_url": bild_url})
+                        
+                        if neue_slides:
+                            st.session_state.slides_data = neue_slides
+                            st.success("Komplette Präsentation erfolgreich automatisch erstellt!")
+                            st.rerun()
+                        else:
+                            st.error("Fehler bei der automatischen Generierung.")
+                    except Exception as e:
+                        st.error(f"Fehler: {e}")
+
+        st.write("---")
+        st.markdown("### 🎨 2. Folien-Studio & Vorschau (Manuell & Erweitert)")
+        st.markdown("Füge neue Folien hinzu, bearbeite Titel/Text und sieh dir die generierten Profi-Bilder im Voraus an:")
+
+        # Button zum Hinzufügen einer neuen Folie
+        if st.button("➕ Neue Folie hinzufügen"):
+            st.session_state.slides_data.append({
+                "titel": f"Folie {len(st.session_state.slides_data) + 1}: Neuer Titel",
+                "text": "Stichpunkt 1\nStichpunkt 2",
+                "prompt": "Professional modern slide background",
+                "bild_url": None
+            })
+            st.rerun()
+
+        # Tabs für jede einzelne Folie
+        folien_tabs = st.tabs([f"Folie {i+1}" for i in range(len(st.session_state.slides_data))])
+
+        for idx, tab in enumerate(folien_tabs):
+            with tab:
+                slide = st.session_state.slides_data[idx]
+                
+                # Manuelle Bearbeitung
+                neuer_titel = st.text_input("Folientitel:", value=slide["titel"], key=f"titel_{idx}")
+                neuer_text = st.text_area("Inhalt / Stichpunkte:", value=slide["text"], key=f"text_{idx}", height=80)
+                neuer_prompt = st.text_input("Bild-Prompt (Englisch für Replicate):", value=slide["prompt"], key=f"prompt_{idx}")
+                
+                st.session_state.slides_data[idx]["titel"] = neuer_titel
+                st.session_state.slides_data[idx]["text"] = neuer_text
+                st.session_state.slides_data[idx]["prompt"] = neuer_prompt
+
+                col_b1, col_b2 = st.columns(2)
+                with col_b1:
+                    if st.button(f"🖼️ Bild für Folie {idx+1} generieren", key=f"gen_img_{idx}"):
+                        if eingeloggter_kunde != ADMIN_NAME:
+                            st.session_state.kunden_daten[eingeloggter_kunde]["guthaben"] -= 0.10
+                        with st.spinner("Generiere Bild..."):
+                            url = generiere_replicate_bild(neuer_prompt)
+                            st.session_state.slides_data[idx]["bild_url"] = url
+                            st.rerun()
+                
+                with col_b2:
+                    if len(st.session_state.slides_data) > 1:
+                        if st.button(f"🗑️ Folie {idx+1} löschen", key=f"del_slide_{idx}"):
+                            st.session_state.slides_data.pop(idx)
+                            st.rerun()
+
+                # Vorschau des Bildes
+                if slide["bild_url"]:
+                    st.markdown("**Vorschau des generierten Bildes:**")
+                    st.image(slide["bild_url"], use_container_width=True)
+                else:
+                    st.info("Noch kein Bild für diese Folie generiert.")
+
+        st.write("---")
+        # Download als PowerPoint
+        pptx_datei = erstelle_pptx_aus_session()
+        st.download_button(
+            label="📥 Vollständige Präsentation (.pptx) herunterladen",
+            data=pptx_datei,
+            file_name="Scion_Mind_Profi_Praesentation.pptx",
+            mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            use_container_width=True
+        )
