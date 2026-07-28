@@ -5,6 +5,7 @@ from io import BytesIO
 import re
 import requests
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from reportlab.lib.pagesizes import A4, landscape
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image as RLImage, PageBreak
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -29,7 +30,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("Scion Mind - Enterprise Autonomes Agenten-Studio")
-st.markdown("*designed by Christian Schmidt | Powered by A2A & Realtime AI*")
+st.markdown("*designed by Christian Schmidt | Powered by 4er-A2A & High-Speed Multi-Threading*")
 st.write("---")
 
 MASTER_OPENAI_KEY = st.secrets["OPENAI_API_KEY"]
@@ -49,7 +50,6 @@ if "slides_data" not in st.session_state:
         {"titel": "Folie 1: Willkommen", "text": "Hier steht der Text für Folie 1...", "prompt": "Professional corporate presentation slide background, modern clean style", "bild_url": None}
     ]
 
-# Initialisierung für Proaktive Assistenz (Simulierter Ticket-Monitor)
 if "proaktive_tickets" not in st.session_state:
     st.session_state.proaktive_tickets = [
         {"id": "INC-4091", "system": "ERP Server", "status": "Kritisch: Hohe Latenz gemeldet", "loesung_bereit": False},
@@ -149,6 +149,19 @@ with st.sidebar:
         if st.button(chat_name, key=f"btn_{chat_name}"):
             st.session_state.aktiver_chat = chat_name
             st.rerun()
+
+@st.cache_data(show_spinner=False)
+def get_cached_ai_response(model_name, system_content, user_content):
+    """Intelligentes Caching für wiederkehrende Analyse-Schritte"""
+    client = OpenAI(api_key=MASTER_OPENAI_KEY)
+    response = client.chat.completions.create(
+        model=model_name,
+        messages=[
+            {"role": "system", "content": system_content},
+            {"role": "user", "content": user_content}
+        ]
+    )
+    return response.choices[0].message.content
 
 def generiere_replicate_bild_mit_selbstcheck(prompt):
     for versuch in range(2):
@@ -293,7 +306,6 @@ else:
             except Exception as e:
                 st.error(f"Ein Fehler ist aufgetreten: {e}")
 
-        # Proaktiver System-Monitor Ansicht im linken Bereich
         if modus == "Proaktiver System-Monitor (KI-Wächter)":
             st.markdown("### 🛡️ Autonomer Hintergrund-Wächter")
             st.markdown("Der Agent überwacht im Hintergrund ERP-Systeme, Server und Support-Tickets auf Unregelmäßigkeiten:")
@@ -314,13 +326,16 @@ else:
                 st.info("Alle Systeme im grünen Bereich. Keine neuen Anomalien gefunden.")
 
     with spalte_rechts:
-        # 1. EXPANDER: Präsentations- & Dokumenten-Studio (Multi-Agenten A2A)
+        # EXPANDER 1: Präsentations- & Dokumenten-Studio mit optimalem 4er-Fließband & Multi-Threading
         with st.expander("📊 Autonomes Präsentations- & Dokumenten-Studio öffnen", expanded=False):
-            st.markdown("### ⚡ Multi-Agenten-Autopilot (A2A)")
+            st.markdown("### ⚡ Optimales 4er-Fließband (A2A)")
             auto_thema = st.text_input("Ziel / Thema für die Präsentation:", placeholder="Z.B.: Marktanalyse & Strategie 2026")
             anzahl_folien = st.slider("Autonome Anzahl der Folien:", min_value=2, max_value=10, value=4)
             
-            if st.button("🚀 A2A-Workflow komplett starten", use_container_width=True):
+            modell_wahl = st.selectbox("Wähle das KI-Modell:", ["gpt-4o-mini (Blitzschnell & Effizient)", "gpt-4o (Maximale Tiefe & Analyse)"])
+            aktiviertes_modell = "gpt-4o-mini" if "mini" in modell_wahl else "gpt-4o"
+
+            if st.button("🚀 4er-A2A-Workflow komplett starten", use_container_width=True):
                 if not auto_thema:
                     st.warning("Bitte gib ein Thema ein.")
                 else:
@@ -331,59 +346,68 @@ else:
                     progress_bar = st.progress(0)
                     
                     try:
-                        client = OpenAI(api_key=MASTER_OPENAI_KEY)
-                        
-                        status_box.text(" Agent 1/3 (Autonomer Web-Scraper): Holt Live-Daten ein...")
-                        progress_bar.progress(20)
-                        
-                        recherche_prompt = client.chat.completions.create(
-                            model="gpt-4o-mini",
-                            messages=[
-                                {"role": "system", "content": "Du bist ein autonomer Web-Scraping-Agent. Simuliere präzise Marktdaten und aktuelle Fakten."},
-                                {"role": "user", "content": auto_thema}
-                            ]
-                        ).choices[0].message.content
+                        # SCHRITT 1: Agent 1 (Researcher / Scout)
+                        status_box.text(" Agent 1/4 (Researcher / Scout): Durchsucht Live-Web & Datenbanken...")
+                        progress_bar.progress(15)
+                        recherche_ergebnis = get_cached_ai_response(
+                            aktiviertes_modell,
+                            "Du bist Agent 1 (Researcher/Scout). Sammle harte Fakten, Markttrends und Daten zum Thema.",
+                            auto_thema
+                        )
 
-                        status_box.text(" Agent 2/3 (Struktur): Baut das digitale Folien-Fließband auf...")
-                        progress_bar.progress(50)
+                        # SCHRITT 2: Agent 2 (Stratege / Architekt)
+                        status_box.text(" Agent 2/4 (Stratege / Architekt): Baut das logische Storyboard-Gerüst...")
+                        progress_bar.progress(35)
+                         storyboard_ergebnis = get_cached_ai_response(
+                            aktiviertes_modell,
+                            f"Du bist Agent 2 (Stratege/Architekt). Basierend auf diesen Fakten: '{recherche_ergebnis}', erstelle das logische Inhaltsgerüst für genau {anzahl_folien} Folien.",
+                            auto_thema
+                        )
+
+                        # SCHRITT 3: Agent 3 (Copywriter / Redakteur)
+                        status_box.text(" Agent 3/4 (Copywriter / Redakteur): Formuliert verkaufsstarke Bullet-Points...")
+                        progress_bar.progress(60)
                         
                         system_instruction = (
-                            f"You are a presentation structuring agent. Based on these research facts: '{recherche_prompt}', create exactly {anzahl_folien} structured slides. "
+                            f"You are Agent 3 (Copywriter). Based on this structure: '{storyboard_ergebnis}', format exactly {anzahl_folien} slides. "
                             "Format each slide strictly as 'TITLE: [Title]|||TEXT: [Bullet points]|||PROMPT: [English visual image prompt]'. "
                             "Separate slides with '###'."
                         )
-                        
-                        completion = client.chat.completions.create(
-                            model="gpt-4o-mini",
-                            messages=[
-                                {"role": "system", "content": system_instruction},
-                                {"role": "user", "content": auto_thema}
-                            ]
-                        )
-                        roh_text = completion.choices[0].message.content
+                        roh_text = get_cached_ai_response(aktiviertes_modell, system_instruction, auto_thema)
                         roh_folien = roh_text.split("###")
+
+                        # SCHRITT 4: Agent 4 (Art Director / Designer) & Asynchrone Bildgenerierung (Multi-Threading)
+                        status_box.text(" Agent 4/4 (Art Director / Designer): Generiert High-End Bilder parallel via Multi-Threading...")
+                        progress_bar.progress(85)
                         
-                        status_box.text(" Agent 3/3 (Grafik & Qualität): Generiert High-End Bilder und prüft das Ergebnis...")
-                        progress_bar.progress(80)
-                        
-                        neue_slides = []
+                        parsed_slides_raw = []
                         for f in roh_folien:
                             if "TITLE:" in f:
                                 try:
                                     t_part = f.split("TITLE:")[1].split("|||")[0].strip()
                                     txt_part = f.split("TEXT:")[1].split("|||")[0].strip() if "TEXT:" in f else ""
                                     p_part = f.split("PROMPT:")[1].strip() if "PROMPT:" in f else "Professional business background"
-                                    
-                                    bild_url = generiere_replicate_bild_mit_selbstcheck(p_part)
-                                    neue_slides.append({"titel": t_part, "text": txt_part, "prompt": p_part, "bild_url": bild_url})
+                                    parsed_slides_raw.append({"titel": t_part, "text": txt_part, "prompt": p_part})
                                 except Exception:
                                     continue
-                        
+
+                        # Asynchrone Parallelisierung (ThreadPoolExecutor) für Höchstgeschwindigkeit bei Bildern
+                        neue_slides = [None] * len(parsed_slides_raw)
+                        def process_slide(index, slide_item):
+                            bild_url = generiere_replicate_bild_mit_selbstcheck(slide_item["prompt"])
+                            return index, {"titel": slide_item["titel"], "text": slide_item["text"], "prompt": slide_item["prompt"], "bild_url": bild_url}
+
+                        with ThreadPoolExecutor(max_workers=5) as executor:
+                            futures = [executor.submit(process_slide, idx, s) for idx, s in enumerate(parsed_slides_raw)]
+                            for future in as_completed(futures):
+                                idx, res = future.result()
+                                neue_slides[idx] = res
+
                         if neue_slides:
                             progress_bar.progress(100)
-                            status_box.text(" A2A-Fließband erfolgreich durchgelaufen!")
+                            status_box.text(" 4er-Fließband in Rekordzeit abgeschlossen!")
                             st.session_state.slides_data = neue_slides
-                            st.success("Komplette Präsentation vollautomatisch erstellt!")
+                            st.success("Komplette Präsentation vollautomatisch & parallel erstellt!")
                             st.rerun()
                         else:
                             st.error("Fließband-Fehler bei der Generierung.")
@@ -461,12 +485,11 @@ else:
                     use_container_width=True
                 )
 
-        # 2. EXPANDER: Echtzeit-Sprachagent (Voice Agent) & Audio-Generator
+        # EXPANDER 2: Echtzeit-Sprachagent & Audio-Generator
         with st.expander("🎙️ Echtzeit-Sprachagent (Voice Agent) & Audio", expanded=False):
             st.markdown("### ⚡ Live-Sprachchat (Voice Interface)")
             st.markdown("Nutze das Echtzeit-Audio-Widget, um direkt per Mikrofon mit dem Agenten zu sprechen:")
             
-            # Integration des nativen Streamlit Audio-Inputs für den Live-Voice-Agenten
             live_audio = st.audio_input("Sprich jetzt mit deinem Voice Agenten:")
             if live_audio is not None:
                 with st.spinner("Voice Agent verarbeitet Audio in Echtzeit..."):
@@ -479,7 +502,6 @@ else:
                         spoken_text = transcript_res.text
                         st.info(f"Du hast gesagt: \"{spoken_text}\"")
                         
-                        # Generiere direkte Antwort als Sprache zurück
                         speech_res = client_voice.audio.speech.create(
                             model="tts-1",
                             voice="alloy",
