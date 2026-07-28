@@ -29,8 +29,8 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("Scion Mind - Enterprise Autonomes Agenten-Studio")
-st.markdown("*designed by Christian Schmidt | Powered by 4er-A2A & High-Speed Multi-Threading*")
+st.title("Scion Mind - Enterprise Agent-Studio")
+st.markdown("*designed by Christian Schmidt*")
 st.write("---")
 
 MASTER_OPENAI_KEY = st.secrets["OPENAI_API_KEY"]
