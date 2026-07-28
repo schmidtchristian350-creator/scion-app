@@ -5,8 +5,6 @@ from io import BytesIO
 import re
 import requests
 import time
-import os
-from moviepy.editor import VideoFileClip, AudioFileClip, concatenate_videoclips
 
 st.set_page_config(page_title="Scion Mind", layout="wide")
 
@@ -266,7 +264,7 @@ else:
     with spalte_rechts:
         st.subheader("🎬 60-Sekunden Multi-Szenen Studio")
         
-        st.markdown("Gib bis zu 4 verschiedene Szenen-Prompts ein, die nacheinander abgespielt werden sollen:")
+        st.markdown("Generiere nacheinander bis zu 4 Szenen und die passende Tonspur für deinen Film:")
         scene1 = st.text_area("Szene 1 (Englischer Prompt):", height=60, placeholder="Z.B.: Cinematic intro shot...")
         scene2 = st.text_area("Szene 2 (Englischer Prompt):", height=60, placeholder="Z.B.: Close-up action shot...")
         scene3 = st.text_area("Szene 3 (Englischer Prompt):", height=60, placeholder="Z.B.: Product feature view...")
@@ -275,7 +273,7 @@ else:
         sprechender_text = st.text_area("Gesamter Sprechtext für die 60-Sekunden-Tonspur:", height=100, placeholder="Füge hier deinen vollständigen Text ein...")
         stimme = st.selectbox("Sprecher-Stimme:", ["alloy", "echo", "fable", "onyx", "nova", "shimmer"])
         
-        if st.button("🚀 60-Sekunden Film komplett generieren & verschmelzen", use_container_width=True):
+        if st.button("🚀 60-Sekunden Audio & Szenen generieren", use_container_width=True):
             prompts = [s for s in [scene1, scene2, scene3, scene4] if s.strip()]
             if not prompts or not sprechender_text:
                 st.warning("Bitte fülle mindestens eine Szene und den Sprechtext aus.")
@@ -297,23 +295,15 @@ else:
                         voice=stimme,
                         input=sprechender_text
                     )
-                    audio_path = "final_audio.mp3"
-                    with open(audio_path, "wb") as f:
-                        f.write(audio_response.content)
+                    audio_bytes = audio_response.content
                     
-                    audio_clip = AudioFileClip(audio_path)
-                    total_audio_duration = audio_clip.duration
-                    
-                    # Berechne, wie lang jede Videoszene sein muss, damit sie sich perfekt aufteilen
-                    scene_duration = total_audio_duration / len(prompts)
-                    
-                    video_clip_paths = []
                     headers = {
                         "Authorization": f"Bearer {VIDEO_API_KEY}",
                         "Content-Type": "application/json",
                         "Prefer": "respond-async"
                     }
                     
+                    video_urls = []
                     # 2. Jede Szene einzeln bei Replicate generieren
                     for idx, prompt in enumerate(prompts):
                         status_text.text(f"🦫 Generiere Szene {idx+1} von {len(prompts)}...")
@@ -340,40 +330,21 @@ else:
                             time.sleep(5)
                             
                         if v_url:
-                            # Videodatei herunterladen
-                            v_data = requests.get(v_url).content
-                            v_path = f"scene_{idx}.mp4"
-                            with open(v_path, "wb") as vf:
-                                vf.write(v_data)
-                            video_clip_paths.append(v_path)
+                            video_urls.append(v_url)
                     
-                    if video_clip_paths:
-                        status_text.text("🦫 Verschmelze Szenen & passe Länge an...")
-                        progress_bar.progress(85)
-                        
-                        # 3. Mit MoviePy die Clips auf die richtige Länge bringen und aneinanderhängen
-                        loaded_clips = []
-                        for path in video_clip_paths:
-                            clip = VideoFileClip(path)
-                            # Schleife oder Anpassung, damit es zur Szenenlänge passt
-                            looped_clip = clip.loop(duration=scene_duration)
-                            loaded_clips.append(looped_clip)
-                            
-                        final_video = concatenate_videoclips(loaded_clips)
-                        # Tonspur drunterlegen
-                        final_video = final_video.set_audio(audio_clip)
-                        
-                        final_output_path = "final_output_video.mp4"
-                        final_video.write_videofile(final_output_path, codec="libx264", audio_codec="aac", fps=24, logger=None)
-                        
+                    if video_urls:
                         progress_bar.progress(100)
-                        status_text.text("✅ Dein 60-Sekunden-Film ist fertig!")
+                        status_text.text("✅ Dein Multi-Szenen-Film ist bereit!")
                         
-                        st.success("Hier ist dein fertiges, zusammengefügtes Video mit synchronem Ton:")
-                        st.video(final_output_path)
+                        st.success("Hier ist deine 60-Sekunden Tonspur und deine generierten Videoszenen nacheinander:")
                         
-                        with open(final_output_path, "rb") as f:
-                            st.download_button("📥 Film herunterladen (.mp4)", f, file_name="Scion_Mind_Film.mp4", mime="video/mp4", use_container_width=True)
+                        st.markdown("### 🔊 Komplette 60-Sekunden Tonspur:")
+                        st.audio(audio_bytes, format="audio/mp3")
+                        
+                        st.markdown("### 🎬 Generierte Videoszenen (folge einfach Szene 1 bis 4):")
+                        for i, v_url in enumerate(video_urls):
+                            st.markdown(f"**Szene {i+1}:**")
+                            st.video(v_url)
                     else:
                         st.error("Fehler beim Generieren der Videoszenen.")
                         
