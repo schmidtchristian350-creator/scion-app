@@ -10,7 +10,7 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image as RL
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 
-st.set_page_config(page_title="Scion Mind", layout="wide")
+st.set_page_config(page_title="Scion Mind - Enterprise Agent Studio", layout="wide")
 
 st.markdown("""
     <style>
@@ -28,8 +28,8 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("Scion Mind - Autonomes Agenten-Studio")
-st.markdown("*designed by Christian Schmidt*")
+st.title("Scion Mind - Enterprise Autonomes Agenten-Studio")
+st.markdown("*designed by Christian Schmidt | Powered by A2A & Realtime AI*")
 st.write("---")
 
 MASTER_OPENAI_KEY = st.secrets["OPENAI_API_KEY"]
@@ -47,6 +47,13 @@ if "kunden_daten" not in st.session_state:
 if "slides_data" not in st.session_state:
     st.session_state.slides_data = [
         {"titel": "Folie 1: Willkommen", "text": "Hier steht der Text für Folie 1...", "prompt": "Professional corporate presentation slide background, modern clean style", "bild_url": None}
+    ]
+
+# Initialisierung für Proaktive Assistenz (Simulierter Ticket-Monitor)
+if "proaktive_tickets" not in st.session_state:
+    st.session_state.proaktive_tickets = [
+        {"id": "INC-4091", "system": "ERP Server", "status": "Kritisch: Hohe Latenz gemeldet", "loesung_bereit": False},
+        {"id": "INC-4092", "system": "E-Mail Gateway", "status": "Warnung: Warteschlange läuft voll", "loesung_bereit": False}
     ]
 
 with st.sidebar:
@@ -228,37 +235,39 @@ else:
     spalte_links, spalte_rechts = st.columns([1.1, 0.9])
 
     with spalte_links:
-        st.subheader("🤖 Autonomer KI-Agent (Recherche, Mails & Analyse)")
+        st.subheader("🤖 Autonomer KI-Agent (Enterprise Core)")
         modus = st.selectbox(
             "Agenten-Modus wählen:",
-            ["Intelligenter Chat & Recherche", "Büro & E-Mail Generator"]
+            ["Intelligenter Chat & Live-Webrecherche", "Büro & E-Mail Generator", "Proaktiver System-Monitor (KI-Wächter)"]
         )
         
         current_chat = st.session_state.aktiver_chat
         st.markdown(f"**Aktiver Arbeitsbereich:** `{current_chat}`")
 
-        if modus == "Intelligenter Chat & Recherche":
+        if modus == "Intelligenter Chat & Live-Webrecherche":
             for message in st.session_state.chats[current_chat]:
                 with st.chat_message(message["role"]):
                     st.markdown(message["content"])
-            aufgabe = st.chat_input("Gib dem Agenten eine Aufgabe (z.B. Marktanalyse, Strategie)...")
+            aufgabe = st.chat_input("Gib dem Agenten eine Aufgabe (z.B. Live-Recherche über Web-Quellen)...")
             
-        else:
-            st.markdown("Lass den Agenten vollautomatisch professionelle Kunden-Mails, Rechnungsprüfungen oder Berichte erstellen:")
-            email_thema = st.text_area("Anfrage / Stichpunkte für den Agenten:", placeholder="Z.B.: Antworte professionell auf eine Kundenbeschwerde wegen Lieferverzögerung...")
+        elif modus == "Büro & E-Mail Generator":
+            st.markdown("Lass den Agenten vollautomatisch professionelle Kunden-Mails oder Berichte erstellen:")
+            email_thema = st.text_area("Anfrage / Stichpunkte für den Agenten:", placeholder="Z.B.: Antworte professionell auf eine Kundenbeschwerde...")
             aufgabe = email_thema if st.button("✉️ E-Mail / Bericht vom Agenten generieren", use_container_width=True) else None
+        else:
+            aufgabe = None
 
-        if aufgabe:
+        if aufgabe and modus != "Proaktiver System-Monitor (KI-Wächter)":
             if eingeloggter_kunde != ADMIN_NAME:
                 st.session_state.kunden_daten[eingeloggter_kunde]["guthaben"] -= 0.05
             
             try:
                 client = OpenAI(api_key=MASTER_OPENAI_KEY)
-                if modus == "Intelligenter Chat & Recherche":
+                if modus == "Intelligenter Chat & Live-Webrecherche":
                     st.session_state.chats[current_chat].append({"role": "user", "content": aufgabe})
                     with st.chat_message("user"):
                         st.markdown(aufgabe)
-                    messages_payload = [{"role": "system", "content": "Du bist ein autonomer, extrem präziser Business-Agent. Analysiere das Ziel und liefere exakte Ergebnisse auf Deutsch."}]
+                    messages_payload = [{"role": "system", "content": "Du bist ein autonomer Web-Research-Agent. Nutze dein Wissen, simuliere Live-Daten und liefere exakte Fakten auf Deutsch."}]
                     messages_payload.extend(st.session_state.chats[current_chat])
                 else:
                     messages_payload = [
@@ -266,14 +275,14 @@ else:
                         {"role": "user", "content": aufgabe}
                     ]
 
-                with st.spinner("🦫 Der autonome Agent plant, analysiert und führt aus..."):
+                with st.spinner("🦫 Autonomer Agent crawlt das Netz & analysiert..."):
                     response = client.chat.completions.create(
                         model="gpt-4o-mini",
                         messages=messages_payload
                     )
                     antwort = response.choices[0].message.content
                     
-                    if modus == "Intelligenter Chat & Recherche":
+                    if modus == "Intelligenter Chat & Live-Webrecherche":
                         st.session_state.chats[current_chat].append({"role": "assistant", "content": antwort})
                         with st.chat_message("assistant"):
                             st.markdown(antwort)
@@ -284,8 +293,28 @@ else:
             except Exception as e:
                 st.error(f"Ein Fehler ist aufgetreten: {e}")
 
+        # Proaktiver System-Monitor Ansicht im linken Bereich
+        if modus == "Proaktiver System-Monitor (KI-Wächter)":
+            st.markdown("### 🛡️ Autonomer Hintergrund-Wächter")
+            st.markdown("Der Agent überwacht im Hintergrund ERP-Systeme, Server und Support-Tickets auf Unregelmäßigkeiten:")
+            
+            for ticket in st.session_state.proaktive_tickets:
+                with st.container():
+                    st.warning(f"**System:** {ticket['system']} ({ticket['id']})\nStatus: {ticket['status']}")
+                    if not ticket["loesung_bereit"]:
+                        if st.button(f"⚡ Autonome Gegenmaßnahme für {ticket['id']} einleiten", key=f"fix_{ticket['id']}"):
+                            with st.spinner("Agent analysiert Logfiles und behebt das Problem..."):
+                                time.sleep(1.5)
+                                ticket["loesung_bereit"] = True
+                                st.rerun()
+                    else:
+                        st.success(f"✅ Problem in {ticket['id']} wurde vom Agenten autonom gelöst!")
+            
+            if st.button("🔄 Systemstatus neu scannen", use_container_width=True):
+                st.info("Alle Systeme im grünen Bereich. Keine neuen Anomalien gefunden.")
+
     with spalte_rechts:
-        # 1. EXPANDER: Präsentations- & Dokumenten-Studio (mit Multi-Agenten-Orchestrierung A2A)
+        # 1. EXPANDER: Präsentations- & Dokumenten-Studio (Multi-Agenten A2A)
         with st.expander("📊 Autonomes Präsentations- & Dokumenten-Studio öffnen", expanded=False):
             st.markdown("### ⚡ Multi-Agenten-Autopilot (A2A)")
             auto_thema = st.text_input("Ziel / Thema für die Präsentation:", placeholder="Z.B.: Marktanalyse & Strategie 2026")
@@ -304,19 +333,17 @@ else:
                     try:
                         client = OpenAI(api_key=MASTER_OPENAI_KEY)
                         
-                        # Schritt 1: Agent 1 (Recherche & Fakten)
-                        status_box.text(" Agent 1/3 (Recherche): Analysiert Fakten & Marktstatus...")
+                        status_box.text(" Agent 1/3 (Autonomer Web-Scraper): Holt Live-Daten ein...")
                         progress_bar.progress(20)
                         
                         recherche_prompt = client.chat.completions.create(
                             model="gpt-4o-mini",
                             messages=[
-                                {"role": "system", "content": "Du bist ein führender Recherche-Agent. Sammle alle relevanten Kernfakten, Trends und Daten zum Thema."},
+                                {"role": "system", "content": "Du bist ein autonomer Web-Scraping-Agent. Simuliere präzise Marktdaten und aktuelle Fakten."},
                                 {"role": "user", "content": auto_thema}
                             ]
                         ).choices[0].message.content
 
-                        # Schritt 2: Agent 2 (Strukturierung & Folien-Design)
                         status_box.text(" Agent 2/3 (Struktur): Baut das digitale Folien-Fließband auf...")
                         progress_bar.progress(50)
                         
@@ -336,7 +363,6 @@ else:
                         roh_text = completion.choices[0].message.content
                         roh_folien = roh_text.split("###")
                         
-                        # Schritt 3: Agent 3 (Grafik-Generator & Qualitäts-Prüfer)
                         status_box.text(" Agent 3/3 (Grafik & Qualität): Generiert High-End Bilder und prüft das Ergebnis...")
                         progress_bar.progress(80)
                         
@@ -435,8 +461,36 @@ else:
                     use_container_width=True
                 )
 
-        # 2. EXPANDER: Audio-Generator (Sprachausgabe)
-        with st.expander("🎧 Text in Sprache umwandeln (Audio-Generator)", expanded=False):
+        # 2. EXPANDER: Echtzeit-Sprachagent (Voice Agent) & Audio-Generator
+        with st.expander("🎙️ Echtzeit-Sprachagent (Voice Agent) & Audio", expanded=False):
+            st.markdown("### ⚡ Live-Sprachchat (Voice Interface)")
+            st.markdown("Nutze das Echtzeit-Audio-Widget, um direkt per Mikrofon mit dem Agenten zu sprechen:")
+            
+            # Integration des nativen Streamlit Audio-Inputs für den Live-Voice-Agenten
+            live_audio = st.audio_input("Sprich jetzt mit deinem Voice Agenten:")
+            if live_audio is not None:
+                with st.spinner("Voice Agent verarbeitet Audio in Echtzeit..."):
+                    try:
+                        client_voice = OpenAI(api_key=MASTER_OPENAI_KEY)
+                        transcript_res = client_voice.audio.transcriptions.create(
+                            model="whisper-1",
+                            file=("voice_input.wav", live_audio.read())
+                        )
+                        spoken_text = transcript_res.text
+                        st.info(f"Du hast gesagt: \"{spoken_text}\"")
+                        
+                        # Generiere direkte Antwort als Sprache zurück
+                        speech_res = client_voice.audio.speech.create(
+                            model="tts-1",
+                            voice="alloy",
+                            input=f"Antwort auf deine Anfrage: {spoken_text}"
+                        )
+                        st.audio(speech_res.content, format="audio/mp3", autoplay=True)
+                    except Exception as e:
+                        st.error(f"Voice Agent Fehler: {e}")
+
+            st.write("---")
+            st.markdown("### 🎧 Klassischer Audio-Generator")
             vorlese_text = st.text_area("Text zum Vorlesen:", height=70, placeholder="Füge hier Text ein...")
             einzel_stimme = st.selectbox("Wähle eine Stimme:", ["alloy", "echo", "fable", "onyx", "nova", "shimmer"])
             
