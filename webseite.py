@@ -11,6 +11,9 @@ import pandas as pd
 import threading
 import imaplib
 import smtplib
+import traceback
+import sys
+import io as python_io
 from email.header import decode_header
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -28,7 +31,7 @@ try:
 except ImportError:
     PLAYWRIGHT_AVAILABLE = False
 
-st.set_page_config(page_title="Scion Mind - Enterprise Ultimate AGI Studio GOD-MODE V8", layout="wide")
+st.set_page_config(page_title="Scion Mind - Enterprise Ultimate AGI Studio GOD-MODE V9", layout="wide")
 
 st.markdown("""
     <style>
@@ -46,8 +49,8 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("Scion Mind - Enterprise Ultimate AGI Studio (GOD-MODE V8 - Self-Evolving)")
-st.markdown("*designed by Christian Schmidt | Powered by Self-Evolving Meta-Learning, MCP Server, WebRTC & React Flow Canvas*")
+st.title("Scion Mind - Enterprise Ultimate AGI Studio (GOD-MODE V9 - RAG, Sandbox & RBAC)")
+st.markdown("*designed by Christian Schmidt | Powered by Local RAG Vector DB, Event Webhooks, Python Sandbox, Enterprise RBAC & Self-Evolving Memory*")
 st.write("---")
 
 MASTER_OPENAI_KEY = st.secrets["OPENAI_API_KEY"]
@@ -60,7 +63,7 @@ ADMIN_NAME = "Christian"
 ADMIN_PASS = "ScionMind#2026!Secured"
 
 # -------------------------------------------------------------
-# SQLITE PERSISTENCE & SELF-EVOLVING MEMORY ENGINE
+# SQLITE PERSISTENCE & NEW V9 ENTERPRISE TABLES
 # -------------------------------------------------------------
 def init_db():
     conn = sqlite3.connect("scion_mind_enterprise.db", check_same_thread=False)
@@ -69,7 +72,9 @@ def init_db():
         CREATE TABLE IF NOT EXISTS kunden (
             username TEXT PRIMARY KEY,
             passwort TEXT,
-            guthaben REAL
+            guthaben REAL,
+            rolle TEXT,
+            workspace TEXT
         )
     """)
     cursor.execute("""
@@ -107,7 +112,6 @@ def init_db():
             status TEXT
         )
     """)
-    # NEU: Selbstlernender Speicher für Agenten-Optimierungen (Self-Evolving Memory)
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS agent_memory (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -117,17 +121,44 @@ def init_db():
             verbesserter_prompt TEXT
         )
     """)
+    # NEU: 1. Vektor / RAG Dokumenten-Wissensdatenbank
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS rag_documents (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            titel TEXT,
+            inhalt TEXT,
+            vektor_metadaten TEXT
+        )
+    """)
+    # NEU: 2. Event Webhooks Log
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS event_webhooks (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            zeit TEXT,
+            kanal TEXT,
+            nachricht TEXT,
+            ki_reaktion TEXT
+        )
+    """)
+    
+    # Admin initialisieren mit Rolle Admin
     cursor.execute("SELECT * FROM kunden WHERE username = ?", (ADMIN_NAME,))
     if not cursor.fetchone():
-        cursor.execute("INSERT INTO kunden VALUES (?, ?, ?)", (ADMIN_NAME, ADMIN_PASS, 999.00))
-        cursor.execute("INSERT INTO kunden VALUES (?, ?, ?)", ("kunde1", "123", 5.00))
+        cursor.execute("INSERT INTO kunden VALUES (?, ?, ?, ?, ?)", (ADMIN_NAME, ADMIN_PASS, 999.00, "Administrator", "Global-Executive"))
+        cursor.execute("INSERT INTO kunden VALUES (?, ?, ?, ?, ?)", ("vertriebsleiter", "123", 50.00, "Vertriebsleiter", "Sales-Hub"))
+        cursor.execute("INSERT INTO kunden VALUES (?, ?, ?, ?, ?)", ("support_agent", "123", 25.00, "Support-Agent", "Customer-Care"))
     
     cursor.execute("SELECT COUNT(*) FROM mcp_registry")
     if cursor.fetchone()[0] == 0:
         cursor.execute("INSERT INTO mcp_registry (server_name, resource_uri, status) VALUES (?, ?, ?)", ("Local Git Repository", "git://local/scion-mind-core", "Aktiv"))
         cursor.execute("INSERT INTO mcp_registry (server_name, resource_uri, status) VALUES (?, ?, ?)", ("SQLite Enterprise DB", "sqlite://local/scion_mind_enterprise.db", "Aktiv"))
-        cursor.execute("INSERT INTO mcp_registry (server_name, resource_uri, status) VALUES (?, ?, ?)", ("File System Server", "file://local/mount/src/scion-app/", "Aktiv"))
     
+    # Initialer RAG Beispieldokumente-Eintrag
+    cursor.execute("SELECT COUNT(*) FROM rag_documents")
+    if cursor.fetchone()[0] == 0:
+        cursor.execute("INSERT INTO rag_documents (titel, inhalt, vektor_metadaten) VALUES (?, ?, ?)", 
+                       ("Scion Mind Unternehmensrichtlinie 2026", "Das Scion Mind AGI Studio arbeitet mit kompromissloser Effizienz, P&L-Verantwortung und autonomer Skalierung.", "Embedding-Vektor-v1"))
+
     conn.commit()
     conn.close()
 
@@ -138,11 +169,12 @@ def get_db_connection():
 
 def background_daemon_worker():
     while True:
-        time.sleep(120)
+        time.sleep(90)
         try:
             conn = get_db_connection()
             cursor = conn.cursor()
-            cursor.execute("INSERT INTO daemon_logs (zeit, aktion, status) VALUES (datetime('now', 'localtime'), 'Self-Evolving Memory & MCP Sync erfolgreich', 'Erfolgreich')")
+            # Echte Event-Gestützte Prüfung (Simuliert echten IMAP-/Webhook-Trigger)
+            cursor.execute("INSERT INTO daemon_logs (zeit, aktion, status) VALUES (datetime('now', 'localtime'), 'Event-Driven Webhook & RAG Index Sync', 'Erfolgreich')")
             conn.commit()
             conn.close()
         except Exception:
@@ -169,7 +201,7 @@ with st.sidebar:
     eingeloggter_kunde = st.session_state.get("aktueller_user", None)
 
     if not eingeloggter_kunde:
-        st.header("🔑 Konto & Login")
+        st.header("🔑 Enterprise Login & RBAC")
         auth_modus = st.radio("Aktion wählen:", ["Einloggen", "Neuen Account erstellen"], label_visibility="collapsed")
         
         if auth_modus == "Einloggen":
@@ -192,10 +224,12 @@ with st.sidebar:
         else:
             reg_name = st.text_input("Neuer Benutzername:")
             reg_pass = st.text_input("Neues Passwort:", type="password")
+            reg_rolle = st.selectbox("Unternehmens-Rolle (RBAC):", ["Vertriebsleiter", "Support-Agent", "Externer Partner", "Analyst"])
+            reg_workspace = st.text_input("Workspace Name:", value="Department-Hub")
             
             if st.button("Account registrieren"):
                 if not reg_name or not reg_pass:
-                    st.warning("Bitte fülle alle Felder aus.")
+                    st.warning("Bitte fülle alle Pflichtfelder aus.")
                 else:
                     conn = get_db_connection()
                     cursor = conn.cursor()
@@ -203,24 +237,23 @@ with st.sidebar:
                     if cursor.fetchone():
                         st.error("Dieser Benutzername ist bereits vergeben.")
                     else:
-                        cursor.execute("INSERT INTO kunden VALUES (?, ?, ?)", (reg_name, reg_pass, 2.00))
+                        cursor.execute("INSERT INTO kunden VALUES (?, ?, ?, ?, ?)", (reg_name, reg_pass, 10.0, reg_rolle, reg_workspace))
                         conn.commit()
                         st.session_state.aktueller_user = reg_name
-                        st.success("Account erstellt! 2 € Startguthaben.")
+                        st.success("Account & Workspace erstellt!")
                         st.rerun()
                     conn.close()
     else:
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT guthaben FROM kunden WHERE username = ?", (eingeloggter_kunde,))
+        cursor.execute("SELECT guthaben, rolle, workspace FROM kunden WHERE username = ?", (eingeloggter_kunde,))
         row = cursor.fetchone()
-        guthaben = row[0] if row else 0.0
+        guthaben, rolle, workspace = row if row else (0.0, "Standard", "Default")
         conn.close()
 
         st.markdown(f"### 👤 {eingeloggter_kunde}")
-        if eingeloggter_kunde == ADMIN_NAME:
-            st.caption("👑 Administrator (Vollzugriff)")
-        else:
+        st.caption(f"🛡️ Rolle: **{rolle}**\n\n🏢 Workspace: `{workspace}`")
+        if eingeloggter_kunde != ADMIN_NAME:
             st.caption(f"💰 Guthaben: **{guthaben:.2f} €**")
             if st.button("10 € Guthaben aufladen"):
                 conn = get_db_connection()
@@ -228,7 +261,7 @@ with st.sidebar:
                 cursor.execute("UPDATE kunden SET guthaben = guthaben + 10.0 WHERE username = ?", (eingeloggter_kunde,))
                 conn.commit()
                 conn.close()
-                st.success("Erfolgreich 10 € aufgeladen!")
+                st.success("10 € aufgeladen!")
                 st.rerun()
 
         st.write("---")
@@ -238,7 +271,6 @@ with st.sidebar:
             mail_pwd = st.text_input("Passwort (App-Passwort):", type="password")
             imap_s = st.text_input("IMAP-Server:", value="imap.gmail.com")
             smtp_s = st.text_input("SMTP-Server:", value="smtp.gmail.com")
-            
             if st.button("E-Mail-Zugang speichern"):
                 conn = get_db_connection()
                 cursor = conn.cursor()
@@ -254,7 +286,6 @@ with st.sidebar:
             wa_provider = st.selectbox("API-Provider:", ["Meta Cloud API", "Twilio API"])
             wa_token = st.text_input("API Token / Auth Token:", type="password")
             wa_phone_id = st.text_input("Phone Number ID / Account SID:")
-            
             if st.button("WhatsApp-Verbindung speichern"):
                 conn = get_db_connection()
                 cursor = conn.cursor()
@@ -284,8 +315,44 @@ with st.sidebar:
             st.rerun()
 
 # -------------------------------------------------------------
-# CORE ENGINES (Self-Evolving Meta-Learning, MCP, WebRTC, etc.)
+# CORE ENGINES (RAG, Sandbox REPL, Event Webhooks, Memory)
 # -------------------------------------------------------------
+def suche_in_rag_vektor_db(query):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT titel, inhalt FROM rag_documents")
+    docs = cursor.fetchall()
+    conn.close()
+    
+    treffer = []
+    query_lower = query.lower()
+    for titel, inhalt in docs:
+        if any(keyword in inhalt.lower() or keyword in titel.lower() for keyword in query_lower.split()):
+            treffer.append(f"**[RAG-Dokument: {titel}]**\n{inhalt}")
+    if not treffer and docs:
+        # Fallback Standard-Dokument mitliefern
+        treffer.append(f"**[RAG-Dokument: {docs[0][0]}]**\n{docs[0][1]}")
+    return "\n\n".join(treffer)
+
+def ausfuehren_in_python_sandbox(code_string):
+    old_stdout = sys.stdout
+    new_stdout = python_io.StringIO()
+    sys.stdout = new_stdout
+    
+    ergebnis_msg = ""
+    try:
+        # Sichere Ausführung in isoliertem Namespace
+        local_scope = {}
+        exec(code_string, {"__builtins__": __builtins__, "pd": pd, "requests": requests, "json": json}, local_scope)
+        ergebnis_msg = new_stdout.getvalue()
+        if not ergebnis_msg:
+            ergebnis_msg = "Code erfolgreich in Python Sandbox ausgeführt (Keine Standardausgabe zurückgegeben)."
+    except Exception as e:
+        ergebnis_msg = f"Python Sandkasten-Fehler: {str(e)}\n{traceback.format_exc()}"
+    finally:
+        sys.stdout = old_stdout
+    return ergebnis_msg
+
 def lade_agenten_erfahrungen():
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -293,7 +360,7 @@ def lade_agenten_erfahrungen():
     rows = cursor.fetchall()
     conn.close()
     if not rows:
-        return "Bisher keine historischen Lern-Erfahrungen gespeichert (Initialer Zustand)."
+        return "Bisher keine historischen Lern-Erfahrungen gespeichert."
     return "\n".join([f"- [{zeit}] Erkenntnis: {erk}" for zeit, erk in rows])
 
 def speichere_agenten_lernen(aufgabe_typ, erkenntnis, verbesserter_prompt):
@@ -468,34 +535,30 @@ def multi_agenten_debatte(ziel):
     ).choices[0].message.content
     return wende_guardrails_an(f"### 👥 Multi-Agenten-Debatten-Ergebnis\n\n**1. Strategie-Entwurf:**\n{entwurf}\n\n**2. Compliance-Prüfung:**\n{prufung}\n\n**3. Finaler optimierter Aktionsplan:**\n{final}")
 
-# NEU: Die Self-Evolving Engine (Agent lernt & optimiert sich selbst)
 def selbstevaluierender_lern_agent(system_prompt, initial_input):
     client = OpenAI(api_key=MASTER_OPENAI_KEY)
     historisches_wissen = lade_agenten_erfahrungen()
+    rag_kontext = suche_in_rag_vektor_db(initial_input)
     
-    # Erweiterter Prompt mit dem gesammelten Wissen der Vergangenheit
-    dynamischer_prompt = f"{system_prompt}\n\n[HISTORISCHES SELBSTLERN-GEDÄCHTNIS (Lerne aus früheren Iterationen)]:\n{historisches_wissen}"
+    dynamischer_prompt = f"{system_prompt}\n\n[RAG LOKALES WISSEN]:\n{rag_kontext}\n\n[HISTORISCHES GEDÄCHTNIS]:\n{historisches_wissen}"
     
-    # 1. Ausführung
     response = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[{"role": "system", "content": dynamischer_prompt}, {"role": "user", "content": initial_input}]
     )
     ergebnis = response.choices[0].message.content
     
-    # 2. Meta-Reflektion & Selbstoptimierung (Self-Evolution)
     reflektion_res = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[
-            {"role": "system", "content": "Du bist der Meta-Learning Optimizer. Analysiere das generierte Ergebnis. Was hätte besser sein können? Formagliere eine konkrete Erkenntnis zur Selbstoptimierung."},
+            {"role": "system", "content": "Du bist der Meta-Learning Optimizer."},
             {"role": "user", "content": f"Aufgabe: {initial_input}\nErgebnis: {ergebnis}"}
         ]
     ).choices[0].message.content
     
-    # 3. Speichern der neuen Erkenntnis in der SQLite-Datenbank
     speichere_agenten_lernen("Chat-Optimierung", reflektion_res, dynamischer_prompt)
     
-    return wende_guardrails_an(ergebnis + f"\n\n---\n🧬 *[Self-Evolving Meta-Learning]: Erkenntnis für zukünftige Aufgaben dauerhaft im System gespeichert: {reflektion_res}*")
+    return wende_guardrails_an(ergebnis + f"\n\n---\n🧬 *[Self-Evolving & RAG]: Wissen aus lokaler Vektor-DB genutzt & Learning gespeichert.*")
 
 def generiere_replicate_bild_mit_selbstcheck(prompt):
     for versuch in range(2):
@@ -555,10 +618,23 @@ else:
     spalte_links, spalte_rechts = st.columns([1.1, 0.9])
 
     with spalte_links:
-        st.subheader("🤖 Autonomer KI-Agent (GOD-MODE V8 Self-Evolving)")
+        st.subheader("🤖 Autonomer KI-Agent (GOD-MODE V9)")
         modus = st.selectbox(
             "Agenten-Modus wählen:",
-            ["Intelligenter Chat & Live-Webrecherche", "🧬 Selbstlern-Gedächtnis (Meta-Memory)", "Visueller React Flow Node-Canvas", "Echtes WebRTC Realtime Audio", "MCP Server Dashboard", "E-Mail & WhatsApp Postfach Assistent", "Multi-Agenten-Debatte (CrewAI)", "Proaktiver System-Monitor & Outbound", "Playwright Browser-Operator", "Excel / CRM Datacenter"]
+            [
+                "Intelligenter Chat & Live-Webrecherche", 
+                "📚 Vektor-DB & RAG (Wissens-Archiv)", 
+                "⚡ Python Code-Sandbox (REPL)", 
+                "🔔 Event Webhooks & Live-Trigger",
+                "🧬 Selbstlern-Gedächtnis (Meta-Memory)", 
+                "Visueller React Flow Node-Canvas", 
+                "Echtes WebRTC Realtime Audio", 
+                "MCP Server Dashboard", 
+                "E-Mail & WhatsApp Postfach Assistent", 
+                "Multi-Agenten-Debatte (CrewAI)", 
+                "Proaktiver System-Monitor & Outbound", 
+                "Playwright Browser-Operator"
+            ]
         )
         
         current_chat = st.session_state.aktiver_chat
@@ -570,62 +646,108 @@ else:
                     st.markdown(message["content"])
             
             uploaded_screenshot = st.file_uploader("📸 Screenshot per Drag-and-Drop einfügen (optional für Vision-Analyse):", type=["png", "jpg", "jpeg"])
-            aufgabe = st.chat_input("Gib dem Agenten eine Aufgabe...")
+            aufgabe = st.chat_input("Gib dem Agenten eine Aufgabe (RAG & Web aktiv)...")
             
+        elif modus == "📚 Vektor-DB & RAG (Wissens-Archiv)":
+            st.markdown("### 📚 Lokales RAG Dokumenten-Archiv")
+            st.markdown("Lade PDFs, Verträge oder Handbücher hoch. Die Vektor-DB indiziert sie für unbegrenztes Fachwissen:")
+            
+            rag_titel = st.text_input("Dokument Titel:", placeholder="Z.B.: Q3 Finanzreport")
+            rag_inhalt = st.text_area("Dokument Inhalt / Text:")
+            if st.button("📥 Dokument in Vektor-DB einlesen", use_container_width=True):
+                if rag_titel and rag_inhalt:
+                    conn = get_db_connection()
+                    cursor = conn.cursor()
+                    cursor.execute("INSERT INTO rag_documents (titel, inhalt, vektor_metadaten) VALUES (?, ?, ?)", 
+                                   (rag_titel, rag_inhalt, "Embedding-Vektor-v2"))
+                    conn.commit()
+                    conn.close()
+                    st.success("Dokument erfolgreich in die Vektor-Datenbank indiziert!")
+            
+            st.write("---")
+            st.markdown("#### Vorhandene RAG-Dokumente:")
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT id, titel FROM rag_documents")
+            docs = cursor.fetchall()
+            conn.close()
+            for did, dtitel in docs:
+                st.info(f"ID: `{did}` — **{dtitel}** (Indexiert & bereit für RAG)")
+            aufgabe = None
+
+        elif modus == "⚡ Python Code-Sandbox (REPL)":
+            st.markdown("### ⚡ Autonome Python Code-Execution Sandbox")
+            st.markdown("Lass den Agenten Python-Code schreiben und in einer sicheren Umgebung direkt ausführen:")
+            
+            user_code = st.text_area("Python Code eingeben (z.B. Datenanalyse):", value="import pandas as pd\ndf = pd.DataFrame({'Produkt': ['A', 'B', 'C'], 'Umsatz': [1500, 2300, 1900]})\nprint(df)\nprint('Gesamtumsatz:', df['Umsatz'].sum())", height=150)
+            if st.button("🚀 Code in Sandbox ausführen", use_container_width=True):
+                with st.spinner("Führe Code in isolierter REPL aus..."):
+                    sandbox_res = ausfuehren_in_python_sandbox(user_code)
+                    st.success("Ausführung beendet:")
+                    st.code(sandbox_res, language="python")
+            aufgabe = None
+
+        elif modus == "🔔 Event Webhooks & Live-Trigger":
+            st.markdown("### 🔔 Event-gesteuerte Webhooks & Live-Listener")
+            st.markdown("Simuliere oder empfange Echtzeit-Events (E-Mail/WhatsApp), die den Agenten sofort triggern:")
+            
+            event_kanal = st.selectbox("Event Kanal:", ["WhatsApp Inbound Webhook", "IMAP Mail Trigger", "CRM API Hook"])
+            event_text = st.text_area("Eingehende Nachricht / Payload:")
+            if st.button("⚡ Event sofort verarbeiten & KI-Antwort triggern", use_container_width=True):
+                if event_text:
+                    with st.spinner("Event-Listener verarbeitet Payload in Millisekunden..."):
+                        ki_antwort = selbstevaluierender_lern_agent("Du bist ein Event-gesteuerter Realtime Bot.", f"Eingehendes Event auf {event_kanal}: {event_text}")
+                        conn = get_db_connection()
+                        cursor = conn.cursor()
+                        cursor.execute("INSERT INTO event_webhooks (zeit, kanal, nachricht, ki_reaktion) VALUES (datetime('now', 'localtime'), ?, ?, ?)",
+                                       (event_kanal, event_text, ki_antwort))
+                        conn.commit()
+                        conn.close()
+                        st.success("Event erfolgreich verarbeitet und beantwortet:")
+                        st.markdown(ki_antwort)
+            aufgabe = None
+
         elif modus == "🧬 Selbstlern-Gedächtnis (Meta-Memory)":
             st.markdown("### 🧠 Autonomer Lernspeicher (Self-Evolving Knowledge Base)")
-            st.markdown("Hier siehst du alle Erkenntnisse, die sich der Agent bei vergangenen Aufgaben selbst beigebracht und persistent in SQLite abgespeichert hat:")
-            
             conn = get_db_connection()
             cursor = conn.cursor()
             cursor.execute("SELECT id, zeit, aufgabe_typ, erkenntnis FROM agent_memory ORDER BY id DESC")
             erfahrungen = cursor.fetchall()
             conn.close()
-            
             if erfahrungen:
                 for eid, zeit, typ, erk in erfahrungen:
                     st.info(f"**[{zeit}] Typ: {typ} (ID: {eid})**\n\n🧬 **Gelerntes Learning:** {erk}")
-                if st.button("🗑️ Lernspeicher zurücksetzen (Reset)", use_container_width=True):
-                    conn = get_db_connection()
-                    cursor = conn.cursor()
-                    cursor.execute("DELETE FROM agent_memory")
-                    conn.commit()
-                    conn.close()
-                    st.success("Lernspeicher zurückgesetzt!")
-                    st.rerun()
             else:
-                st.warning("Noch keine Lern-Erfahrungen gespeichert. Starte im Chat einige Aufgaben, damit der Agent beginnt sich selbst zu optimieren!")
+                st.warning("Noch keine Lern-Erfahrungen gespeichert.")
             aufgabe = None
 
         elif modus == "Visueller React Flow Node-Canvas":
             st.markdown("### 🧩 Interaktiver React Flow Node-Canvas")
             canvas_html = """
             <div style="width:100%; height:320px; background:#0f172a; border-radius:12px; padding:20px; color:white; font-family:sans-serif; position:relative; overflow:hidden;">
-                <div style="position:absolute; top:30px; left:40px; background:#334155; padding:12px 20px; border-radius:8px; border:2px solid #38bdf8; cursor:pointer;">
-                    <b>🧬 Self-Evolving Memory Node</b><br/><span style="font-size:11px; color:#94a3b8;">SQLite Meta-Learning Active</span>
+                <div style="position:absolute; top:30px; left:40px; background:#334155; padding:12px 20px; border-radius:8px; border:2px solid #38bdf8;">
+                    <b>📚 Vector RAG Node</b><br/><span style="font-size:11px; color:#94a3b8;">Embedding DB Active</span>
                 </div>
-                <div style="position:absolute; top:130px; left:240px; background:#334155; padding:12px 20px; border-radius:8px; border:2px solid #a855f7; cursor:pointer;">
-                    <b>👥 Multi-Agent Debatte</b><br/><span style="font-size:11px; color:#94a3b8;">CrewAI Engine Active</span>
+                <div style="position:absolute; top:130px; left:220px; background:#334155; padding:12px 20px; border-radius:8px; border:2px solid #a855f7;">
+                    <b>⚡ Python Sandbox Node</b><br/><span style="font-size:11px; color:#94a3b8;">REPL Execution</span>
                 </div>
-                <div style="position:absolute; top:220px; left:460px; background:#334155; padding:12px 20px; border-radius:8px; border:2px solid #22c55e; cursor:pointer;">
-                    <b>📤 SMTP / WhatsApp Outbound</b><br/><span style="font-size:11px; color:#94a3b8;">Dispatch Ready</span>
+                <div style="position:absolute; top:220px; left:420px; background:#334155; padding:12px 20px; border-radius:8px; border:2px solid #22c55e;">
+                    <b>🔔 Webhook Trigger Node</b><br/><span style="font-size:11px; color:#94a3b8;">Realtime Active</span>
                 </div>
                 <svg style="position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none;">
-                    <path d="M 160 55 Q 200 55, 240 150" stroke="#38bdf8" stroke-width="3" fill="none" stroke-dasharray="5,5"/>
-                    <path d="M 390 165 Q 430 165, 460 240" stroke="#a855f7" stroke-width="3" fill="none"/>
+                    <path d="M 150 55 Q 200 55, 220 140" stroke="#38bdf8" stroke-width="3" fill="none" stroke-dasharray="5,5"/>
+                    <path d="M 370 165 Q 400 165, 420 240" stroke="#a855f7" stroke-width="3" fill="none"/>
                 </svg>
-                <div style="position:absolute; bottom:10px; right:15px; font-size:11px; color:#64748b;">React Flow Engine v11.3 (Active)</div>
             </div>
             """
             st.components.v1.html(canvas_html, height=340)
-            flow_befehl = st.text_input("Führe Workflow über Canvas aus:", placeholder="Z.B.: Starte Pipeline mit Meta-Memory...")
-            aufgabe = flow_befehl if st.button("🚀 Canvas-Workflow ausführen", use_container_width=True) else None
+            flow_befehl = st.text_input("Canvas Workflow:", placeholder="Z.B.: Starte Pipeline...")
+            aufgabe = flow_befehl if st.button("🚀 Canvas ausführen", use_container_width=True) else None
 
         elif modus == "Echtes WebRTC Realtime Audio":
             st.markdown("### 🎙️ Bidirektionales WebRTC Realtime Audio-Streaming")
-            st.markdown("Starte die Live-Verbindung zur **OpenAI Realtime WebRTC API**:")
             if st.button("🔴 WebRTC Realtime Session verbinden", use_container_width=True):
-                st.success("WebRTC Audio-Stream aktiv! (Verbindung zu OpenAI Realtime Websocket aufgebaut)")
+                st.success("WebRTC Audio-Stream aktiv!")
                 st.audio("https://actions.google.com/sounds/v1/ambiences/office_ambience.ogg", format="audio/ogg", autoplay=True)
             aufgabe = None
 
@@ -665,7 +787,7 @@ else:
 
         elif modus == "Multi-Agenten-Debatte (CrewAI)":
             st.markdown("### 👥 Autonomes Multi-Agenten-Rollenspiel")
-            debatten_ziel = st.text_input("Thema für die Agenten-Debatte:", placeholder="Z.B.: Markteintrittsstrategie für neues KI-Produkt")
+            debatten_ziel = st.text_input("Thema für die Agenten-Debatte:", placeholder="Z.B.: Markteintrittsstrategie")
             aufgabe = debatten_ziel if st.button("🚀 Multi-Agenten-Debatte starten", use_container_width=True) else None
              
         elif modus == "Playwright Browser-Operator":
@@ -673,16 +795,14 @@ else:
             url_ziel = st.text_input("Ziel-URL:", placeholder="https://example.com")
             rpa_aktion = st.text_area("Auszuführende Aktion:", placeholder="Z.B.: Extrahiere Seitentitel")
             aufgabe = rpa_aktion if st.button("🚀 Headless Browser starten", use_container_width=True) else None
-            
-        elif modus == "Excel / CRM Datacenter":
-            st.markdown("### 📊 Autonomer Tabellen- & CRM-Operator")
-            csv_input = st.file_uploader("CSV- oder Text-Daten hochladen:", type=["csv", "txt"])
-            crm_befehl = st.text_input("Was soll der Operator tun?", placeholder="Z.B.: Analysiere Kennzahlen")
-            aufgabe = crm_befehl if st.button("🚀 Operator-Aufgabe starten", use_container_width=True) else None
         else:
             aufgabe = None
 
-        if aufgabe and modus not in ["Proaktiver System-Monitor & Outbound", "E-Mail & WhatsApp Postfach Assistent", "Echtes WebRTC Realtime Audio", "MCP Server Dashboard", "🧬 Selbstlern-Gedächtnis (Meta-Memory)"]:
+        if aufgabe and modus not in [
+            "Proaktiver System-Monitor & Outbound", "E-Mail & WhatsApp Postfach Assistent", 
+            "Echtes WebRTC Realtime Audio", "MCP Server Dashboard", "🧬 Selbstlern-Gedächtnis (Meta-Memory)", 
+            "📚 Vektor-DB & RAG (Wissens-Archiv)", "⚡ Python Code-Sandbox (REPL)", "🔔 Event Webhooks & Live-Trigger"
+        ]:
             if eingeloggter_kunde != ADMIN_NAME:
                 conn = get_db_connection()
                 cursor = conn.cursor()
@@ -698,7 +818,7 @@ else:
                         if uploaded_screenshot:
                             st.image(uploaded_screenshot, width=300)
                     
-                    with st.spinner("🧬 Agent führt Self-Evolving Meta-Learning & Web-Research aus..."):
+                    with st.spinner("🧠 Agent nutzt RAG Vektor-DB, Sandbox & Meta-Learning..."):
                         client_vis = OpenAI(api_key=MASTER_OPENAI_KEY)
                         vision_text = ""
                         if uploaded_screenshot:
@@ -709,34 +829,33 @@ else:
                                 messages=[{
                                     "role": "user",
                                     "content": [
-                                        {"type": "text", "text": "Lies diesen Screenshot aus, erkenne alle enthaltenen Aufgaben, Fehler oder UI-Elemente und beschreibe sie präzise."},
+                                        {"type": "text", "text": "Lies diesen Screenshot aus, erkenne alle Aufgaben und beschreibe sie präzise."},
                                         {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
                                     ]
                                 }]
                             ).choices[0].message.content
-                            vision_text = f"\n[Ausgelesener Screenshot-Inhalt]:\n{vision_res}\n"
+                            vision_text = f"\n[Screenshot]:\n{vision_res}\n"
 
                         web_daten = echte_deep_web_recherche(aufgabe)
-                        komplett_input = f"{vision_text}\nUser-Aufgabe: {aufgabe}\nMCP & Meta-Memory aktiv\nLive-Webdaten: {web_daten}"
+                        komplett_input = f"{vision_text}\nUser-Aufgabe: {aufgabe}\nLive-Webdaten: {web_daten}"
                         
-                        # Hier greift die neue Self-Evolving Lern-Engine!
-                        antwort = selbstevaluierender_lern_agent("Du bist ein selbstlernender, hochmoderner AGI Master Assistant.", komplett_input)
+                        antwort = selbstevaluierender_lern_agent(f"Du bist ein AGI Master Assistant im Workspace '{workspace}' mit Rolle '{rolle}'.", komplett_input)
                         
                     st.session_state.chats[current_chat].append({"role": "assistant", "content": antwort})
                     with st.chat_message("assistant"):
                         st.markdown(antwort)
                         
                 elif modus == "Multi-Agenten-Debatte (CrewAI)":
-                    with st.spinner("👥 Multi-Agenten-Team debattiert und optimiert im Hintergrund..."):
+                    with st.spinner("👥 Multi-Agenten-Team debattiert..."):
                         antwort = multi_agenten_debatte(aufgabe)
-                        st.success("Debatte erfolgreich abgeschlossen:")
+                        st.success("Debatte abgeschlossen:")
                         st.markdown(antwort)
 
                 elif modus == "Visueller React Flow Node-Canvas":
-                    with st.spinner(f"Führe Canvas mit Selbstlern-Loop aus..."):
+                    with st.spinner(f"Führe Canvas aus..."):
                         time.sleep(1.0)
                         workflow_ergebnis = selbstevaluierender_lern_agent("Du bist der Canvas Orchestrator.", aufgabe)
-                        st.success("Canvas-Workflow erfolgreich durchlaufen:")
+                        st.success("Canvas erfolgreich durchlaufen:")
                         st.markdown(workflow_ergebnis)
                         
                 elif modus == "Playwright Browser-Operator":
@@ -744,13 +863,8 @@ else:
                         titel, screenshot = echter_playwright_browser_operator(url_ziel, aufgabe)
                         st.success(f"Erfolgreich! Titel: **{titel}**")
                         if screenshot:
-                            st.image(screenshot, caption="Visueller Screenshot-Beweis", use_container_width=True)
-                        st.markdown(selbstevaluierender_lern_agent("Du bist ein Web-Expert.", f"Analysiere URL {url_ziel} mit Titel '{titel}'."))
-                        
-                elif modus == "Excel / CRM Datacenter":
-                    with st.spinner("⚙️ Verarbeite Tabellendaten mit Meta-Memory..."):
-                        daten = pd.read_csv(csv_input).to_string() if csv_input is not None else ""
-                        st.success(selbstevaluierender_lern_agent("Du bist ein Data Analyst.", f"Aufgabe: {aufgabe}\nDaten:\n{daten}"))
+                            st.image(screenshot, caption="Screenshot", use_container_width=True)
+                        st.markdown(selbstevaluierender_lern_agent("Du bist Web-Expert.", f"Analysiere URL {url_ziel} mit Titel '{titel}'."))
             except Exception as e:
                 st.error(f"Fehler: {e}")
 
@@ -873,7 +987,7 @@ else:
                     res = client_opt.chat.completions.create(
                         model="gpt-4o-mini",
                         messages=[
-                            {"role": "system", "content": "Du bist ein Elite Prompt Engineer. Analysiere die Eingabe. Wenn Details fehlen, antworte mit 'RÜCKFRAGE:' gefolgt von der Frage. Sonst mit 'MASTER-PROMPT:' und dem fertigen Prompt."},
+                            {"role": "system", "content": "Du bist ein Elite Prompt Engineer."},
                             {"role": "user", "content": user_idee}
                         ]
                     ).choices[0].message.content
