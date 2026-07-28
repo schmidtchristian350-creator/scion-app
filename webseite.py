@@ -92,7 +92,6 @@ init_db()
 def get_db_connection():
     return sqlite3.connect("scion_mind_enterprise.db", check_same_thread=False)
 
-# Session State Initialisierung aus DB
 if "aktueller_user" not in st.session_state:
     st.session_state.aktueller_user = None
 
@@ -206,7 +205,6 @@ with st.sidebar:
 # CORE ENGINE 1: ECHTE PLAYWRIGHT HEADLESS BROWSER AUTOMATION
 # -------------------------------------------------------------
 def echter_playwright_browser_operator(url, befehl):
-    """Führt echte Headless-Browser-Interaktionen per Playwright durch"""
     if not PLAYWRIGHT_AVAILABLE:
         return f"Simulierter Headless-Browser-Modus: URL `{url}` angesteuert. Befehl: '{befehl}' erfolgreich verarbeitet (Playwright-Paket nicht installiert)."
     
@@ -216,8 +214,6 @@ def echter_playwright_browser_operator(url, befehl):
             page = browser.new_page()
             page.goto(url if url.startswith("http") else f"https://{url}", timeout=15000)
             titel = page.title()
-            
-            # Screenshot als visueller Beweis
             screenshot_bytes = page.screenshot(full_page=True)
             browser.close()
             return titel, screenshot_bytes
@@ -552,7 +548,7 @@ else:
             else:
                 st.download_button("📥 Download .pdf", data=erstelle_pdf_aus_session(), file_name="praesentation.pdf", mime="application/pdf", use_container_width=True)
 
-        # SPRACHMODUL MIT REALTIME AUDIO HINWEIS
+        # SPRACHMODUL KORRIGIERT
         with st.expander("🎙️ Echtzeit-Sprachagent (Realtime Audio)", expanded=False):
             st.markdown("### ⚡ Live-Sprachchat (Whisper & TTS)")
             live_audio = st.audio_input("Sprich mit deinem Agenten:")
@@ -561,7 +557,7 @@ else:
                     try:
                         client_v = OpenAI(api_key=MASTER_OPENAI_KEY)
                         transcript = client_v.audio.transcriptions.create(model="whisper-1", file=("audio.wav", live_audio.read())).text
-                        st.info(Erkannt: "{transcript}")
+                        st.info(f'Erkannt: "{transcript}"')
                         speech = client_v.audio.speech.create(model="tts-1", voice="alloy", input=f"Antwort: {transcript}")
                         st.audio(speech.content, format="audio/mp3", autoplay=True)
                     except Exception as e:
