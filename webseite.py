@@ -66,17 +66,24 @@ try:
 except ImportError:
     PLAYWRIGHT_AVAILABLE = False
 
-st.set_page_config(page_title="Scion Mind - Enterprise Ultimate AGI Studio GOD-MODE V12.13", layout="wide")
+st.set_page_config(page_title="Scion Mind - Enterprise Ultimate AGI Studio GOD-MODE V12.14", layout="wide")
 
+# ROBUSTES DARK/LIGHT-MODE CSS (GARANTIERT LESBARE SCHRIFTEN)
 st.markdown("""
     <style>
-    .stApp { background-color: #f8f9fa; }
-    [data-testid="stSidebar"] { background-color: #1e293b; color: white; }
-    [data-testid="stSidebar"] label, [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3, [data-testid="stSidebar"] p { color: white !important; }
+    /* Allgemeine Text- und Label-Sicherheit für den Dark Mode */
+    .stApp { background-color: var(--background-color); color: var(--text-color); }
+    
+    [data-testid="stSidebar"] { background-color: #1e293b; color: #ffffff !important; }
+    [data-testid="stSidebar"] label, [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3, [data-testid="stSidebar"] p, [data-testid="stSidebar"] span { color: #ffffff !important; }
+    
+    /* Buttons einheitlich stylen */
     .stButton button { background-color: #0f172a; color: white; border-radius: 8px; border: none; font-weight: bold; width: 100%; }
     .stButton button:hover { background-color: #334155; color: white; }
-    input, textarea, [data-baseweb="input"] div, [data-baseweb="base-input"] { background-color: #ffffff !important; border-radius: 8px !important; border: 1px solid #cbd5e1 !important; }
-    input:focus, textarea:focus, [data-baseweb="input"] input:focus { border-color: #0f172a !important; box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.1) !important; }
+    
+    /* Eingabefelder und Dropdowns lesbar machen */
+    input, textarea, [data-baseweb="input"] div, [data-baseweb="base-input"] { border-radius: 8px !important; }
+    
     [data-testid="stStatusWidget"] svg, [data-testid="stSpinner"] svg {
         width: 40px !important;
         height: 40px !important;
@@ -84,8 +91,8 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("Scion Mind - Enterprise Ultimate AGI Studio (GOD-MODE V12.13)")
-st.markdown("*designed by Christian Schmidt | Powered by Wertbasiertem Credit-System & Sovereign Paywall Core*")
+st.title("Scion Mind - Enterprise Ultimate AGI Studio (GOD-MODE V12.14)")
+st.markdown("*designed by Christian Schmidt | Powered by Dark-Mode UI Fix & Wertbasiertem Credit-System*")
 st.write("---")
 
 MASTER_OPENAI_KEY = st.secrets["OPENAI_API_KEY"]
@@ -98,7 +105,7 @@ ADMIN_NAME = "Christian"
 ADMIN_PASS = "ScionMind#2026!Secured"
 
 # -------------------------------------------------------------
-# SQLITE PERSISTENCE & V12.13 TABELLEN
+# SQLITE PERSISTENCE & V12.14 TABELLEN
 # -------------------------------------------------------------
 def init_db():
     conn = sqlite3.connect("scion_mind_enterprise.db", check_same_thread=False)
@@ -568,7 +575,7 @@ with st.sidebar:
             st.rerun()
 
 # -------------------------------------------------------------
-# CORE ENGINES V12.13 (Inkl. Wertbasiertem Credit-System)
+# CORE ENGINES V12.14 (Inkl. Wertbasiertem Credit-System)
 # -------------------------------------------------------------
 
 def verschruessle_api_key(api_key):
@@ -1104,7 +1111,7 @@ def selbstevaluierender_lern_agent(system_prompt, initial_input, use_local=False
     reflektion_res = ausfuehren_mit_ollama_fallback("Du bist Meta-Learning Optimizer.", f"Aufgabe: {initial_input}\nErgebnis: {ergebnis}", use_local=use_local)
     
     speichere_agenten_lernen("Chat-Optimierung", reflektion_res, dynamischer_prompt)
-    return wende_guardrails_an(ergebnis + f"\n\n---\n🧬 *[Scion Mind V12.13 Sovereign Core]: Wertbasiertes Credit-System aktiv.*")
+    return wende_guardrails_an(ergebnis + f"\n\n---\n🧬 *[Scion Mind V12.14 Sovereign Core]: Dark-Mode UI Fix aktiv.*")
 
 def generiere_replicate_bild_mit_selbstcheck(prompt):
     for versuch in range(2):
@@ -1177,7 +1184,7 @@ else:
         spalte_links, spalte_rechts = st.columns([1.1, 0.9])
 
         with spalte_links:
-            st.subheader("🤖 Autonomer KI-Agent (GOD-MODE V12.13)")
+            st.subheader("🤖 Autonomer KI-Agent (GOD-MODE V12.14)")
             modus = st.selectbox(
                 "Agenten-Modus wählen:",
                 [
@@ -1240,7 +1247,6 @@ else:
                 aufgabe = schwarm_ziel if run_schwarm else None
                 
                 if aufgabe:
-                    # Wertbasierter Abzug für schwere Aufgabe: 0.05 €
                     berechne_nid = eingeloggter_kunde
                     berechne_und_ziehe_credits_ab(berechne_nid, 0.05)
                     with st.spinner("LangGraph Schwarm iteriert und sichert Checkpoints (0.05 € berechnet)..."):
@@ -1256,7 +1262,7 @@ else:
                     if terminal_befehl:
                         berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005)
                         terminal_box = st.empty()
-                        log_text = "[INFO] Starte Scion Terminal V12.13 (0.005 € abgezogen)...\n"
+                        log_text = "[INFO] Starte Scion Terminal V12.14 (0.005 € abgezogen)...\n"
                         terminal_box.code(log_text, language="bash")
                         time.sleep(0.5)
                         
@@ -1564,7 +1570,6 @@ else:
                 "🕸️ LangGraph Schwarm (Durable Checkpoints)", "🖥️ Live-Terminal & Realtime Stream", "🟢 Lokaler Ollama Fallback (Zero-Cloud)",
                 "🎯 Autonomer Deep Web-Scraper & Lead-Gen", "🧪 Automatisiertes Self-Testing & QA-Agent", "📊 Konkurrenten SWOT-Analyzer", "Computer-Use Browser-Operator"
             ]:
-                # Standard-Chat-Nachricht kostet ultra-faire 0,005 € (1/2 Cent)
                 berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005)
                 
                 try:
