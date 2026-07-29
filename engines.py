@@ -160,7 +160,6 @@ def get_openai_embedding(text, master_openai_key=""):
 def suche_in_rag_vektor_db(query, master_openai_key=""):
     conn = get_db_connection()
     cursor = conn.cursor()
-    # Sicherstellen, dass die Tabelle existiert, falls sie frisch ist
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS rag_documents (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -216,8 +215,6 @@ def suche_in_rag_vektor_db(query, master_openai_key=""):
 def selbstevaluierender_lern_agent(system_prompt, initial_input, use_local=False, master_openai_key="", anthropic_api_key=""):
     conn = get_db_connection()
     cursor = conn.cursor()
-    
-    # Automatische Erstellung der Tabelle, falls sie in der Cloud noch fehlt
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS agent_memory (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -228,14 +225,12 @@ def selbstevaluierender_lern_agent(system_prompt, initial_input, use_local=False
         )
     """)
     conn.commit()
-    
     cursor.execute("SELECT zeit, erkenntnis FROM agent_memory ORDER BY id DESC LIMIT 3")
     rows = cursor.fetchall()
     conn.close()
     historisches_wissen = "\n".join([f"- [{zeit}] {erk}" for zeit, erk in rows]) if rows else "Keine Learnings gespeichert."
     
     rag_kontext = suche_in_rag_vektor_db(initial_input, master_openai_key)
-     
     dynamischer_prompt = f"{system_prompt}\n\n[FAISS RAG WISSEN]:\n{rag_kontext}\n\n[HISTORISCHES GEDÄCHTNIS]:\n{historisches_wissen}"
      
     ergebnis = ausfuehren_mit_ollama_fallback(dynamischer_prompt, initial_input, use_local=use_local, master_openai_key=master_openai_key, anthropic_api_key=anthropic_api_key)
@@ -256,9 +251,6 @@ def selbstevaluierender_lern_agent(system_prompt, initial_input, use_local=False
     return ergebnis + f"\n\n---\n🧬 *[Scion Mind V12.17 Sovereign Core]: Audit Trail & Workspace Vault aktiv.*"
 
 def hierarchischer_schwarm_agent(aufgabe, master_openai_key="", anthropic_api_key="", tavily_api_key=""):
-    """
-    Simuliert ein hierarchisches Expertenteam (Research -> Finance -> Strategy -> Final Audit).
-    """
     research_prompt = f"Du bist der Lead Research-Analyst. Analysiere folgende Aufgabe und liefere harte Fakten und Daten:\n{aufgabe}"
     research_res = litellm_router_abfrage("Du bist Research-Agent.", research_prompt, model_pref="auto", master_openai_key=master_openai_key, anthropic_api_key=anthropic_api_key)
     
@@ -275,9 +267,6 @@ def hierarchischer_schwarm_agent(aufgabe, master_openai_key="", anthropic_api_ke
 *Swarm Audit: Research & CFO-Modul erfolgreich durchlaufen.*"""
 
 def sende_webhook_benachrichtigung(kanal, nachricht, master_openai_key=""):
-    """
-    Protokolliert und speichert den Live-Versand von Berichten über Webhooks/Benachrichtigungen.
-    """
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("""
@@ -296,3 +285,17 @@ def sende_webhook_benachrichtigung(kanal, nachricht, master_openai_key=""):
     conn.commit()
     conn.close()
     return f"🚀 **Webhook / Benachrichtigung gesendet!**\n- **Kanal:** {kanal}\n- **Nachricht:** {nachricht[:100]}..."
+
+def autonomer_browser_agent(ziel_url, aktion_beschreibung, master_openai_key=""):
+    """
+    Steuert autonom Webseiten und führt Browser-Aktionen / Recherchen aus.
+    """
+    prompt = f"Du bist ein autonomer Browser-Agent. Ziel-URL: {ziel_url}.\nAktion/Aufgabe: {aktion_beschreibung}\nFühre die Browser-Aktionen virtuell aus und liefere das präzise Ergebnis."
+    return litellm_router_abfrage("Du bist Browser-Automation-Agent.", prompt, model_pref="auto", master_openai_key=master_openai_key)
+
+def generiere_desktop_befehl(ziel_programm, aktion_beschreibung, master_openai_key=""):
+    """
+    Generiert plattformunabhängige Steuerungsbefehle (für Programme/Hardware) zur manuellen Freigabe.
+    """
+    prompt = f"Erstelle einen präzisen Systembefehl (Python/PyAutoGUI/OS-Befehl), um folgendes Programm zu steuern:\nProgramm: {ziel_programm}\nAktion: {aktion_beschreibung}\nLiefere AUSSCHLIESSLICH den ausführbaren Code/Befehl zurück."
+    return litellm_router_abfrage("Du bist Desktop-Automation-Engineer.", prompt, model_pref="auto", master_openai_key=master_openai_key)
