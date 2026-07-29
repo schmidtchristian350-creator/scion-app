@@ -451,7 +451,7 @@ Falls keine Nummer gefunden werden kann, gib an, wo man sie offiziell finden kan
     return litellm_router_abfrage("Du bist Telefonbuch- und Kontakt-Agent.", prompt, model_pref="auto", master_openai_key=master_openai_key, anthropic_api_key=anthropic_api_key)
 
 # ==========================================
-# 🚀 NEU: MULTI-MODALITÄT, RAG-IMPORTER & AUDIT TRAIL
+# 🚀 MULTI-MODALITÄT, RAG-IMPORTER & AUDIT TRAIL
 # ==========================================
 
 def analysiere_bild_oder_dokument(datei_bytes, prompt_text="Analysiere dieses Dokument oder Bild präzise.", master_openai_key=""):
@@ -536,3 +536,102 @@ def protokolliere_audit_trail(username, aktion, details=""):
         conn.close()
     except Exception:
         pass
+
+# ==========================================
+# 🚀 NEU: CHROMA-GEDÄCHTNIS, FALLBACK-KETTE & ACTION-VAULT
+# ==========================================
+
+def get_chroma_client_und_collection():
+    try:
+        import chromadb
+        client = chromadb.PersistentClient(path="./chroma_db_storage")
+        collection = client.get_or_create_collection(name="scion_enterprise_memory")
+        return collection
+    except Exception:
+        return None
+
+def speichere_in_chroma_gedaechtnis(doc_id, text_inhalt, metadata=None):
+    col = get_chroma_client_und_collection()
+    if col:
+        try:
+            col.upsert(
+                documents=[text_inhalt],
+                metadatas=[metadata or {"typ": "allgemein"}],
+                ids=[doc_id]
+            )
+            return True
+        except Exception:
+            pass
+    return False
+
+def suche_in_chroma_gedaechtnis(query_text, n_results=2):
+    col = get_chroma_client_und_collection()
+    if col:
+        try:
+            results = col.query(query_texts=[query_text], n_results=n_results)
+            if results and "documents" in results and results["documents"]:
+                return "\n\n".join(results["documents"][0])
+        except Exception:
+            pass
+    return ""
+
+def robuste_multi_provider_abfrage(system_prompt, user_prompt, master_openai_key="", anthropic_api_key=""):
+    """
+    Automatische Fallback-Kette: Versucht OpenAI -> Bei Fehler Claude -> Bei Fehler Lokales Llama 3.
+    """
+    # Versuch 1: OpenAI GPT-4o-mini
+    if master_openai_key:
+        try:
+            client = OpenAI(api_key=master_openai_key)
+            resp = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}]
+            )
+            return f"🔵 [Fallback-Kette Erfolg -> OpenAI GPT-4o-mini]:\n" + resp.choices[0].message.content
+        except Exception:
+            pass
+
+    # Versuch 2: Claude 3.5 Sonnet
+    if anthropic_api_key:
+        try:
+            headers = {"x-api-key": anthropic_api_key, "anthropic-version": "2023-06-01", "content-type": "application/json"}
+            data = {"model": "claude-3-5-sonnet-20241022", "max_tokens": 1500, "system": system_prompt, "messages": [{"role": "user", "content": user_prompt}]}
+            res = requests.post("[https://api.anthropic.com/v1/messages](https://api.anthropic.com/v1/messages)", json=data, headers=headers, timeout=5).json()
+            content = res.get("content", [{"text": ""}])
+            if content and "text" in content[0]:
+                return f"🟣 [Fallback-Kette Erfolg -> Claude 3.5 Sonnet]:\n" + content[0]["text"]
+        except Exception:
+            pass
+
+    # Versuch 3: Lokaler Ollama Llama 3 (Zero Cloud / Offline-Modus)
+    try:
+        url = "http://localhost:11434/api/generate"
+        payload = {"model": "llama3", "prompt": f"System: {system_prompt}\n\nUser: {user_prompt}", "stream": False}
+        res = requests.post(url, json=payload, timeout=4).json()
+        if "response" in res:
+            return f"🟢 [Fallback-Kette Erfolg -> Lokal Llama 3 (Offline-Modus)]: \n{res['response']}"
+    except Exception:
+        pass
+
+    return "❌ [Kritischer Fehler]: Alle Provider (OpenAI, Anthropic, Ollama) sind fehlgeschlagen."
+
+def erstelle_action_approval_eintrag(aktion_typ, payload):
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS action_approval_vault (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                zeit TEXT,
+                aktion_typ TEXT,
+                payload TEXT,
+                status TEXT
+            )
+        """)
+        cursor.execute("INSERT INTO action_approval_vault (zeit, aktion_typ, payload, status) VALUES (datetime('now', 'localtime'), ?, ?, ?)",
+                       (aktion_typ, payload, "AUSSTEHEND"))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception:
+        return False
