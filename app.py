@@ -11,7 +11,8 @@ from database import init_db, get_db_connection
 from engines import (
     litellm_router_abfrage, ausfuehren_mit_ollama_fallback, echte_deep_web_recherche,
     berechne_pl_break_even, starte_swot_analyse, ausfuehren_in_self_healing_sandbox,
-    suche_in_rag_vektor_db, selbstevaluierender_lern_agent, verschruessle_api_key, ent_huelle_api_key
+    suche_in_rag_vektor_db, selbstevaluierender_lern_agent, verschruessle_api_key, ent_huelle_api_key,
+    hierarchischer_schwarm_agent, sende_webhook_benachrichtigung
 )
 from exporters import (
     exportiere_zu_docx, exportiere_zu_xlsx, exportiere_zu_pdf, erstelle_pptx_aus_session, erstelle_pdf_aus_session
@@ -187,16 +188,16 @@ with st.sidebar:
                 user_dict = {f"{u[0]} (Guthaben: {u[1]:.2f} €)": u[0] for u in user_Rows} if user_Rows else {}
                 if user_dict:
                     ausgewaehlte_anzeige = st.selectbox("Account wählen:", list(user_dict.keys()))
-                    ausgewaehlter_user = user_dict[ausgewaehlte_anzeige]
+                    ausgewählter_user = user_dict[ausgewaehlte_anzeige]
                     betrag_input = st.number_input("Betrag in €:", value=1.00, step=0.50)
                     col_a1, col_a2 = st.columns(2)
                     with col_a1:
                         if st.button("➕ Gutschreiben"):
-                            guthaben_gutschreiben(ausgewaehlter_user, betrag_input)
+                            guthaben_gutschreiben(ausgewählter_user, betrag_input)
                             st.rerun()
                     with col_a2:
                         if st.button("➖ Einziehen"):
-                            guthaben_einziehen(ausgewaehlter_user, betrag_input)
+                            guthaben_einziehen(ausgewählter_user, betrag_input)
                             st.rerun()
 
         st.write("---")
@@ -238,6 +239,7 @@ else:
                 "Agenten-Modus wählen:",
                 [
                     "🤖 Autonomer Master-Agent (Automatischer Tool-Router)", 
+                    "🧬 Multi-Agenten-Schwarm (Hierarchical Swarm Board)",
                     "📊 Analytics & P&L Break-Even Rechner",
                     "📊 Konkurrenten SWOT-Analyzer",
                     "🛠️ Closed-Loop Self-Healing Sandbox (REPL)",
@@ -259,8 +261,10 @@ else:
                 with st.chat_message("user"):
                     st.markdown(aufgabe)
 
-                with st.spinner("🤖 Agent analysiert Aufgabe und wählt optimales Tool..."):
-                    if "Break-Even" in modus:
+                with st.spinner("🤖 Agent analysiert Aufgabe und arbeitet..."):
+                    if "Schwarm" in modus:
+                        antwort = hierarchischer_schwarm_agent(aufgabe, MASTER_OPENAI_KEY, ANTHROPIC_API_KEY, TAVILY_API_KEY)
+                    elif "Break-Even" in modus:
                         antwort = berechne_pl_break_even(15000.0, 150.0, 50.0)
                     elif "SWOT" in modus:
                         antwort = starte_swot_analyse(aufgabe, TAVILY_API_KEY, MASTER_OPENAI_KEY, ANTHROPIC_API_KEY)
@@ -272,9 +276,10 @@ else:
                         antwort = ausfuehren_mit_ollama_fallback("Du bist ein Assistent.", aufgabe, use_local=True, master_openai_key=MASTER_OPENAI_KEY, anthropic_api_key=ANTHROPIC_API_KEY)
                     else:
                         # --- VOLLAUTOMATISCHER TOOL-ROUTER ---
-                        # Der Agent entscheidet anhand des Inputs selbst, welches Tool er nutzt
                         lower_aufgabe = aufgabe.lower()
-                        if any(w in lower_aufgabe for w in ["recherche", "suche", "internet", "aktuell", "markt", "konkurrent"]):
+                        if any(w in lower_aufgabe for w in ["schwarm", "team", "experten", "komplex"]):
+                            antwort = hierarchischer_schwarm_agent(aufgabe, MASTER_OPENAI_KEY, ANTHROPIC_API_KEY, TAVILY_API_KEY)
+                        elif any(w in lower_aufgabe for w in ["recherche", "suche", "internet", "aktuell", "markt", "konkurrent"]):
                             antwort = echte_deep_web_recherche(aufgabe, TAVILY_API_KEY, MASTER_OPENAI_KEY, ANTHROPIC_API_KEY)
                         elif any(w in lower_aufgabe for w in ["swot", "analyse", "stärken", "schwächen"]):
                             antwort = starte_swot_analyse(aufgabe, TAVILY_API_KEY, MASTER_OPENAI_KEY, ANTHROPIC_API_KEY)
@@ -285,7 +290,6 @@ else:
                         elif any(w in lower_aufgabe for w in ["wissen", "datenbank", "rag", "dokument"]):
                             antwort = suche_in_rag_vektor_db(aufgabe, MASTER_OPENAI_KEY)
                         else:
-                            # Standard: Selbstevaluierender Lern-Agent mit RAG & Gedächtnis
                             antwort = selbstevaluierender_lern_agent(f"Du bist Assistent für {eingeloggter_kunde}.", aufgabe, use_local=False, master_openai_key=MASTER_OPENAI_KEY, anthropic_api_key=ANTHROPIC_API_KEY)
 
                 st.session_state.chats[current_chat].append({"role": "assistant", "content": antwort})
@@ -293,15 +297,29 @@ else:
                     st.markdown(antwort)
 
         with spalte_rechts:
-            with st.expander("📊 Präsentations- & Export-Studio", expanded=True):
+            with st.expander("📊 Enterprise Export- & Webhook-Studio", expanded=True):
                 export_titel = st.text_input("Dokumenten-Titel:", value="Scion_Mind_Ausarbeitung")
                 aktueller_export_text = st.session_state.chats[current_chat][-1]["content"] if st.session_state.chats[current_chat] else "Kein Text"
                 
                 ex_col1, ex_col2 = st.columns(2)
                 with ex_col1:
                     pdf_data = exportiere_zu_pdf(export_titel, aktueller_export_text, workspace)
-                    st.download_button("📥 Als PDF", data=pdf_data, file_name=f"{export_titel}.pdf", mime="application/pdf", use_container_width=True)
+                    st.download_button("📥 PDF Export", data=pdf_data, file_name=f"{export_titel}.pdf", mime="application/pdf", use_container_width=True)
+                    
+                    xlsx_data = exportiere_zu_xlsx(export_titel, aktueller_export_text, workspace)
+                    if xlsx_data:
+                        st.download_button("📥 Excel (.xlsx)", data=xlsx_data, file_name=f"{export_titel}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
                 with ex_col2:
                     docx_data = exportiere_zu_docx(export_titel, aktueller_export_text, workspace)
                     if docx_data:
-                        st.download_button("📥 Als Word (.docx)", data=docx_data, file_name=f"{export_titel}.docx", use_container_width=True)
+                        st.download_button("📥 Word (.docx)", data=docx_data, file_name=f"{export_titel}.docx", use_container_width=True)
+                        
+                    pptx_data = erstelle_pptx_aus_session(st.session_state.slides_data)
+                    st.download_button("📥 PowerPoint (.pptx)", data=pptx_data, file_name=f"{export_titel}.pptx", mime="application/vnd.openxmlformats-officedocument.presentationml.presentation", use_container_width=True)
+
+                st.write("---")
+                st.markdown("### 🚀 Live-Webhook / Benachrichtigung")
+                webhook_kanal = st.selectbox("Ziel-Kanal:", ["E-Mail (Management)", "WhatsApp Business API", "Interner Webhook"])
+                if st.button("Bericht über Webhook senden"):
+                    status_meldung = sende_webhook_benachrichtigung(webhook_kanal, aktueller_export_text, MASTER_OPENAI_KEY)
+                    st.success(status_meldung)
