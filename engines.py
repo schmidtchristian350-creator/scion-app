@@ -405,7 +405,7 @@ def sende_whatsapp(username, empfaenger_nummer, nachricht):
         return f"WhatsApp-Fehler: {str(e)}"
 
 # ==========================================
-# 🚀 NEU: ERWEITERTE ENTERPRISE MODULE
+# 🚀 ERWEITERTE ENTERPRISE MODULE
 # ==========================================
 
 # 1. Strukturiertes Langzeitgedächtnis (Long-Term Fact Store)
@@ -460,7 +460,6 @@ def playwright_browser_scout(ziel_url, aktion_beschreibung):
             browser.close()
             return f"🌐 [Playwright Live DOM-Extrakt für {ziel_url}]:\n{inhalt[:3000]}"
     except Exception as e:
-        # Fallback wenn Playwright Binary noch nicht installiert ist
         try:
             r = requests.get(ziel_url, timeout=10)
             return f"🌐 [HTTP-Fallback Extrakt für {ziel_url}]:\n{r.text[:2000]}"
@@ -470,7 +469,7 @@ def playwright_browser_scout(ziel_url, aktion_beschreibung):
 # 3. Asynchrone Hintergrund-Jobs (Thread-Runner)
 BACKGROUND_QUEUE = queue.Queue()
 
-defhintergrund_worker_runner(funktion, *args, **kwargs):
+def hintergrund_worker_runner(funktion, *args, **kwargs):
     try:
         ergebnis = funktion(*args, **kwargs)
         BACKGROUND_QUEUE.put(("ERFOLG", ergebnis))
