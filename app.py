@@ -308,7 +308,7 @@ else:
         spalte_links, spalte_rechts = st.columns([1.1, 0.9])
 
         with spalte_links:
-            st.subheader("🤖 Vollautonomer Universal-Agent (GOD-MODE V12.17)")
+            st.subheader("🤖 Vollautonomer Universal-Agent")
             st.caption("⚡ Universeller Betrieb: Steuert Webseiten autonom, generiert Hardware-Programmbefehle und unterstützt Sprachbefehle.")
             
             current_chat = st.session_state.aktiver_chat
