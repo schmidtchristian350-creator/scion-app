@@ -160,6 +160,14 @@ def get_openai_embedding(text, master_openai_key=""):
 def suche_in_rag_vektor_db(query, master_openai_key=""):
     conn = get_db_connection()
     cursor = conn.cursor()
+    # Sicherstellen, dass die Tabelle existiert, falls sie frisch ist
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS rag_documents (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            titel TEXT,
+            inhalt TEXT
+        )
+    """)
     cursor.execute("SELECT titel, inhalt FROM rag_documents")
     docs = cursor.fetchall()
     conn.close()
@@ -208,6 +216,19 @@ def suche_in_rag_vektor_db(query, master_openai_key=""):
 def selbstevaluierender_lern_agent(system_prompt, initial_input, use_local=False, master_openai_key="", anthropic_api_key=""):
     conn = get_db_connection()
     cursor = conn.cursor()
+    
+    # Automatische Erstellung der Tabelle, falls sie in der Cloud noch fehlt
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS agent_memory (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            zeit TEXT,
+            aufgabe_typ TEXT,
+            erkenntnis TEXT,
+            verbesserter_prompt TEXT
+        )
+    """)
+    conn.commit()
+    
     cursor.execute("SELECT zeit, erkenntnis FROM agent_memory ORDER BY id DESC LIMIT 3")
     rows = cursor.fetchall()
     conn.close()
