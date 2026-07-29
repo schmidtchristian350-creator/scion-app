@@ -5,6 +5,11 @@ import base64
 import requests
 import traceback
 import sys
+import smtplib
+import imaplib
+from email.header import decode_header
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 import io as python_io
 from openai import OpenAI
 from database import get_db_connection
@@ -119,7 +124,7 @@ def ausfuehren_in_self_healing_sandbox(code_string, master_openai_key=""):
          
         try:
             local_scope = {}
-            exec(aktueller_code, {"__builtins__": __builtins__, "pd": pd, "requests": requests, "json": json}, local_scope)
+            exec(aktueller_code, {"__builtins__": __builtins__, "pd": pd if 'pd' in globals() else None, "requests": requests, "json": json}, local_scope)
             ergebnis_msg = new_stdout.getvalue()
             sys.stdout = old_stdout
             if not ergebnis_msg:
@@ -288,16 +293,16 @@ def sende_webhook_benachrichtigung(kanal, nachricht, master_openai_key=""):
 
 def autonomer_browser_agent(ziel_url, aktion_beschreibung, master_openai_key=""):
     """
-    Steuert autonom Webseiten und führt Browser-Aktionen / Recherchen aus.
+    Steuert autonom Webseiten, liest Daten aus und kann Änderungen vorbereiten oder durchführen.
     """
-    prompt = f"Du bist ein autonomer Browser-Agent. Ziel-URL: {ziel_url}.\nAktion/Aufgabe: {aktion_beschreibung}\nFühre die Browser-Aktionen virtuell aus und liefere das präzise Ergebnis."
-    return litellm_router_abfrage("Du bist Browser-Automation-Agent.", prompt, model_pref="auto", master_openai_key=master_openai_key)
+    prompt = f"Du bist ein autonomer Browser- und Webseiten-Agent. Ziel-URL: {ziel_url}.\nAktion/Aufgabe: {aktion_beschreibung}\nAnalysiere die Website, fülle Formulare aus, logge dich ein oder nimm Änderungen vor und liefere den präzisen Bericht."
+    return litellm_router_abfrage("Du bist Web-Automation-Expert.", prompt, model_pref="auto", master_openai_key=master_openai_key)
 
 def generiere_desktop_befehl(ziel_programm, aktion_beschreibung, master_openai_key=""):
     """
-    Generiert plattformunabhängige Steuerungsbefehle (für Programme/Hardware) zur manuellen Freigabe.
+    Generiert plattformunabhängige Steuerungsbefehle (Python/PyAutoGUI/OS), um Programme zu steuern und einzuloggen.
     """
-    prompt = f"Erstelle einen präzisen Systembefehl (Python/PyAutoGUI/OS-Befehl), um folgendes Programm zu steuern:\nProgramm: {ziel_programm}\nAktion: {aktion_beschreibung}\nLiefere AUSSCHLIESSLICH den ausführbaren Code/Befehl zurück."
+    prompt = f"Erstelle einen präzisen Systembefehl oder Python-Skript (z.B. via PyAutoGUI oder AppleScript/OS), um folgendes Programm zu steuern, sich einzuloggen oder Daten zu bearbeiten:\nProgramm: {ziel_programm}\nAktion: {aktion_beschreibung}\nLiefere AUSSCHLIESSLICH den ausführbaren Code/Befehl zurück."
     return litellm_router_abfrage("Du bist Desktop-Automation-Engineer.", prompt, model_pref="auto", master_openai_key=master_openai_key)
 
 def verarbeite_sprachbefehl(sprach_text, master_openai_key=""):
@@ -306,3 +311,90 @@ def verarbeite_sprachbefehl(sprach_text, master_openai_key=""):
     """
     prompt = f"Du bist der Sprachassistent auf dem iPhone von Christian. Beantworte diesen Sprachbefehl kurz, präzise und direkt zum Vorlesen:\n{sprach_text}"
     return litellm_router_abfrage("Du bist iPhone Siri-Voice-Agent.", prompt, model_pref="auto", master_openai_key=master_openai_key)
+
+def lade_letzte_emails(username):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT imap_server, email_adresse, email_passwort FROM email_config WHERE username = ?", (username,))
+    row = cursor.fetchone()
+    conn.close()
+    if not row:
+        return "Keine Mail-Config hinterlegt."
+    imap_s, mail_adr, mail_pwd = row
+    try:
+        mail = imaplib.IMAP4_SSL(imap_s)
+        mail.login(mail_adr, mail_pwd)
+        mail.select("inbox")
+        status, messages = mail.search(None, "UNSEEN")
+        if status != "OK":
+            status, messages = mail.search(None, "ALL")
+        mail_ids = messages[0].split()
+        neueste_ids = mail_ids[-5:]
+        ergebnis_liste = []
+        for mid in reversed(neueste_ids):
+            res, msg_data = mail.fetch(mid, "(RFC822)")
+            for response_part in msg_data:
+                if isinstance(response_part, tuple):
+                    import email
+                    msg = email.message_from_bytes(response_part[1])
+                    subject, encoding = decode_header(msg["Subject"])[0]
+                    if isinstance(subject, bytes):
+                        subject = subject.decode(encoding or "utf-8", errors="ignore")
+                    ergebnis_liste.append(f"- **Von:** {msg.get('From')}\n  **Betreff:** {subject}")
+        mail.logout()
+        return "\n\n".join(ergebnis_liste) if ergebnis_liste else "Keine neuen Mails."
+    except Exception as e:
+        if SENTRY_AVAILABLE:
+            sentry_sdk.capture_exception(e)
+        return f"IMAP-Fehler: {str(e)}"
+
+def sende_email(username, empfaenger, betreff, inhalt):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT smtp_server, email_adresse, email_passwort FROM email_config WHERE username = ?", (username,))
+    row = cursor.fetchone()
+    conn.close()
+    if not row:
+        return "Fehler: Keine E-Mail-Config hinterlegt."
+    smtp_s, mail_adr, mail_pwd = row
+    try:
+        msg = MIMEMultipart()
+        msg['From'] = mail_adr
+        msg['To'] = empfaenger
+        msg['Subject'] = betreff
+        msg.attach(MIMEText(inhalt, 'plain'))
+        server = smtplib.SMTP_SSL(smtp_s, 465)
+        server.login(mail_adr, mail_pwd)
+        server.sendmail(mail_adr, empfaenger, msg.as_string())
+        server.quit()
+        return "E-Mail erfolgreich gesendet!"
+    except Exception as e:
+        if SENTRY_AVAILABLE:
+            sentry_sdk.capture_exception(e)
+        return f"SMTP-Fehler: {str(e)}"
+
+def sende_whatsapp(username, empfaenger_nummer, nachricht):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT provider, api_token, phone_id FROM whatsapp_config WHERE username = ?", (username,))
+    row = cursor.fetchone()
+    conn.close()
+    if not row:
+        return "Fehler: Keine WhatsApp-Config hinterlegt."
+    provider, token, phone_id = row
+    try:
+        if "Meta" in provider:
+            url = f"[https://graph.facebook.com/v17.0/](https://graph.facebook.com/v17.0/){phone_id}/messages"
+            headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+            payload = {"messaging_product": "whatsapp", "to": empfaenger_nummer, "type": "text", "text": {"body": nachricht}}
+            res = requests.post(url, json=payload, headers=headers).json()
+            return f"WhatsApp über Meta gesendet! Antwort: {res}"
+        else:
+            from twilio.rest import Client
+            client = Client(phone_id, token)
+            msg = client.messages.create(body=nachricht, from_='whatsapp:+14155238886', to=f'whatsapp:{empfaenger_nummer}')
+            return f"WhatsApp über Twilio! ID: {msg.sid}"
+    except Exception as e:
+        if SENTRY_AVAILABLE:
+            sentry_sdk.capture_exception(e)
+        return f"WhatsApp-Fehler: {str(e)}"
