@@ -12,7 +12,7 @@ from engines import (
     litellm_router_abfrage, ausfuehren_mit_ollama_fallback, echte_deep_web_recherche,
     berechne_pl_break_even, starte_swot_analyse, ausfuehren_in_self_healing_sandbox,
     suche_in_rag_vektor_db, selbstevaluierender_lern_agent, verschruessle_api_key, ent_huelle_api_key,
-    hierarchischer_schwarm_agent, sende_webhook_benachrichtigung
+    hierarchischer_schwarm_agent, sende_webhook_benachrichtigung, autonomer_browser_agent, generiere_desktop_befehl
 )
 from exporters import (
     exportiere_zu_docx, exportiere_zu_xlsx, exportiere_zu_pdf, erstelle_pptx_aus_session, erstelle_pdf_aus_session
@@ -51,6 +51,9 @@ ADMIN_PASS = "ScionMind#2026!Secured"
 
 if "session_verrauchter_betrag" not in st.session_state:
     st.session_state.session_verrauchter_betrag = 0.0
+
+if "pending_desktop_action" not in st.session_state:
+    st.session_state.pending_desktop_action = None
 
 def berechne_und_ziehe_credits_ab(username, kosten, grund="Agenten-Nutzung"):
     if username != ADMIN_NAME:
@@ -234,8 +237,8 @@ else:
         spalte_links, spalte_rechts = st.columns([1.1, 0.9])
 
         with spalte_links:
-            st.subheader("🤖 Autonomer Master-Agent (GOD-MODE V12.17)")
-            st.caption("⚡ Vollautonomer Betrieb: Der Agent wählt alle Werkzeuge, Recherchen und Berechnungen eigenständig aus.")
+            st.subheader("🤖 Vollautonomer Universal-Agent (GOD-MODE V12.17)")
+            st.caption("⚡ Universeller Betrieb: Steuert Webseiten autonom und generiert Hardware-Programmbefehle zur manuellen Freigabe.")
             
             current_chat = st.session_state.aktiver_chat
             
@@ -243,41 +246,67 @@ else:
                 with st.chat_message(message["role"]):
                     st.markdown(message["content"])
 
-            aufgabe = st.chat_input("Gib dem Agenten eine komplexe Aufgabe...")
+            aufgabe = st.chat_input("Gib dem Agenten eine komplexe Aufgabe (Web, Programme, Analyse)...")
             if aufgabe:
                 berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005, grund="Agenten-Aktion")
                 st.session_state.chats[current_chat].append({"role": "user", "content": aufgabe})
                 with st.chat_message("user"):
                     st.markdown(aufgabe)
 
-                with st.spinner("🤖 Autonomer Master-Agent analysiert und arbeitet..."):
+                with st.spinner("🤖 Universal-Agent plant und steuert Aktionen..."):
                     lower_aufgabe = aufgabe.lower()
                     
-                    # 1. Komplexe Aufgaben / Multi-Agenten-Schwarm bei strategischen / umfassenden Themen
-                    if any(w in lower_aufgabe for w in ["komplex", "strategie", "schwarm", "team", "vollständig", "analyse & konzept"]):
+                    # 1. Autonome Webseiten- & Browser-Steuerung
+                    if any(w in lower_aufgabe for w in ["surfe", "öffne webseite", "klicke auf", "browser", "web-automation", "navigiere"]):
+                        antwort = autonomer_browser_agent("https://google.com", aufgabe, MASTER_OPENAI_KEY)
+                    
+                    # 2. Programm-Steuerung auf Hardware mit manueller Freigabe (Human-in-the-Loop)
+                    elif any(w in lower_aufgabe for w in ["öffne programm", "starte app", "excel", "programm steuern", "klicke app", "applikation"]):
+                        st.session_state.pending_desktop_action = generiere_desktop_befehl("Universal-OS", aufgabe, MASTER_OPENAI_KEY)
+                        antwort = f"⚠️ **Sicherheitsabfrage zur Programm-Steuerung (Human-in-the-Loop)**\n\nDer Agent möchte folgendes Programm auf deiner Hardware steuern:\n```bash\n{st.session_state.pending_desktop_action}\n```\nBitte bestätige die Ausführung über den Button unten."
+                    
+                    # 3. Komplexe Aufgaben / Multi-Agenten-Schwarm
+                    elif any(w in lower_aufgabe for w in ["komplex", "strategie", "schwarm", "team", "vollständig", "analyse & konzept"]):
                         antwort = hierarchischer_schwarm_agent(aufgabe, MASTER_OPENAI_KEY, ANTHROPIC_API_KEY, TAVILY_API_KEY)
-                    # 2. Live-Webrecherche bei aktuellen Markt- oder Konkurrenzfragen
+                    # 4. Live-Webrecherche
                     elif any(w in lower_aufgabe for w in ["recherche", "suche", "internet", "aktuell", "markt", "konkurrent", "wettbewerber"]):
                         antwort = echte_deep_web_recherche(aufgabe, TAVILY_API_KEY, MASTER_OPENAI_KEY, ANTHROPIC_API_KEY)
-                    # 3. SWOT-Analyse bei Firmen- oder Produktbezug
+                    # 5. SWOT-Analyse
                     elif any(w in lower_aufgabe for w in ["swot", "stärken", "schwächen", "chancen", "risiken"]):
                         antwort = starte_swot_analyse(aufgabe, TAVILY_API_KEY, MASTER_OPENAI_KEY, ANTHROPIC_API_KEY)
-                    # 4. Finanz- & Break-Even-Berechnung bei Kosten- oder Margenfragen
+                    # 6. Finanz- & Break-Even-Berechnung
                     elif any(w in lower_aufgabe for w in ["break-even", "p&l", "fixkosten", "kosten", "marge", "gewinn"]):
                         antwort = berechne_pl_break_even(15000.0, 150.0, 50.0)
-                    # 5. Code-Ausführung bei Programmieraufgaben
-                    elif any(w in lower_aufgabe for w in ["python", "code", "skript", "programm", "ausführen"]):
+                    # 7. Code-Ausführung / Sandbox
+                    elif any(w in lower_aufgabe for w in ["python", "code", "skript", "ausführen"]):
                         antwort = ausfuehren_in_self_healing_sandbox(aufgabe, MASTER_OPENAI_KEY)
-                    # 6. Wissens-Abfrage bei Dokumentenbezug
+                    # 8. Wissens-Abfrage / RAG
                     elif any(w in lower_aufgabe for w in ["wissen", "datenbank", "rag", "archiv", "dokument"]):
                         antwort = suche_in_rag_vektor_db(aufgabe, MASTER_OPENAI_KEY)
-                    # 7. Standard: Autonomer Lern-Agent mit RAG, Web-Fallback und Gedächtnis
+                    # 9. Standard: Autonomer Lern-Agent
                     else:
                         antwort = selbstevaluierender_lern_agent(f"Du bist der autonome Enterprise Master-Agent für {eingeloggter_kunde}.", aufgabe, use_local=False, master_openai_key=MASTER_OPENAI_KEY, anthropic_api_key=ANTHROPIC_API_KEY)
 
                 st.session_state.chats[current_chat].append({"role": "assistant", "content": antwort})
                 with st.chat_message("assistant"):
                     st.markdown(antwort)
+
+            # Manuelle Freigabe-Schnittstelle für lokale Programm-Steuerung auf Hardware
+            if st.session_state.pending_desktop_action:
+                st.warning("🔒 **Ausstehende Programm-Steuerung auf deiner Hardware erfordert deine manuelle Freigabe:**")
+                col_f1, col_f2 = st.columns(2)
+                with col_f1:
+                    if st.button("✅ Aktion bestätigen & ausführen"):
+                        exec_res = ausfuehren_in_self_healing_sandbox(st.session_state.pending_desktop_action, MASTER_OPENAI_KEY)
+                        st.success("Programm erfolgreich auf Hardware gesteuert!")
+                        st.markdown(exec_res)
+                        st.session_state.pending_desktop_action = None
+                        st.rerun()
+                with col_f2:
+                    if st.button("❌ Verwerfen / Abbrechen"):
+                        st.session_state.pending_desktop_action = None
+                        st.info("Aktion wurde verworfen.")
+                        st.rerun()
 
         with spalte_rechts:
             with st.expander("📊 Enterprise Export- & Webhook-Studio", expanded=True):
