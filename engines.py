@@ -7,6 +7,7 @@ import traceback
 import sys
 import smtplib
 import imaplib
+import ssl
 from email.header import decode_header
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -124,7 +125,7 @@ def ausfuehren_in_self_healing_sandbox(code_string, master_openai_key=""):
          
         try:
             local_scope = {}
-            exec(aktueller_code, {"__builtins__": __builtins__, "pd": pd if 'pd' in globals() else None, "requests": requests, "json": json}, local_scope)
+            exec(aktueller_code, {"__builtins__": __builtins__, "pd": pd if 'pd' in globals() else None, "requests": requests, "json": json, "ssl": ssl}, local_scope)
             ergebnis_msg = new_stdout.getvalue()
             sys.stdout = old_stdout
             if not ergebnis_msg:
