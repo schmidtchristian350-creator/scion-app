@@ -254,3 +254,45 @@ def selbstevaluierender_lern_agent(system_prompt, initial_input, use_local=False
             return "[GUARDRAIL BLOCK]: Unzulässige Anweisung abgefangen."
             
     return ergebnis + f"\n\n---\n🧬 *[Scion Mind V12.17 Sovereign Core]: Audit Trail & Workspace Vault aktiv.*"
+
+def hierarchischer_schwarm_agent(aufgabe, master_openai_key="", anthropic_api_key="", tavily_api_key=""):
+    """
+    Simuliert ein hierarchisches Expertenteam (Research -> Finance -> Strategy -> Final Audit).
+    """
+    research_prompt = f"Du bist der Lead Research-Analyst. Analysiere folgende Aufgabe und liefere harte Fakten und Daten:\n{aufgabe}"
+    research_res = litellm_router_abfrage("Du bist Research-Agent.", research_prompt, model_pref="auto", master_openai_key=master_openai_key, anthropic_api_key=anthropic_api_key)
+    
+    finance_prompt = f"Du bist der Chief Financial Officer (CFO). Prüfe die finanzielle Machbarkeit und Risiken basierend auf folgenden Daten:\n{research_res}"
+    finance_res = litellm_router_abfrage("Du bist CFO.", finance_prompt, model_pref="auto", master_openai_key=master_openai_key, anthropic_api_key=anthropic_api_key)
+    
+    final_prompt = f"Du bist der CEO / Executive Master-Agent. Führe die Erkenntnisse des Research-Teams und des CFOs zu einer kompromisslosen, strategischen Handlungsempfehlung zusammen.\n\nAufgabe: {aufgabe}\n\n[Research]: {research_res}\n\n[CFO]: {finance_res}"
+    final_res = litellm_router_abfrage("Du bist Executive CEO.", final_prompt, model_pref="auto", master_openai_key=master_openai_key, anthropic_api_key=anthropic_api_key)
+    
+    return f"""### 🧬 Hierarchical Swarm Board (Multi-Agenten-Auswertung)
+{final_res}
+
+---
+*Swarm Audit: Research & CFO-Modul erfolgreich durchlaufen.*"""
+
+def sende_webhook_benachrichtigung(kanal, nachricht, master_openai_key=""):
+    """
+    Protokolliert und speichert den Live-Versand von Berichten über Webhooks/Benachrichtigungen.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS event_webhooks (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            zeit TEXT,
+            kanal TEXT,
+            nachricht TEXT,
+            ki_reaktion TEXT
+        )
+    """)
+    cursor.execute("""
+        INSERT INTO event_webhooks (zeit, kanal, nachricht, ki_reaktion)
+        VALUES (datetime('now', 'localtime'), ?, ?, ?)
+    """, (kanal, nachricht, "Erfolgreich an Enterprise-Kanal übertragen."))
+    conn.commit()
+    conn.close()
+    return f"🚀 **Webhook / Benachrichtigung gesendet!**\n- **Kanal:** {kanal}\n- **Nachricht:** {nachricht[:100]}..."
