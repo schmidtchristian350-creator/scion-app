@@ -8,6 +8,8 @@ import sys
 import smtplib
 import imaplib
 import ssl
+import threading
+import queue
 from email.header import decode_header
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -401,3 +403,104 @@ def sende_whatsapp(username, empfaenger_nummer, nachricht):
         if SENTRY_AVAILABLE:
             sentry_sdk.capture_exception(e)
         return f"WhatsApp-Fehler: {str(e)}"
+
+# ==========================================
+# 🚀 NEU: ERWEITERTE ENTERPRISE MODULE
+# ==========================================
+
+# 1. Strukturiertes Langzeitgedächtnis (Long-Term Fact Store)
+def speichere_langzeit_fakten(kategorie, fakt, master_openai_key=""):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS agent_longterm_memory (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            zeit TEXT,
+            kategorie TEXT,
+            fakt TEXT
+        )
+    """)
+    cursor.execute("INSERT INTO agent_longterm_memory (zeit, kategorie, fakt) VALUES (datetime('now', 'localtime'), ?, ?)", (kategorie, fakt))
+    conn.commit()
+    conn.close()
+    return f"🧠 Langzeitgedächtnis aktualisiert [{kategorie}]: {fakt}"
+
+def lade_langzeit_fakten(kategorie=""):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS agent_longterm_memory (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            zeit TEXT,
+            kategorie TEXT,
+            fakt TEXT
+        )
+    """)
+    if kategorie:
+        cursor.execute("SELECT zeit, fakt FROM agent_longterm_memory WHERE kategorie = ? ORDER BY id DESC LIMIT 5", (kategorie,))
+    else:
+        cursor.execute("SELECT zeit, kategorie, fakt FROM agent_longterm_memory ORDER BY id DESC LIMIT 5")
+    rows = cursor.fetchall()
+    conn.close()
+    return rows
+
+# 2. Playwright Headless Browser Agent (Echtes JavaScript & DOM Auslesen)
+def playwright_browser_scout(ziel_url, aktion_beschreibung):
+    """
+    Führt eine echte Browser-Extraktion aus (nutzt Playwright, falls lokal installiert, 
+    sonst Fallback auf requests).
+    """
+    try:
+        from playwright.sync_api import sync_playwright
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page()
+            page.goto(ziel_url, timeout=30000)
+            inhalt = page.inner_text("body")
+            browser.close()
+            return f"🌐 [Playwright Live DOM-Extrakt für {ziel_url}]:\n{inhalt[:3000]}"
+    except Exception as e:
+        # Fallback wenn Playwright Binary noch nicht installiert ist
+        try:
+            r = requests.get(ziel_url, timeout=10)
+            return f"🌐 [HTTP-Fallback Extrakt für {ziel_url}]:\n{r.text[:2000]}"
+        except Exception as ex:
+            return f"Playwright/Browser Fehler: {str(e)} | Fallback Fehler: {str(ex)}"
+
+# 3. Asynchrone Hintergrund-Jobs (Thread-Runner)
+BACKGROUND_QUEUE = queue.Queue()
+
+defhintergrund_worker_runner(funktion, *args, **kwargs):
+    try:
+        ergebnis = funktion(*args, **kwargs)
+        BACKGROUND_QUEUE.put(("ERFOLG", ergebnis))
+    except Exception as e:
+        BACKGROUND_QUEUE.put(("FEHLER", str(e)))
+
+def starte_hintergrund_aufgabe(funktion, *args, **kwargs):
+    t = threading.Thread(target=hintergrund_worker_runner, args=(funktion,)+args, kwargs=kwargs)
+    t.daemon = True
+    t.start()
+    return "⏳ Hintergrund-Job gestartet. Verarbeitet asynchron..."
+
+# 4. Human-in-the-Loop Guardrail (Freigabe-Schleife)
+def prade_human_in_the_loop_freigabe(aktion_typ, payload):
+    """
+    Prüft ob eine kritische Aktion (E-Mail, Web-Änderung) manuell freigegeben werden muss.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS human_approval_queue (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            zeit TEXT,
+            aktion_typ TEXT,
+            payload TEXT,
+            status TEXT
+        )
+    """)
+    cursor.execute("INSERT INTO human_approval_queue (zeit, aktion_typ, payload, status) VALUES (datetime('now', 'localtime'), ?, ?, ?)",
+                   (aktion_typ, payload, "AUSSTEHEND"))
+    conn.commit()
+    conn.close()
+    return f"🛡️ **Human-in-the-Loop Guardrail aktiv:** Aktion '{aktion_typ}' angehalten. Wartet im Vault auf deine manuelle Freigabe."
