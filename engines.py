@@ -297,23 +297,14 @@ def sende_webhook_benachrichtigung(kanal, nachricht, master_openai_key=""):
     return f"🚀 **Webhook / Benachrichtigung gesendet!**\n- **Kanal:** {kanal}\n- **Nachricht:** {nachricht[:100]}..."
 
 def autonomer_browser_agent(ziel_url, aktion_beschreibung, master_openai_key=""):
-    """
-    Steuert autonom Webseiten, liest Daten aus und kann Änderungen vorbereiten oder durchführen.
-    """
     prompt = f"Du bist ein autonomer Browser- und Webseiten-Agent. Ziel-URL: {ziel_url}.\nAktion/Aufgabe: {aktion_beschreibung}\nAnalysiere die Website, fülle Formulare aus, logge dich ein oder nimm Änderungen vor und liefere den präzisen Bericht."
     return litellm_router_abfrage("Du bist Web-Automation-Expert.", prompt, model_pref="auto", master_openai_key=master_openai_key)
 
 def generiere_desktop_befehl(ziel_programm, aktion_beschreibung, master_openai_key=""):
-    """
-    Generiert plattformunabhängige Steuerungsbefehle (Python/PyAutoGUI/OS), um Programme zu steuern und einzuloggen.
-    """
     prompt = f"Erstelle einen präzisen Systembefehl oder Python-Skript (z.B. via PyAutoGUI oder AppleScript/OS), um folgendes Programm zu steuern, sich einzuloggen oder Daten zu bearbeiten:\nProgramm: {ziel_programm}\nAktion: {aktion_beschreibung}\nLiefere AUSSCHLIESSLICH den ausführbaren Code/Befehl zurück."
     return litellm_router_abfrage("Du bist Desktop-Automation-Engineer.", prompt, model_pref="auto", master_openai_key=master_openai_key)
 
 def verarbeite_sprachbefehl(sprach_text, master_openai_key=""):
-    """
-    Verarbeitet den diktierten Text vom iPhone und gibt eine präzise Antwort aus.
-    """
     prompt = f"Du bist der Sprachassistent auf dem iPhone von Christian. Beantworte diesen Sprachbefehl kurz, präzise und direkt zum Vorlesen:\n{sprach_text}"
     return litellm_router_abfrage("Du bist iPhone Siri-Voice-Agent.", prompt, model_pref="auto", master_openai_key=master_openai_key)
 
@@ -405,101 +396,27 @@ def sende_whatsapp(username, empfaenger_nummer, nachricht):
         return f"WhatsApp-Fehler: {str(e)}"
 
 # ==========================================
-# 🚀 ERWEITERTE ENTERPRISE MODULE
+# 🎯 DIREKTE PERSONEN- UND LEAD-SUCHE
 # ==========================================
 
-# 1. Strukturiertes Langzeitgedächtnis (Long-Term Fact Store)
-def speichere_langzeit_fakten(kategorie, fakt, master_openai_key=""):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS agent_longterm_memory (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            zeit TEXT,
-            kategorie TEXT,
-            fakt TEXT
-        )
-    """)
-    cursor.execute("INSERT INTO agent_longterm_memory (zeit, kategorie, fakt) VALUES (datetime('now', 'localtime'), ?, ?)", (kategorie, fakt))
-    conn.commit()
-    conn.close()
-    return f"🧠 Langzeitgedächtnis aktualisiert [{kategorie}]: {fakt}"
+def suche_ziel_leads(ziel_position, unternehmen_oder_branche, tavily_api_key="", master_openai_key="", anthropic_api_key=""):
+    suchanfrage = f"site:[linkedin.com/in](https://linkedin.com/in) OR site:xing.com {ziel_position} {unternehmen_oder_branche}"
+    web_daten = echte_deep_web_recherche(suchanfrage, tavily_api_key, master_openai_key, anthropic_api_key)
+    
+    prompt = f"""Du bist ein erfahrener B2B-Sales- und Lead-Generation-Experte. 
+Analysiere die folgenden Web-Suchergebnisse und extrahiere eine saubere Liste von potenziellen Leads (Entscheidern).
 
-def lade_langzeit_fakten(kategorie=""):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS agent_longterm_memory (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            zeit TEXT,
-            kategorie TEXT,
-            fakt TEXT
-        )
-    """)
-    if kategorie:
-        cursor.execute("SELECT zeit, fakt FROM agent_longterm_memory WHERE kategorie = ? ORDER BY id DESC LIMIT 5", (kategorie,))
-    else:
-        cursor.execute("SELECT zeit, kategorie, fakt FROM agent_longterm_memory ORDER BY id DESC LIMIT 5")
-    rows = cursor.fetchall()
-    conn.close()
-    return rows
+Suchanfrage: {suchanfrage}
+Rohes Datenmaterial:
+{web_daten}
 
-# 2. Playwright Headless Browser Agent (Echtes JavaScript & DOM Auslesen)
-def playwright_browser_scout(ziel_url, aktion_beschreibung):
-    """
-    Führt eine echte Browser-Extraktion aus (nutzt Playwright, falls lokal installiert, 
-    sonst Fallback auf requests).
-    """
-    try:
-        from playwright.sync_api import sync_playwright
-        with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
-            page = browser.new_page()
-            page.goto(ziel_url, timeout=30000)
-            inhalt = page.inner_text("body")
-            browser.close()
-            return f"🌐 [Playwright Live DOM-Extrakt für {ziel_url}]:\n{inhalt[:3000]}"
-    except Exception as e:
-        try:
-            r = requests.get(ziel_url, timeout=10)
-            return f"🌐 [HTTP-Fallback Extrakt für {ziel_url}]:\n{r.text[:2000]}"
-        except Exception as ex:
-            return f"Playwright/Browser Fehler: {str(e)} | Fallback Fehler: {str(ex)}"
+Erstelle eine übersichtliche Liste mit folgenden Details pro Lead (sofern auffindbar):
+1. Vollständiger Name
+2. Aktuelle Rolle / Position
+3. Unternehmen
+4. Profil-Link (URL)
+5. Relevanter Kontext für die Kontaktaufnahme
 
-# 3. Asynchrone Hintergrund-Jobs (Thread-Runner)
-BACKGROUND_QUEUE = queue.Queue()
+Falls keine genauen Daten auffindbar sind, gib plausible Hinweise, wo man sie findet, aber fokussiere dich primär auf echte Treffer aus den Daten."""
 
-def hintergrund_worker_runner(funktion, *args, **kwargs):
-    try:
-        ergebnis = funktion(*args, **kwargs)
-        BACKGROUND_QUEUE.put(("ERFOLG", ergebnis))
-    except Exception as e:
-        BACKGROUND_QUEUE.put(("FEHLER", str(e)))
-
-def starte_hintergrund_aufgabe(funktion, *args, **kwargs):
-    t = threading.Thread(target=hintergrund_worker_runner, args=(funktion,)+args, kwargs=kwargs)
-    t.daemon = True
-    t.start()
-    return "⏳ Hintergrund-Job gestartet. Verarbeitet asynchron..."
-
-# 4. Human-in-the-Loop Guardrail (Freigabe-Schleife)
-def prade_human_in_the_loop_freigabe(aktion_typ, payload):
-    """
-    Prüft ob eine kritische Aktion (E-Mail, Web-Änderung) manuell freigegeben werden muss.
-    """
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS human_approval_queue (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            zeit TEXT,
-            aktion_typ TEXT,
-            payload TEXT,
-            status TEXT
-        )
-    """)
-    cursor.execute("INSERT INTO human_approval_queue (zeit, aktion_typ, payload, status) VALUES (datetime('now', 'localtime'), ?, ?, ?)",
-                   (aktion_typ, payload, "AUSSTEHEND"))
-    conn.commit()
-    conn.close()
-    return f"🛡️ **Human-in-the-Loop Guardrail aktiv:** Aktion '{aktion_typ}' angehalten. Wartet im Vault auf deine manuelle Freigabe."
+    return litellm_router_abfrage("Du bist Lead-Gen-Spezialist.", prompt, model_pref="auto", master_openai_key=master_openai_key, anthropic_api_key=anthropic_api_key)
