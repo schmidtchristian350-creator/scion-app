@@ -234,19 +234,8 @@ else:
         spalte_links, spalte_rechts = st.columns([1.1, 0.9])
 
         with spalte_links:
-            st.subheader("🤖 Autonomer KI-Agent (GOD-MODE V12.17)")
-            modus = st.selectbox(
-                "Agenten-Modus wählen:",
-                [
-                    "🤖 Autonomer Master-Agent (Automatischer Tool-Router)", 
-                    "🧬 Multi-Agenten-Schwarm (Hierarchical Swarm Board)",
-                    "📊 Analytics & P&L Break-Even Rechner",
-                    "📊 Konkurrenten SWOT-Analyzer",
-                    "🛠️ Closed-Loop Self-Healing Sandbox (REPL)",
-                    "📚 Vektor-DB & RAG (Wissens-Archiv)",
-                    "🟢 Lokaler Ollama Fallback (Zero-Cloud)"
-                ]
-            )
+            st.subheader("🤖 Autonomer Master-Agent (GOD-MODE V12.17)")
+            st.caption("⚡ Vollautonomer Betrieb: Der Agent wählt alle Werkzeuge, Recherchen und Berechnungen eigenständig aus.")
             
             current_chat = st.session_state.aktiver_chat
             
@@ -254,43 +243,37 @@ else:
                 with st.chat_message(message["role"]):
                     st.markdown(message["content"])
 
-            aufgabe = st.chat_input("Gib dem Agenten eine Aufgabe...")
+            aufgabe = st.chat_input("Gib dem Agenten eine komplexe Aufgabe...")
             if aufgabe:
                 berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005, grund="Agenten-Aktion")
                 st.session_state.chats[current_chat].append({"role": "user", "content": aufgabe})
                 with st.chat_message("user"):
                     st.markdown(aufgabe)
 
-                with st.spinner("🤖 Agent analysiert Aufgabe und arbeitet..."):
-                    if "Schwarm" in modus:
+                with st.spinner("🤖 Autonomer Master-Agent analysiert und arbeitet..."):
+                    lower_aufgabe = aufgabe.lower()
+                    
+                    # 1. Komplexe Aufgaben / Multi-Agenten-Schwarm bei strategischen / umfassenden Themen
+                    if any(w in lower_aufgabe for w in ["komplex", "strategie", "schwarm", "team", "vollständig", "analyse & konzept"]):
                         antwort = hierarchischer_schwarm_agent(aufgabe, MASTER_OPENAI_KEY, ANTHROPIC_API_KEY, TAVILY_API_KEY)
-                    elif "Break-Even" in modus:
-                        antwort = berechne_pl_break_even(15000.0, 150.0, 50.0)
-                    elif "SWOT" in modus:
+                    # 2. Live-Webrecherche bei aktuellen Markt- oder Konkurrenzfragen
+                    elif any(w in lower_aufgabe for w in ["recherche", "suche", "internet", "aktuell", "markt", "konkurrent", "wettbewerber"]):
+                        antwort = echte_deep_web_recherche(aufgabe, TAVILY_API_KEY, MASTER_OPENAI_KEY, ANTHROPIC_API_KEY)
+                    # 3. SWOT-Analyse bei Firmen- oder Produktbezug
+                    elif any(w in lower_aufgabe for w in ["swot", "stärken", "schwächen", "chancen", "risiken"]):
                         antwort = starte_swot_analyse(aufgabe, TAVILY_API_KEY, MASTER_OPENAI_KEY, ANTHROPIC_API_KEY)
-                    elif "Sandbox" in modus:
+                    # 4. Finanz- & Break-Even-Berechnung bei Kosten- oder Margenfragen
+                    elif any(w in lower_aufgabe for w in ["break-even", "p&l", "fixkosten", "kosten", "marge", "gewinn"]):
+                        antwort = berechne_pl_break_even(15000.0, 150.0, 50.0)
+                    # 5. Code-Ausführung bei Programmieraufgaben
+                    elif any(w in lower_aufgabe for w in ["python", "code", "skript", "programm", "ausführen"]):
                         antwort = ausfuehren_in_self_healing_sandbox(aufgabe, MASTER_OPENAI_KEY)
-                    elif "RAG" in modus:
+                    # 6. Wissens-Abfrage bei Dokumentenbezug
+                    elif any(w in lower_aufgabe for w in ["wissen", "datenbank", "rag", "archiv", "dokument"]):
                         antwort = suche_in_rag_vektor_db(aufgabe, MASTER_OPENAI_KEY)
-                    elif "Ollama" in modus:
-                        antwort = ausfuehren_mit_ollama_fallback("Du bist ein Assistent.", aufgabe, use_local=True, master_openai_key=MASTER_OPENAI_KEY, anthropic_api_key=ANTHROPIC_API_KEY)
+                    # 7. Standard: Autonomer Lern-Agent mit RAG, Web-Fallback und Gedächtnis
                     else:
-                        # --- VOLLAUTOMATISCHER TOOL-ROUTER ---
-                        lower_aufgabe = aufgabe.lower()
-                        if any(w in lower_aufgabe for w in ["schwarm", "team", "experten", "komplex"]):
-                            antwort = hierarchischer_schwarm_agent(aufgabe, MASTER_OPENAI_KEY, ANTHROPIC_API_KEY, TAVILY_API_KEY)
-                        elif any(w in lower_aufgabe for w in ["recherche", "suche", "internet", "aktuell", "markt", "konkurrent"]):
-                            antwort = echte_deep_web_recherche(aufgabe, TAVILY_API_KEY, MASTER_OPENAI_KEY, ANTHROPIC_API_KEY)
-                        elif any(w in lower_aufgabe for w in ["swot", "analyse", "stärken", "schwächen"]):
-                            antwort = starte_swot_analyse(aufgabe, TAVILY_API_KEY, MASTER_OPENAI_KEY, ANTHROPIC_API_KEY)
-                        elif any(w in lower_aufgabe for w in ["break-even", "p&l", "fixkosten", "kosten", "marge"]):
-                            antwort = berechne_pl_break_even(15000.0, 150.0, 50.0)
-                        elif any(w in lower_aufgabe for w in ["python", "code", "skript", "ausführen", "sandbox"]):
-                            antwort = ausfuehren_in_self_healing_sandbox(aufgabe, MASTER_OPENAI_KEY)
-                        elif any(w in lower_aufgabe for w in ["wissen", "datenbank", "rag", "dokument"]):
-                            antwort = suche_in_rag_vektor_db(aufgabe, MASTER_OPENAI_KEY)
-                        else:
-                            antwort = selbstevaluierender_lern_agent(f"Du bist Assistent für {eingeloggter_kunde}.", aufgabe, use_local=False, master_openai_key=MASTER_OPENAI_KEY, anthropic_api_key=ANTHROPIC_API_KEY)
+                        antwort = selbstevaluierender_lern_agent(f"Du bist der autonome Enterprise Master-Agent für {eingeloggter_kunde}.", aufgabe, use_local=False, master_openai_key=MASTER_OPENAI_KEY, anthropic_api_key=ANTHROPIC_API_KEY)
 
                 st.session_state.chats[current_chat].append({"role": "assistant", "content": antwort})
                 with st.chat_message("assistant"):
