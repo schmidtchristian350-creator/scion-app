@@ -1,14 +1,15 @@
 import streamlit as st
+from openai import OpenAI
+from pptx import Presentation
+from io import BytesIO
+import re
+import requests
 import time
 import json
-import base64
-import secrets
-import threading
+import sqlite3
 import pandas as pd
-from openai import OpenAI
-from database import init_db, get_db_connection
-from engines import ausfuehren_mit_ollama_fallback, echte_deep_web_recherche, berechne_pl_break_even, starte_swot_analyse, ausfuehren_in_self_healing_sandbox, suche_in_rag_vektor_db, selbstevaluierender_lern_agent, verschruessle_api_key, ent_huelle_api_key, hierarchischer_schwarm_agent, sende_webhook_benachrichtigung, autonomer_browser_agent, generiere_desktop_befehl, verarbeite_sprachbefehl
-from exporters import exportiere_zu_docx, exportiere_zu_xlsx, exportiere_zu_pdf, erstelle_pptx_aus_session, erstelle_pdf_aus_session
+# Hier die Importe aus deiner engines-Datei ganz sauber ohne Sonderzeichen einfügen:
+from engines import ausfuehren_mit_ollama_fallback, echte_deep_web_recherche
 
 # Initialisierung der Datenbank
 init_db()
