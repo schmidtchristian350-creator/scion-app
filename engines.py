@@ -420,3 +420,32 @@ Erstelle eine übersichtliche Liste mit folgenden Details pro Lead (sofern auffi
 Falls keine genauen Daten auffindbar sind, gib plausible Hinweise, wo man sie findet, aber fokussiere dich primär auf echte Treffer aus den Daten."""
 
     return litellm_router_abfrage("Du bist Lead-Gen-Spezialist.", prompt, model_pref="auto", master_openai_key=master_openai_key, anthropic_api_key=anthropic_api_key)
+
+# ==========================================
+# 📞 NEU: TELEFONBUCH- & RUFNUMMERN-SUCHE
+# ==========================================
+
+def suche_telefonnummer_und_kontakte(name_oder_firma, ort_oder_bereich="", tavily_api_key="", master_openai_key="", anthropic_api_key=""):
+    """
+    Sucht gezielt nach Telefonnummern, Kontaktdaten oder offiziellen Einträgen 
+    von Personen, Firmen oder Behörden.
+    """
+    suchanfrage = f"Telefonnummer Kontakt Impressum {name_oder_firma} {ort_oder_bereich}"
+    web_daten = echte_deep_web_recherche(suchanfrage, tavily_api_key, master_openai_key, anthropic_api_key)
+    
+    prompt = f"""Du bist ein präziser Recherche-Agent für Kontaktdaten und Telefonnummern.
+Analysiere die folgenden Suchergebnisse und extrahiere alle verfügbaren Rufnummern, Adressen und Kommunikationskanäle.
+
+Suchanfrage: {suchanfrage}
+Rohes Datenmaterial:
+{web_daten}
+
+Erstelle eine saubere, übersichtliche Liste mit:
+1. Name / Unternehmen / Institution
+2. Telefonnummer(n)
+3. Adresse / Standort (sofern auffindbar)
+4. Offizielle Website / Quelle
+
+Falls keine Nummer gefunden werden kann, gib an, wo man sie offiziell finden kann."""
+
+    return litellm_router_abfrage("Du bist Telefonbuch- und Kontakt-Agent.", prompt, model_pref="auto", master_openai_key=master_openai_key, anthropic_api_key=anthropic_api_key)
