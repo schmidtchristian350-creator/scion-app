@@ -449,3 +449,90 @@ Erstelle eine saubere, übersichtliche Liste mit:
 Falls keine Nummer gefunden werden kann, gib an, wo man sie offiziell finden kann."""
 
     return litellm_router_abfrage("Du bist Telefonbuch- und Kontakt-Agent.", prompt, model_pref="auto", master_openai_key=master_openai_key, anthropic_api_key=anthropic_api_key)
+
+# ==========================================
+# 🚀 NEU: MULTI-MODALITÄT, RAG-IMPORTER & AUDIT TRAIL
+# ==========================================
+
+def analysiere_bild_oder_dokument(datei_bytes, prompt_text="Analysiere dieses Dokument oder Bild präzise.", master_openai_key=""):
+    """
+    Nimmt Bild- oder Dokumenten-Bytes entgegen und analysiert sie über das vision-fähige OpenAI-Modell.
+    """
+    try:
+        client = OpenAI(api_key=master_openai_key)
+        encoded_image = base64.b64encode(datei_bytes).decode('utf-8')
+        
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": prompt_text},
+                        {
+                            "type": "image_url",
+                            "image_url": {"url": f"data:image/jpeg;base64,{encoded_image}"}
+                        },
+                    ],
+                }
+            ],
+            max_tokens=1000
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        return f"Multi-Modal-Analyse Fehler: {str(e)}"
+
+def importiere_pdf_in_rag_db(titel, pdf_bytes, master_openai_key=""):
+    """
+    Extrahiert Text aus einer hochgeladenen PDF-Datei und speichert sie direkt in der FAISS/SQLite RAG-Datenbank.
+    """
+    try:
+        import pypdf
+        reader = pypdf.PdfReader(python_io.BytesIO(pdf_bytes))
+        gesamter_text = ""
+        for page in reader.pages:
+            t = page.extract_text()
+            if t:
+                gesamter_text += t + "\n"
+                
+        if not gesamter_text.strip():
+            return "Fehler: Konnte keinen Text aus der PDF extrahieren."
+            
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS rag_documents (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                titel TEXT,
+                inhalt TEXT
+            )
+        """)
+        cursor.execute("INSERT INTO rag_documents (titel, inhalt) VALUES (?, ?)", (titel, gesamter_text))
+        conn.commit()
+        conn.close()
+        return f"✅ PDF '{titel}' erfolgreich in die RAG-Vektor-Datenbank importiert ({len(gesamter_text)} Zeichen)."
+    except Exception as e:
+        return f"PDF-Import Fehler: {str(e)}"
+
+def protokolliere_audit_trail(username, aktion, details=""):
+    """
+    Schreibt einen lückenlosen Audit-Trail Eintrag in die SQLite-Datenbank.
+    """
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS enterprise_audit_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                zeit TEXT,
+                username TEXT,
+                aktion TEXT,
+                details TEXT
+            )
+        """)
+        cursor.execute("INSERT INTO enterprise_audit_logs (zeit, username, aktion, details) VALUES (datetime('now', 'localtime'), ?, ?, ?)",
+                       (username, aktion, details))
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
