@@ -23,7 +23,10 @@ from engines import (
     verarbeite_sprachbefehl,
     sende_webhook_benachrichtigung,
     suche_ziel_leads,
-    suche_telefonnummer_und_kontakte
+    suche_telefonnummer_und_kontakte,
+    analysiere_bild_oder_dokument,
+    importiere_pdf_in_rag_db,
+    protokolliere_audit_trail
 )
 
 # Initialisierung der Datenbank
@@ -71,6 +74,7 @@ def berechne_und_ziehe_credits_ab(username, kosten, grund="Agenten-Nutzung"):
         conn.commit()
         conn.close()
     st.session_state.session_verrauchter_betrag += kosten
+    protokolliere_audit_trail(username, "CREDIT_ABZUG", f"Betrag: {kosten}€ | Grund: {grund}")
 
 def guthaben_gutschreiben(username, betrag, grund="Admin-Gutschrift"):
     conn = get_db_connection()
@@ -80,6 +84,7 @@ def guthaben_gutschreiben(username, betrag, grund="Admin-Gutschrift"):
                    (username, betrag, grund))
     conn.commit()
     conn.close()
+    protokolliere_audit_trail(username, "GUTHABEN_GUTSCHRIFT", f"Betrag: {betrag}€ | Grund: {grund}")
 
 def guthaben_einziehen(username, betrag, grund="Admin-Einzug"):
     conn = get_db_connection()
@@ -89,6 +94,7 @@ def guthaben_einziehen(username, betrag, grund="Admin-Einzug"):
                    (username, betrag, grund))
     conn.commit()
     conn.close()
+    protokolliere_audit_trail(username, "GUTHABEN_EINZUG", f"Betrag: {betrag}€ | Grund: {grund}")
 
 def erstelle_pptx_aus_session(slides_data):
     prs = Presentation()
@@ -179,6 +185,7 @@ with st.sidebar:
                 
                 if res and res[0] == login_pass:
                     st.session_state.aktueller_user = login_name
+                    protokolliere_audit_trail(login_name, "LOGIN", "Erfolgreich angemeldet")
                     st.success(f"Willkommen zurück, {login_name}!")
                     st.rerun()
                 else:
@@ -202,6 +209,7 @@ with st.sidebar:
                         cursor.execute("INSERT INTO kunden (username, passwort, guthaben, rolle, workspace) VALUES (?, ?, ?, ?, ?)", (reg_name, reg_pass, 0.0, reg_rolle, reg_workspace))
                         conn.commit()
                         st.session_state.aktueller_user = reg_name
+                        protokolliere_audit_trail(reg_name, "REGISTER", f"Account erstellt mit Rolle {reg_rolle}")
                         st.success("Account & Workspace erstellt!")
                         st.rerun()
                     conn.close()
@@ -244,7 +252,7 @@ with st.sidebar:
                         st.error("Unbekannter Schlüssel.")
 
         if eingeloggter_kunde == ADMIN_NAME:
-            with st.expander("👑 Admin-Zentrale", expanded=True):
+            with st.expander("👑 Admin-Zentrale & Audit Logs", expanded=True):
                 conn = get_db_connection()
                 cursor = conn.cursor()
                 cursor.execute("SELECT username, guthaben FROM kunden")
@@ -264,6 +272,13 @@ with st.sidebar:
                         if st.button("➖ Einziehen"):
                             guthaben_einziehen(ausgewählter_user, betrag_input)
                             st.rerun()
+                            
+                st.write("---")
+                if st.button("📜 Letzte Audit-Logs anzeigen"):
+                    conn = get_db_connection()
+                    df_logs = pd.read_sql_query("SELECT * FROM enterprise_audit_logs ORDER BY id DESC LIMIT 10", conn)
+                    conn.close()
+                    st.dataframe(df_logs)
 
         # iPhone Sprach-Eingang in der Sidebar
         st.write("---")
@@ -271,6 +286,7 @@ with st.sidebar:
         voice_input = st.text_input("Sprachbefehl:", placeholder="Sag etwas zum Agenten...")
         if voice_input:
             with st.spinner("🎙️ Verarbeite Sprachbefehl..."):
+                protokolliere_audit_trail(eingeloggter_kunde, "SPRACHBEFEHL", voice_input)
                 sprach_antwort = verarbeite_sprachbefehl(voice_input, MASTER_OPENAI_KEY)
                 st.success(sprach_antwort)
 
@@ -289,6 +305,7 @@ with st.sidebar:
 
         st.write("---")
         if st.button("Abmelden"):
+            protokolliere_audit_trail(eingeloggter_kunde, "LOGOUT", "Abgemeldet")
             st.session_state.aktueller_user = None
             st.rerun()
 
@@ -320,6 +337,7 @@ else:
             aufgabe = st.chat_input("Gib dem Agenten eine komplexe Aufgabe (Web, Programme, Analyse)...")
             if aufgabe:
                 berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005, grund="Agenten-Aktion")
+                protokolliere_audit_trail(eingeloggter_kunde, "CHAT_AUFGABE", aufgabe)
                 st.session_state.chats[current_chat].append({"role": "user", "content": aufgabe})
                 with st.chat_message("user"):
                     st.markdown(aufgabe)
@@ -356,6 +374,7 @@ else:
                 col_f1, col_f2 = st.columns(2)
                 with col_f1:
                     if st.button("✅ Aktion bestätigen & ausführen"):
+                        protokolliere_audit_trail(eingeloggter_kunde, "DESKTOP_AKTION_CONFIRM", st.session_state.pending_desktop_action)
                         exec_res = ausfuehren_in_self_healing_sandbox(st.session_state.pending_desktop_action, MASTER_OPENAI_KEY)
                         st.success("Programm erfolgreich auf Hardware gesteuert!")
                         st.markdown(exec_res)
@@ -363,18 +382,20 @@ else:
                         st.rerun()
                 with col_f2:
                     if st.button("❌ Verwerfen / Abbrechen"):
+                        protokolliere_audit_trail(eingeloggter_kunde, "DESKTOP_AKTION_CANCEL", "Verworfen")
                         st.session_state.pending_desktop_action = None
                         st.info("Aktion wurde verworfen.")
                         st.rerun()
 
         with spalte_rechts:
             # 🎯 Integrierte Direkt-Leadsuche in der rechten Spalte
-            with st.expander("🎯 Automatische Lead- & Personensuche", expanded=True):
+            with st.expander("🎯 Automatische Lead- & Personensuche", expanded=False):
                 lead_query_input = st.text_input("Branche, Stichwort oder Website eintragen:", placeholder="z. B. 'Softwarefirma Berlin' oder 'salesakademie.de'")
                 if st.button("Leads automatisch herausfiltern"):
                     if lead_query_input:
                         with st.spinner("🔍 Agent filtert Kontakte und Entscheidungsträger heraus..."):
                             berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005, grund="Lead-Suche")
+                            protokolliere_audit_trail(eingeloggter_kunde, "LEAD_SUCHE", lead_query_input)
                             lead_ergebnis = suche_ziel_leads(
                                 ziel_position="Entscheider Geschäftsführer Inhaber",
                                 unternehmen_oder_branche=lead_query_input,
@@ -395,6 +416,7 @@ else:
                     if tel_query_input:
                         with st.spinner("📞 Durchsuche globale Verzeichnisse und Web-Quellen..."):
                             berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005, grund="Telefonbuch-Suche")
+                            protokolliere_audit_trail(eingeloggter_kunde, "TELEFONBUCH_SUCHE", tel_query_input)
                             tel_ergebnis = suche_telefonnummer_und_kontakte(
                                 name_oder_firma=tel_query_input,
                                 ort_oder_bereich="",
@@ -407,6 +429,37 @@ else:
                             st.session_state.chats[current_chat].append({"role": "assistant", "content": tel_ergebnis})
                     else:
                         st.warning("Bitte gib einen Suchbegriff ein.")
+
+            # 👁️ NEU: Multi-Modal & OCR Studio (Bilder/Dokumente)
+            with st.expander("👁️ Multi-Modal & OCR Analyse", expanded=False):
+                uploaded_image = st.file_uploader("Bild oder Dokument hochladen (PNG, JPG, PDF):", type=["png", "jpg", "jpeg"])
+                modal_prompt = st.text_input("Frage zum Bild/Dokument:", value="Analysiere dieses Dokument und fasse die wichtigsten Punkte zusammen.")
+                if st.button("Multi-Modal Analyse starten"):
+                    if uploaded_image:
+                        with st.spinner("👁️ Agent analysiert visuelle Daten..."):
+                            berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005, grund="Multi-Modal-Analyse")
+                            protokolliere_audit_trail(eingeloggter_kunde, "MULTIMODAL_ANALYSE", uploaded_image.name)
+                            bild_bytes = uploaded_image.read()
+                            modal_ergebnis = analysiere_bild_oder_dokument(bild_bytes, modal_prompt, MASTER_OPENAI_KEY)
+                            st.success("Analyse erfolgreich!")
+                            st.markdown(modal_ergebnis)
+                            st.session_state.chats[current_chat].append({"role": "assistant", "content": modal_ergebnis})
+                    else:
+                        st.warning("Bitte lade zuerst eine Datei hoch.")
+
+            # 📚 NEU: PDF-zu-FAISS Importer Studio
+            with st.expander("📚 RAG PDF Dokumenten-Importer", expanded=False):
+                uploaded_pdf = st.file_uploader("PDF-Datei für das Wissensarchiv:", type=["pdf"])
+                pdf_titel = st.text_input("Titel für das RAG-Archiv:", value="Unternehmensdokument")
+                if st.button("PDF in RAG-Wissen aufnehmen"):
+                    if uploaded_pdf:
+                        with st.spinner("📚 Extrahiere Text und füttere Vektor-DB..."):
+                            pdf_bytes = uploaded_pdf.read()
+                            protokolliere_audit_trail(eingeloggter_kunde, "PDF_RAG_IMPORT", pdf_titel)
+                            import_res = importiere_pdf_in_rag_db(pdf_titel, pdf_bytes, MASTER_OPENAI_KEY)
+                            st.success(import_res)
+                    else:
+                        st.warning("Bitte wähle eine PDF-Datei aus.")
 
             with st.expander("📊 Enterprise Export- & Webhook-Studio", expanded=True):
                 export_titel = st.text_input("Dokumenten-Titel:", value="Scion_Mind_Ausarbeitung")
@@ -432,5 +485,6 @@ else:
                 st.markdown("### 🚀 Live-Webhook / Benachrichtigung")
                 webhook_kanal = st.selectbox("Ziel-Kanal:", ["E-Mail (Management)", "WhatsApp Business API", "Interner Webhook"])
                 if st.button("Bericht über Webhook senden"):
+                    protokolliere_audit_trail(eingeloggter_kunde, "WEBHOOK_SEND", webhook_kanal)
                     status_meldung = sende_webhook_benachrichtigung(webhook_kanal, aktueller_export_text, MASTER_OPENAI_KEY)
                     st.success(status_meldung)
