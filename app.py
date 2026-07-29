@@ -8,7 +8,21 @@ import time
 import json
 import sqlite3
 import pandas as pd
-from engines import ausfuehren_mit_ollama_fallback, echte_deep_web_recherche
+from database import get_db_connection, init_db
+from engines import (
+    ausfuehren_mit_ollama_fallback, 
+    echte_deep_web_recherche,
+    berechne_pl_break_even,
+    starte_swot_analyse,
+    ausfuehren_in_self_healing_sandbox,
+    suche_in_rag_vektor_db,
+    selbstevaluierender_lern_agent,
+    hierarchischer_schwarm_agent,
+    autonomer_browser_agent,
+    generiere_desktop_befehl,
+    verarbeite_sprachbefehl,
+    sende_webhook_benachrichtigung
+)
 
 # Initialisierung der Datenbank
 init_db()
@@ -73,6 +87,62 @@ def guthaben_einziehen(username, betrag, grund="Admin-Einzug"):
                    (username, betrag, grund))
     conn.commit()
     conn.close()
+
+def erstelle_pptx_aus_session(slides_data):
+    prs = Presentation()
+    for slide_info in slides_data:
+        slide = prs.slides.add_slide(prs.slide_layouts[1])
+        slide.shapes.title.text = slide_info["titel"]
+        slide.placeholders[1].text = slide_info["text"]
+    io_buf = BytesIO()
+    prs.save(io_buf)
+    io_buf.seek(0)
+    return io_buf
+
+def exportiere_zu_docx(titel, text_inhalt, workspace):
+    try:
+        from docx import Document
+        doc = Document()
+        doc.add_heading(titel, level=1)
+        doc.add_paragraph(text_inhalt)
+        io_buf = BytesIO()
+        doc.save(io_buf)
+        io_buf.seek(0)
+        return io_buf
+    except Exception:
+        return None
+
+def exportiere_zu_xlsx(titel, text_inhalt, workspace):
+    try:
+        import openpyxl
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Ausarbeitung"
+        ws.append(["Titel", titel])
+        ws.append(["Inhalt", text_inhalt])
+        io_buf = BytesIO()
+        wb.save(io_buf)
+        io_buf.seek(0)
+        return io_buf
+    except Exception:
+        return None
+
+def exportiere_zu_pdf(titel, text_inhalt, workspace):
+    from reportlab.lib.pagesizes import A4
+    from reportlab.platypus import SimpleDocTemplate, Paragraph
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib import colors
+    
+    pdf_io = BytesIO()
+    doc = SimpleDocTemplate(pdf_io, pagesize=A4, rightMargin=40, leftMargin=40, topMargin=40, bottomMargin=40)
+    styles = getSampleStyleSheet()
+    story = [
+        Paragraph(titel, ParagraphStyle('T', parent=styles['Heading1'], fontName='Helvetica-Bold', fontSize=20, textColor=colors.HexColor('#0f172a'), spaceAfter=15)),
+        Paragraph(text_inhalt.replace('\n', '<br/>'), ParagraphStyle('B', parent=styles['Normal'], fontName='Helvetica', fontSize=12, textColor=colors.HexColor('#1e293b'), leading=16, spaceAfter=15))
+    ]
+    doc.build(story)
+    pdf_io.seek(0)
+    return pdf_io
 
 if "aktueller_user" not in st.session_state:
     st.session_state.aktueller_user = None
