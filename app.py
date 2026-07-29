@@ -8,16 +8,8 @@ import pandas as pd
 from openai import OpenAI
 
 from database import init_db, get_db_connection
-from engines import (
-    litellm_router_abfrage, ausfuehren_mit_ollama_fallback, echte_deep_web_recherche,
-    berechne_pl_break_even, starte_swot_analyse, ausfuehren_in_self_healing_sandbox,
-    suche_in_rag_vektor_db, selbstevaluierender_lern_agent, verschruessle_api_key, ent_huelle_api_key,
-    hierarchischer_schwarm_agent, sende_webhook_benachrichtigung, autonomer_browser_agent, 
-    generiere_desktop_befehl, verarbeite_sprachbefehl
-)
-from exporters import (
-    exportiere_zu_docx, exportiere_zu_xlsx, exportiere_zu_pdf, erstelle_pptx_aus_session, erstelle_pdf_aus_session
-)
+from engines import litellm_router_abfrage, ausfuehren_mit_ollama_fallback, echte_deep_web_recherche, berechne_pl_break_even, starte_swot_analyse, ausfuehren_in_self_healing_sandbox, suche_in_rag_vektor_db, selbstevaluierender_lern_agent, verschruessle_api_key, ent_huelle_api_key, hierarchischer_schwarm_agent, sende_webhook_benachrichtigung, autonomer_browser_agent, generiere_desktop_befehl, verarbeite_sprachbefehl
+from exporters import exportiere_zu_docx, exportiere_zu_xlsx, exportiere_zu_pdf, erstelle_pptx_aus_session, erstelle_pdf_aus_session
 
 # Initialisierung der Datenbank
 init_db()
@@ -42,10 +34,8 @@ st.markdown("*Powered by Hierarchical Swarm Board • Multi-Agent-Systems • Li
 st.write("---")
 
 MASTER_OPENAI_KEY = st.secrets["OPENAI_API_KEY"]
-IMAGE_API_KEY = st.secrets.get("VIDEO_API_KEY", MASTER_OPENAI_KEY)
 TAVILY_API_KEY = st.secrets.get("TAVILY_API_KEY", "")
 ANTHROPIC_API_KEY = st.secrets.get("ANTHROPIC_API_KEY", "")
-GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY", "")
 
 ADMIN_NAME = "Christian"
 ADMIN_PASS = "ScionMind#2026!Secured"
@@ -90,7 +80,7 @@ if "aktueller_user" not in st.session_state:
 
 if "slides_data" not in st.session_state:
     st.session_state.slides_data = [
-        {"titel": "Folie 1: Willkommen", "text": "Hier steht der Text für Folie 1...", "prompt": "Professional corporate presentation slide background, modern clean style", "bild_url": None}
+        {"titel": "Folie 1: Willkommen", "text": "Hier steht der Text für Folie 1...", "prompt": "Professional corporate presentation slide background", "bild_url": None}
     ]
 
 if "chats" not in st.session_state:
@@ -207,7 +197,7 @@ with st.sidebar:
         # iPhone Sprach-Eingang in der Sidebar
         st.write("---")
         st.markdown("### 🎙️ iPhone Sprach-Eingang")
-        voice_input = st.text_input("Sprachbefehl (oder API-Empfang):", placeholder="Sag etwas zum Agenten...")
+        voice_input = st.text_input("Sprachbefehl:", placeholder="Sag etwas zum Agenten...")
         if voice_input:
             with st.spinner("🎙️ Verarbeite Sprachbefehl..."):
                 sprach_antwort = verarbeite_sprachbefehl(voice_input, MASTER_OPENAI_KEY)
@@ -266,34 +256,23 @@ else:
                 with st.spinner("🤖 Universal-Agent plant und steuert Aktionen..."):
                     lower_aufgabe = aufgabe.lower()
                     
-                    # 1. Autonome Webseiten- & Browser-Steuerung
                     if any(w in lower_aufgabe for w in ["surfe", "öffne webseite", "klicke auf", "browser", "web-automation", "navigiere"]):
                         antwort = autonomer_browser_agent("https://google.com", aufgabe, MASTER_OPENAI_KEY)
-                    
-                    # 2. Programm-Steuerung auf Hardware mit manueller Freigabe (Human-in-the-Loop)
                     elif any(w in lower_aufgabe for w in ["öffne programm", "starte app", "excel", "programm steuern", "klicke app", "applikation"]):
                         st.session_state.pending_desktop_action = generiere_desktop_befehl("Universal-OS", aufgabe, MASTER_OPENAI_KEY)
                         antwort = f"⚠️ **Sicherheitsabfrage zur Programm-Steuerung (Human-in-the-Loop)**\n\nDer Agent möchte folgendes Programm auf deiner Hardware steuern:\n```bash\n{st.session_state.pending_desktop_action}\n```\nBitte bestätige die Ausführung über den Button unten."
-                    
-                    # 3. Komplexe Aufgaben / Multi-Agenten-Schwarm
                     elif any(w in lower_aufgabe for w in ["komplex", "strategie", "schwarm", "team", "vollständig", "analyse & konzept"]):
                         antwort = hierarchischer_schwarm_agent(aufgabe, MASTER_OPENAI_KEY, ANTHROPIC_API_KEY, TAVILY_API_KEY)
-                    # 4. Live-Webrecherche
                     elif any(w in lower_aufgabe for w in ["recherche", "suche", "internet", "aktuell", "markt", "konkurrent", "wettbewerber"]):
                         antwort = echte_deep_web_recherche(aufgabe, TAVILY_API_KEY, MASTER_OPENAI_KEY, ANTHROPIC_API_KEY)
-                    # 5. SWOT-Analyse
                     elif any(w in lower_aufgabe for w in ["swot", "stärken", "schwächen", "chancen", "risiken"]):
                         antwort = starte_swot_analyse(aufgabe, TAVILY_API_KEY, MASTER_OPENAI_KEY, ANTHROPIC_API_KEY)
-                    # 6. Finanz- & Break-Even-Berechnung
                     elif any(w in lower_aufgabe for w in ["break-even", "p&l", "fixkosten", "kosten", "marge", "gewinn"]):
                         antwort = berechne_pl_break_even(15000.0, 150.0, 50.0)
-                    # 7. Code-Ausführung / Sandbox
                     elif any(w in lower_aufgabe for w in ["python", "code", "skript", "ausführen"]):
                         antwort = ausfuehren_in_self_healing_sandbox(aufgabe, MASTER_OPENAI_KEY)
-                    # 8. Wissens-Abfrage / RAG
                     elif any(w in lower_aufgabe for w in ["wissen", "datenbank", "rag", "archiv", "dokument"]):
                         antwort = suche_in_rag_vektor_db(aufgabe, MASTER_OPENAI_KEY)
-                    # 9. Standard: Autonomer Lern-Agent
                     else:
                         antwort = selbstevaluierender_lern_agent(f"Du bist der autonome Enterprise Master-Agent für {eingeloggter_kunde}.", aufgabe, use_local=False, master_openai_key=MASTER_OPENAI_KEY, anthropic_api_key=ANTHROPIC_API_KEY)
 
@@ -301,7 +280,6 @@ else:
                 with st.chat_message("assistant"):
                     st.markdown(antwort)
 
-            # Manuelle Freigabe-Schnittstelle für lokale Programm-Steuerung auf Hardware
             if st.session_state.pending_desktop_action:
                 st.warning("🔒 **Ausstehende Programm-Steuerung auf deiner Hardware erfordert deine manuelle Freigabe:**")
                 col_f1, col_f2 = st.columns(2)
