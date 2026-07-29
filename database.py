@@ -183,4 +183,22 @@ def init_db():
     """)
 
     conn.commit()
+    conn.close() 
+import sqlite3
+
+def init_db():
+    # Stellt sicher, dass die Datenbank und die wichtige Tabelle existieren
+    conn = sqlite3.connect("scion_mind.db")
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS agent_memory (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            zeit TEXT,
+            erkenntnis TEXT
+        )
+    """)
+    conn.commit()
     conn.close()
+
+# Das hier stößt die Erstellung direkt an
+init_db()
