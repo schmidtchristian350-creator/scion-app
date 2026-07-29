@@ -133,7 +133,7 @@ with st.sidebar:
                     if cursor.fetchone():
                         st.error("Dieser Benutzername ist bereits vergeben.")
                     else:
-                        cursor.execute("INSERT INTO kunden VALUES (?, ?, ?, ?, ?)", (reg_name, reg_pass, 0.0, reg_rolle, reg_workspace))
+                        cursor.execute("INSERT INTO kunden (username, passwort, guthaben, rolle, workspace) VALUES (?, ?, ?, ?, ?)", (reg_name, reg_pass, 0.0, reg_rolle, reg_workspace))
                         conn.commit()
                         st.session_state.aktueller_user = reg_name
                         st.success("Account & Workspace erstellt!")
@@ -237,7 +237,7 @@ else:
             modus = st.selectbox(
                 "Agenten-Modus wählen:",
                 [
-                    "Intelligenter Chat & Live-Webrecherche", 
+                    "🤖 Autonomer Master-Agent (Automatischer Tool-Router)", 
                     "📊 Analytics & P&L Break-Even Rechner",
                     "📊 Konkurrenten SWOT-Analyzer",
                     "🛠️ Closed-Loop Self-Healing Sandbox (REPL)",
@@ -259,7 +259,7 @@ else:
                 with st.chat_message("user"):
                     st.markdown(aufgabe)
 
-                with st.spinner("🤖 Agent arbeitet..."):
+                with st.spinner("🤖 Agent analysiert Aufgabe und wählt optimales Tool..."):
                     if "Break-Even" in modus:
                         antwort = berechne_pl_break_even(15000.0, 150.0, 50.0)
                     elif "SWOT" in modus:
@@ -271,7 +271,22 @@ else:
                     elif "Ollama" in modus:
                         antwort = ausfuehren_mit_ollama_fallback("Du bist ein Assistent.", aufgabe, use_local=True, master_openai_key=MASTER_OPENAI_KEY, anthropic_api_key=ANTHROPIC_API_KEY)
                     else:
-                        antwort = selbstevaluierender_lern_agent(f"Du bist Assistent für {eingeloggter_kunde}.", aufgabe, use_local=False, master_openai_key=MASTER_OPENAI_KEY, anthropic_api_key=ANTHROPIC_API_KEY)
+                        # --- VOLLAUTOMATISCHER TOOL-ROUTER ---
+                        # Der Agent entscheidet anhand des Inputs selbst, welches Tool er nutzt
+                        lower_aufgabe = aufgabe.lower()
+                        if any(w in lower_aufgabe for w in ["recherche", "suche", "internet", "aktuell", "markt", "konkurrent"]):
+                            antwort = echte_deep_web_recherche(aufgabe, TAVILY_API_KEY, MASTER_OPENAI_KEY, ANTHROPIC_API_KEY)
+                        elif any(w in lower_aufgabe for w in ["swot", "analyse", "stärken", "schwächen"]):
+                            antwort = starte_swot_analyse(aufgabe, TAVILY_API_KEY, MASTER_OPENAI_KEY, ANTHROPIC_API_KEY)
+                        elif any(w in lower_aufgabe for w in ["break-even", "p&l", "fixkosten", "kosten", "marge"]):
+                            antwort = berechne_pl_break_even(15000.0, 150.0, 50.0)
+                        elif any(w in lower_aufgabe for w in ["python", "code", "skript", "ausführen", "sandbox"]):
+                            antwort = ausfuehren_in_self_healing_sandbox(aufgabe, MASTER_OPENAI_KEY)
+                        elif any(w in lower_aufgabe for w in ["wissen", "datenbank", "rag", "dokument"]):
+                            antwort = suche_in_rag_vektor_db(aufgabe, MASTER_OPENAI_KEY)
+                        else:
+                            # Standard: Selbstevaluierender Lern-Agent mit RAG & Gedächtnis
+                            antwort = selbstevaluierender_lern_agent(f"Du bist Assistent für {eingeloggter_kunde}.", aufgabe, use_local=False, master_openai_key=MASTER_OPENAI_KEY, anthropic_api_key=ANTHROPIC_API_KEY)
 
                 st.session_state.chats[current_chat].append({"role": "assistant", "content": antwort})
                 with st.chat_message("assistant"):
