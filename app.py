@@ -22,7 +22,8 @@ from engines import (
     generiere_desktop_befehl,
     verarbeite_sprachbefehl,
     sende_webhook_benachrichtigung,
-    suche_ziel_leads
+    suche_ziel_leads,
+    suche_telefonnummer_und_kontakte
 )
 
 # Initialisierung der Datenbank
@@ -367,13 +368,13 @@ else:
                         st.rerun()
 
         with spalte_rechts:
-            # 🎯 NEU: Integrierte Direkt-Leadsuche direkt in der rechten Spalte
+            # 🎯 Integrierte Direkt-Leadsuche in der rechten Spalte
             with st.expander("🎯 Automatische Lead- & Personensuche", expanded=True):
                 lead_query_input = st.text_input("Branche, Stichwort oder Website eintragen:", placeholder="z. B. 'Softwarefirma Berlin' oder 'salesakademie.de'")
                 if st.button("Leads automatisch herausfiltern"):
                     if lead_query_input:
                         with st.spinner("🔍 Agent filtert Kontakte und Entscheidungsträger heraus..."):
-                            berechne_ziehe = berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005, grund="Lead-Suche")
+                            berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005, grund="Lead-Suche")
                             lead_ergebnis = suche_ziel_leads(
                                 ziel_position="Entscheider Geschäftsführer Inhaber",
                                 unternehmen_oder_branche=lead_query_input,
@@ -383,10 +384,29 @@ else:
                             )
                             st.success("Lead-Suche abgeschlossen!")
                             st.markdown(lead_ergebnis)
-                            # Direkt in den aktuellen Chat legen für den Export
                             st.session_state.chats[current_chat].append({"role": "assistant", "content": lead_ergebnis})
                     else:
                         st.warning("Bitte gib einen Suchbegriff oder eine Website ein.")
+
+            # 📞 NEU: Integrierte Telefonbuch- & Rufnummernsuche
+            with st.expander("📞 Telefonbuch- & Rufnummernsuche", expanded=False):
+                tel_query_input = st.text_input("Name, Firma oder Institution eingeben:", placeholder="z. B. 'Stadtwerke Erfurt' oder 'Max Mustermann'")
+                if st.button("Rufnummern & Kontakte suchen"):
+                    if tel_query_input:
+                        with st.spinner("📞 Durchsuche globale Verzeichnisse und Web-Quellen..."):
+                            berechne_und_ziehe_credits_ab(eingeloggter_kunde, 0.005, grund="Telefonbuch-Suche")
+                            tel_ergebnis = suche_telefonnummer_und_kontakte(
+                                name_oder_firma=tel_query_input,
+                                ort_oder_bereich="",
+                                tavily_api_key=TAVILY_API_KEY,
+                                master_openai_key=MASTER_OPENAI_KEY,
+                                anthropic_api_key=ANTHROPIC_API_KEY
+                            )
+                            st.success("Suche abgeschlossen!")
+                            st.markdown(tel_ergebnis)
+                            st.session_state.chats[current_chat].append({"role": "assistant", "content": tel_ergebnis})
+                    else:
+                        st.warning("Bitte gib einen Suchbegriff ein.")
 
             with st.expander("📊 Enterprise Export- & Webhook-Studio", expanded=True):
                 export_titel = st.text_input("Dokumenten-Titel:", value="Scion_Mind_Ausarbeitung")
