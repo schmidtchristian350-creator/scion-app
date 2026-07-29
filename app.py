@@ -21,7 +21,7 @@ from exporters import (
 # Initialisierung der Datenbank
 init_db()
 
-st.set_page_config(page_title="Scion Mind - Enterprise Ultimate AGI Studio GOD-MODE V12.17", layout="wide")
+st.set_page_config(page_title="Scion Mind - Enterprise Ultimate AGI", layout="wide")
 
 # CSS Styling
 st.markdown("""
