@@ -12,7 +12,8 @@ from engines import (
     litellm_router_abfrage, ausfuehren_mit_ollama_fallback, echte_deep_web_recherche,
     berechne_pl_break_even, starte_swot_analyse, ausfuehren_in_self_healing_sandbox,
     suche_in_rag_vektor_db, selbstevaluierender_lern_agent, verschruessle_api_key, ent_huelle_api_key,
-    hierarchischer_schwarm_agent, sende_webhook_benachrichtigung, autonomer_browser_agent, generiere_desktop_befehl
+    hierarchischer_schwarm_agent, sende_webhook_benachrichtigung, autonomer_browser_agent, 
+    generiere_desktop_befehl, verarbeite_sprachbefehl
 )
 from exporters import (
     exportiere_zu_docx, exportiere_zu_xlsx, exportiere_zu_pdf, erstelle_pptx_aus_session, erstelle_pdf_aus_session
@@ -21,7 +22,7 @@ from exporters import (
 # Initialisierung der Datenbank
 init_db()
 
-st.set_page_config(page_title="Scion Mind - Enterprise Ultimate AGI", layout="wide")
+st.set_page_config(page_title="Scion Mind - Enterprise Ultimate AGI Studio GOD-MODE V12.17", layout="wide")
 
 # CSS Styling
 st.markdown("""
@@ -203,6 +204,15 @@ with st.sidebar:
                             guthaben_einziehen(ausgewählter_user, betrag_input)
                             st.rerun()
 
+        # iPhone Sprach-Eingang in der Sidebar
+        st.write("---")
+        st.markdown("### 🎙️ iPhone Sprach-Eingang")
+        voice_input = st.text_input("Sprachbefehl (oder API-Empfang):", placeholder="Sag etwas zum Agenten...")
+        if voice_input:
+            with st.spinner("🎙️ Verarbeite Sprachbefehl..."):
+                sprach_antwort = verarbeite_sprachbefehl(voice_input, MASTER_OPENAI_KEY)
+                st.success(sprach_antwort)
+
         st.write("---")
         st.markdown("### 💬 Deine Chats")
         if st.button("➕ Neuer Chat"):
@@ -238,7 +248,7 @@ else:
 
         with spalte_links:
             st.subheader("🤖 Vollautonomer Universal-Agent (GOD-MODE V12.17)")
-            st.caption("⚡ Universeller Betrieb: Steuert Webseiten autonom und generiert Hardware-Programmbefehle zur manuellen Freigabe.")
+            st.caption("⚡ Universeller Betrieb: Steuert Webseiten autonom, generiert Hardware-Programmbefehle und unterstützt Sprachbefehle.")
             
             current_chat = st.session_state.aktiver_chat
             
