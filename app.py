@@ -26,13 +26,17 @@ from engines import (
     suche_telefonnummer_und_kontakte,
     analysiere_bild_oder_dokument,
     importiere_pdf_in_rag_db,
-    protokolliere_audit_trail
+    protokolliere_audit_trail,
+    speichere_in_chroma_gedaechtnis,
+    suche_in_chroma_gedaechtnis,
+    robuste_multi_provider_abfrage,
+    erstelle_action_approval_eintrag
 )
 
 # Initialisierung der Datenbank
 init_db()
 
-st.set_page_config(page_title="Scion Mind - Enterprise Ultimate AGI Studio", layout="wide")
+st.set_page_config(page_title="Scion Mind - Enterprise Ultimate AGI Studio GOD-MODE", layout="wide")
 
 # CSS Styling
 st.markdown("""
@@ -48,7 +52,7 @@ st.markdown("""
 
 st.title("Scion-Mind - Ultimate Studio")
 st.markdown("*designed by Christian Schmidt*") 
-st.markdown("*Powered by Hierarchical Swarm Board • Multi-Agent-Systems • Live-Terminal Streaming • Ollama Local Fallback • OCR • Analytics • Self-Coding*")
+st.markdown("*Powered by Hierarchical Swarm Board • ChromaDB Persistent Memory • Multi-Provider Fallback • Action Vault • OCR • Self-Coding*")
 st.write("---")
 
 MASTER_OPENAI_KEY = st.secrets["OPENAI_API_KEY"]
@@ -325,8 +329,8 @@ else:
         spalte_links, spalte_rechts = st.columns([1.1, 0.9])
 
         with spalte_links:
-            st.subheader("🤖 Vollautonomer Universal-Agent")
-            st.caption("⚡ Universeller Betrieb: Steuert Webseiten autonom, generiert Hardware-Programmbefehle und unterstützt Sprachbefehle.")
+            st.subheader("🤖 Vollautonomer Universal-Agent (GOD-MODE)")
+            st.caption("⚡ Universeller Betrieb: Steuert Webseiten autonom, generiert Hardware-Programmbefehle und nutzt ChromaDB Memory.")
             
             current_chat = st.session_state.aktiver_chat
             
@@ -342,28 +346,33 @@ else:
                 with st.chat_message("user"):
                     st.markdown(aufgabe)
 
-                with st.spinner("🤖 Universal-Agent plant und steuert Aktionen..."):
+                with st.spinner("🤖 Universal-Agent plant und steuert Aktionen (mit Fallback-Kette)..."):
                     lower_aufgabe = aufgabe.lower()
                     
+                    # Suche zuerst im persistenten ChromaDB Gedächtnis
+                    chroma_kontext = suche_in_chroma_gedaechtnis(aufgabe)
+                    erweiterter_prompt = f"Aufgabe: {aufgabe}"
+                    if chroma_kontext:
+                        erweiterter_prompt = f"[Persistent ChromaDB Memory Context]:\n{chroma_kontext}\n\nAufgabe: {aufgabe}"
+
                     if any(w in lower_aufgabe for w in ["surfe", "öffne webseite", "klicke auf", "browser", "web-automation", "navigiere"]):
                         antwort = autonomer_browser_agent("https://google.com", aufgabe, MASTER_OPENAI_KEY)
                     elif any(w in lower_aufgabe for w in ["öffne programm", "starte app", "excel", "programm steuern", "klicke app", "applikation"]):
                         st.session_state.pending_desktop_action = generiere_desktop_befehl("Universal-OS", aufgabe, MASTER_OPENAI_KEY)
                         antwort = f"⚠️ **Sicherheitsabfrage zur Programm-Steuerung (Human-in-the-Loop)**\n\nDer Agent möchte folgendes Programm auf deiner Hardware steuern:\n```bash\n{st.session_state.pending_desktop_action}\n```\nBitte bestätige die Ausführung über den Button unten."
                     elif any(w in lower_aufgabe for w in ["komplex", "strategie", "schwarm", "team", "vollständig", "analyse & konzept"]):
-                        antwort = hierarchischer_schwarm_agent(aufgabe, MASTER_OPENAI_KEY, ANTHROPIC_API_KEY, TAVILY_API_KEY)
+                        antwort = hierarchischer_schwarm_agent(erweiterter_prompt, MASTER_OPENAI_KEY, ANTHROPIC_API_KEY, TAVILY_API_KEY)
                     elif any(w in lower_aufgabe for w in ["recherche", "suche", "internet", "aktuell", "markt", "konkurrent", "wettbewerber"]):
-                        antwort = echte_deep_web_recherche(aufgabe, TAVILY_API_KEY, MASTER_OPENAI_KEY, ANTHROPIC_API_KEY)
+                        antwort = echte_deep_web_recherche(erweiterter_prompt, TAVILY_API_KEY, MASTER_OPENAI_KEY, ANTHROPIC_API_KEY)
                     elif any(w in lower_aufgabe for w in ["swot", "stärken", "schwächen", "chancen", "risiken"]):
-                        antwort = starte_swot_analyse(aufgabe, TAVILY_API_KEY, MASTER_OPENAI_KEY, ANTHROPIC_API_KEY)
+                        antwort = starte_swot_analyse(erweiterter_prompt, TAVILY_API_KEY, MASTER_OPENAI_KEY, ANTHROPIC_API_KEY)
                     elif any(w in lower_aufgabe for w in ["break-even", "p&l", "fixkosten", "kosten", "marge", "gewinn"]):
                         antwort = berechne_pl_break_even(15000.0, 150.0, 50.0)
                     elif any(w in lower_aufgabe for w in ["python", "code", "skript", "ausführen"]):
                         antwort = ausfuehren_in_self_healing_sandbox(aufgabe, MASTER_OPENAI_KEY)
-                    elif any(w in lower_aufgabe for w in ["wissen", "datenbank", "rag", "archiv", "dokument"]):
-                        antwort = suche_in_rag_vektor_db(aufgabe, MASTER_OPENAI_KEY)
                     else:
-                        antwort = selbstevaluierender_lern_agent(f"Du bist der autonome Enterprise Master-Agent für {eingeloggter_kunde}.", aufgabe, use_local=False, master_openai_key=MASTER_OPENAI_KEY, anthropic_api_key=ANTHROPIC_API_KEY)
+                        # Nutzung der robusten Multi-Provider Fallback-Kette
+                        antwort = robuste_multi_provider_abfrage(f"Du bist der autonome Enterprise Master-Agent für {eingeloggter_kunde}.", erweiterter_prompt, MASTER_OPENAI_KEY, ANTHROPIC_API_KEY)
 
                 st.session_state.chats[current_chat].append({"role": "assistant", "content": antwort})
                 with st.chat_message("assistant"):
@@ -388,7 +397,7 @@ else:
                         st.rerun()
 
         with spalte_rechts:
-            # 🎯 Integrierte Direkt-Leadsuche in der rechten Spalte
+            # 🎯 Leadsuche
             with st.expander("🎯 Automatische Lead- & Personensuche", expanded=False):
                 lead_query_input = st.text_input("Branche, Stichwort oder Website eintragen:", placeholder="z. B. 'Softwarefirma Berlin' oder 'salesakademie.de'")
                 if st.button("Leads automatisch herausfiltern"):
@@ -409,7 +418,7 @@ else:
                     else:
                         st.warning("Bitte gib einen Suchbegriff oder eine Website ein.")
 
-            # 📞 NEU: Integrierte Telefonbuch- & Rufnummernsuche
+            # 📞 Telefonbuchsuche
             with st.expander("📞 Telefonbuch- & Rufnummernsuche", expanded=False):
                 tel_query_input = st.text_input("Name, Firma oder Institution eingeben:", placeholder="z. B. 'Stadtwerke Erfurt' oder 'Max Mustermann'")
                 if st.button("Rufnummern & Kontakte suchen"):
@@ -430,7 +439,7 @@ else:
                     else:
                         st.warning("Bitte gib einen Suchbegriff ein.")
 
-            # 👁️ NEU: Multi-Modal & OCR Studio (Bilder/Dokumente)
+            # 👁️ Multi-Modal & OCR Studio
             with st.expander("👁️ Multi-Modal & OCR Analyse", expanded=False):
                 uploaded_image = st.file_uploader("Bild oder Dokument hochladen (PNG, JPG, PDF):", type=["png", "jpg", "jpeg"])
                 modal_prompt = st.text_input("Frage zum Bild/Dokument:", value="Analysiere dieses Dokument und fasse die wichtigsten Punkte zusammen.")
@@ -447,19 +456,43 @@ else:
                     else:
                         st.warning("Bitte lade zuerst eine Datei hoch.")
 
-            # 📚 NEU: PDF-zu-FAISS Importer Studio
-            with st.expander("📚 RAG PDF Dokumenten-Importer", expanded=False):
-                uploaded_pdf = st.file_uploader("PDF-Datei für das Wissensarchiv:", type=["pdf"])
-                pdf_titel = st.text_input("Titel für das RAG-Archiv:", value="Unternehmensdokument")
-                if st.button("PDF in RAG-Wissen aufnehmen"):
+            # 📚 ChromaDB & PDF-zu-Memory Importer
+            with st.expander("🧠 ChromaDB & PDF Persistent Memory", expanded=False):
+                uploaded_pdf = st.file_uploader("PDF-Datei für persistentes Gedächtnis:", type=["pdf"])
+                mem_titel = st.text_input("Titel für das ChromaDB Gedächtnis:", value="Wissensdokument")
+                if st.button("In ChromaDB dauerhaft speichern"):
                     if uploaded_pdf:
-                        with st.spinner("📚 Extrahiere Text und füttere Vektor-DB..."):
+                        with st.spinner("🧠 Extrahiere Text und speichere persistent in ChromaDB..."):
                             pdf_bytes = uploaded_pdf.read()
-                            protokolliere_audit_trail(eingeloggter_kunde, "PDF_RAG_IMPORT", pdf_titel)
-                            import_res = importiere_pdf_in_rag_db(pdf_titel, pdf_bytes, MASTER_OPENAI_KEY)
-                            st.success(import_res)
+                            import pypdf
+                            reader = pypdf.PdfReader(BytesIO(pdf_bytes))
+                            txt = "".join([p.extract_text() for p in reader.pages if p.extract_text()])
+                            if txt:
+                                speichere_in_chroma_gedaechtnis(mem_titel, txt, {"typ": "pdf_import"})
+                                protokolliere_audit_trail(eingeloggter_kunde, "CHROMA_MEMORY_IMPORT", mem_titel)
+                                st.success(f"Erfolgreich persistent in ChromaDB gespeichert ({len(txt)} Zeichen).")
+                            else:
+                                st.error("Konnte keinen Text extrahieren.")
                     else:
                         st.warning("Bitte wähle eine PDF-Datei aus.")
+
+            # 🛡️ Human-in-the-Loop Action Vault
+            with st.expander("🛡️ Action-Approval-Vault (Freigaben)", expanded=False):
+                action_typ_input = st.selectbox("Aktionstyp:", ["E-Mail Versand", "API-Transaktion", "Webseiten-Änderung"])
+                action_payload = st.text_area("Payload / Inhalt der Aktion:", placeholder="z. B. Empfänger, Betreff oder Code-Snippet...")
+                if st.button("In den Freigabe-Vault stellen"):
+                    if action_payload:
+                        erstelle_action_approval_eintrag(action_typ_input, action_payload)
+                        protokolliere_audit_trail(eingeloggter_kunde, "ACTION_VAULT_QUEUE", action_typ_input)
+                        st.success("Aktion angehalten und im Vault zur manuellen Freigabe hinterlegt.")
+                    else:
+                        st.warning("Bitte gib den Inhalt der Aktion ein.")
+                
+                if st.button("Ausstehende Vault-Aktionen anzeigen"):
+                    conn = get_db_connection()
+                    df_vault = pd.read_sql_query("SELECT * FROM action_approval_vault ORDER BY id DESC LIMIT 5", conn)
+                    conn.close()
+                    st.dataframe(df_vault)
 
             with st.expander("📊 Enterprise Export- & Webhook-Studio", expanded=True):
                 export_titel = st.text_input("Dokumenten-Titel:", value="Scion_Mind_Ausarbeitung")
