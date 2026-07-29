@@ -8,34 +8,23 @@ import pandas as pd
 from openai import OpenAI
 
 from database import init_db, get_db_connection
-from engines import ausfuehren_mit_ollama_fallback
-from engines import echte_deep_web_recherche
-from engines import berechne_pl_break_even
-from engines import starte_swot_analyse
-from engines import ausfuehren_in_self_healing_sandbox
-from engines import suche_in_rag_vektor_db
-from engines import selbstevaluierender_lern_agent
-from engines import verschruessle_api_key
-from engines import ent_huelle_api_key
-from engines import hierarchischer_schwarm_agent
-from engines import sende_webhook_benachrichtigung
-from engines import autonomer_browser_agent
-from engines import generiere_desktop_befehl
-from engines import verarbeite_sprachbefehl
-from engines import litellm_router_abfrage
-
-from exporters import exportiere_zu_docx
-from exporters import exportiere_zu_xlsx
-from exporters import exportiere_zu_pdf
-from exporters import erstelle_pptx_aus_session
-from exporters import erstelle_pdf_aus_session
+from engines import (
+    litellm_router_abfrage, ausfuehren_mit_ollama_fallback, echte_deep_web_recherche,
+    berechne_pl_break_even, starte_swot_analyse, ausfuehren_in_self_healing_sandbox,
+    suche_in_rag_vektor_db, selbstevaluierender_lern_agent, verschruessle_api_key, 
+    ent_huelle_api_key, hierarchischer_schwarm_agent, sende_webhook_benachrichtigung, 
+    autonomer_browser_agent, generiere_desktop_befehl, verarbeite_sprachbefehl
+)
+from exporters import (
+    exportiere_zu_docx, exportiere_zu_xlsx, exportiere_zu_pdf, 
+    erstelle_pptx_aus_session, erstelle_pdf_aus_session
+)
 
 # Initialisierung der Datenbank
 init_db()
 
 st.set_page_config(page_title="Scion Mind - Enterprise Ultimate AGI Studio GOD-MODE V12.17", layout="wide")
 
-# CSS Styling
 st.markdown("""
     <style>
     .stApp { background-color: var(--background-color); color: var(--text-color); }
