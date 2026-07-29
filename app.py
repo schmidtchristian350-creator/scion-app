@@ -8,7 +8,6 @@ import pandas as pd
 from openai import OpenAI
 
 from database import init_db, get_db_connection
-from engines import litellm_router_abfrage
 from engines import ausfuehren_mit_ollama_fallback
 from engines import echte_deep_web_recherche
 from engines import berechne_pl_break_even
@@ -23,6 +22,7 @@ from engines import sende_webhook_benachrichtigung
 from engines import autonomer_browser_agent
 from engines import generiere_desktop_befehl
 from engines import verarbeite_sprachbefehl
+from engines import litellm_router_abfrage
 
 from exporters import exportiere_zu_docx
 from exporters import exportiere_zu_xlsx
