@@ -1,4 +1,6 @@
 import io
+import sqlite3
+import requests
 from io import BytesIO
 from database import get_db_connection
 from pptx import Presentation
@@ -81,6 +83,19 @@ def erstelle_pptx_aus_session(slides_data):
     io = BytesIO()
     prs.save(io)
     io.seek(0)
+    return io
+
+def erstelle_pptx_aus_session_mit_vault(titel, slides_data, workspace):
+    prs = Presentation()
+    for slide_info in slides_data:
+        slide = prs.slides.add_slide(prs.slide_layouts[1])
+        slide.shapes.title.text = slide_info["titel"]
+        slide.placeholders[1].text = slide_info["text"]
+    io = BytesIO()
+    prs.save(io)
+    io.seek(0)
+    binaer = io.getvalue()
+    speichere_datei_im_workspace_vault(workspace, titel, "pptx", binaer)
     return io
 
 def erstelle_pdf_aus_session(slides_data):
