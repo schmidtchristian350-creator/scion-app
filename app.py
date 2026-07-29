@@ -8,7 +8,6 @@ import time
 import json
 import sqlite3
 import pandas as pd
-# Hier die Importe aus deiner engines-Datei ganz sauber ohne Sonderzeichen einfügen:
 from engines import ausfuehren_mit_ollama_fallback, echte_deep_web_recherche
 
 # Initialisierung der Datenbank
