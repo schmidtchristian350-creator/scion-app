@@ -30,7 +30,6 @@ from exporters import exportiere_zu_pdf
 from exporters import erstelle_pptx_aus_session
 from exporters import erstelle_pdf_aus_session
 
-# Initialisierung der Datenbank
 init_db()
 
 st.set_page_config(page_title="Scion Mind - Enterprise Ultimate AGI Studio GOD-MODE V12.17", layout="wide")
