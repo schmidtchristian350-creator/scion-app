@@ -257,20 +257,22 @@ def selbstevaluierender_lern_agent(system_prompt, initial_input, use_local=False
     return ergebnis + f"\n\n---\n🧬 *[Scion Mind V12.17 Sovereign Core]: Audit Trail & Workspace Vault aktiv.*"
 
 def hierarchischer_schwarm_agent(aufgabe, master_openai_key="", anthropic_api_key="", tavily_api_key=""):
-    research_prompt = f"Du bist der Lead Research-Analyst. Analysiere folgende Aufgabe und liefere harte Fakten und Daten:\n{aufgabe}"
+    web_daten = echte_deep_web_recherche(aufgabe, tavily_api_key, master_openai_key, anthropic_api_key)
+    
+    research_prompt = f"Du bist der Lead Research-Analyst. Analysiere folgende Aufgabe basierend auf den gefundenen Webdaten und liefere harte Fakten und Daten:\n\nAufgabe: {aufgabe}\n\n[Live-Webdaten]:\n{web_daten}"
     research_res = litellm_router_abfrage("Du bist Research-Agent.", research_prompt, model_pref="auto", master_openai_key=master_openai_key, anthropic_api_key=anthropic_api_key)
     
     finance_prompt = f"Du bist der Chief Financial Officer (CFO). Prüfe die finanzielle Machbarkeit und Risiken basierend auf folgenden Daten:\n{research_res}"
     finance_res = litellm_router_abfrage("Du bist CFO.", finance_prompt, model_pref="auto", master_openai_key=master_openai_key, anthropic_api_key=anthropic_api_key)
     
-    final_prompt = f"Du bist der CEO / Executive Master-Agent. Führe die Erkenntnisse des Research-Teams und des CFOs zu einer kompromisslosen, strategischen Handlungsempfehlung zusammen.\n\nAufgabe: {aufgabe}\n\n[Research]: {research_res}\n\n[CFO]: {finance_res}"
+    final_prompt = f"Du bist der CEO / Executive Master-Agent. Führe die Erkenntnisse des Research-Teams und des CFOs zu einer kompromisslosen, strategischen Handlungsempfehlung zusammen.\n\nAufgabe: {aufgabe}\n\n[Research & Fakten]: {research_res}\n\n[CFO-Prüfung]: {finance_res}"
     final_res = litellm_router_abfrage("Du bist Executive CEO.", final_prompt, model_pref="auto", master_openai_key=master_openai_key, anthropic_api_key=anthropic_api_key)
     
     return f"""### 🧬 Hierarchical Swarm Board (Multi-Agenten-Auswertung)
 {final_res}
 
 ---
-*Swarm Audit: Research & CFO-Modul erfolgreich durchlaufen.*"""
+*Swarm Audit: Live-Webrecherche, Research & CFO-Modul erfolgreich durchlaufen.*"""
 
 def sende_webhook_benachrichtigung(kanal, nachricht, master_openai_key=""):
     conn = get_db_connection()
