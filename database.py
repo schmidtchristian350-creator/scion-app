@@ -12,6 +12,7 @@ def init_db():
     conn = get_db_connection()
     cursor = conn.cursor()
     
+    # 1. Kundentabelle und Spalten-Upgrades
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS kunden (
             username TEXT PRIMARY KEY,
@@ -28,6 +29,7 @@ def init_db():
     if "workspace" not in columns:
         cursor.execute("ALTER TABLE kunden ADD COLUMN workspace TEXT DEFAULT 'Default-Hub'")
 
+    # 2. Alle weiteren Enterprise-Tabellen
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS lizenz_schluessel (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -98,7 +100,7 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             zeit TEXT,
             aufgabe_typ TEXT,
-            erkennnis TEXT,
+            erkenntnis TEXT,
             verbesserter_prompt TEXT
         )
     """)
@@ -176,7 +178,7 @@ def init_db():
         )
     """)
     
-    # Administrator-Account fest hinterlegen
+    # 3. Administrator-Account fest hinterlegen
     cursor.execute("""
         INSERT OR REPLACE INTO kunden (username, passwort, guthaben, rolle, workspace)
         VALUES ('Christian', 'ScionMind#2026!Secured', 999.00, 'Administrator', 'Global-Executive')
@@ -184,21 +186,6 @@ def init_db():
 
     conn.commit()
     conn.close() 
-import sqlite3
 
-def init_db():
-    # Stellt sicher, dass die Datenbank und die wichtige Tabelle existieren
-    conn = sqlite3.connect("scion_mind.db")
-    cursor = conn.cursor()
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS agent_memory (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            zeit TEXT,
-            erkenntnis TEXT
-        )
-    """)
-    conn.commit()
-    conn.close()
-
-# Das hier stößt die Erstellung direkt an
+# Direktes Anstoßen der Initialisierung beim Importieren der Datei
 init_db()
