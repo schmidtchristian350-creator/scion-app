@@ -298,8 +298,9 @@ def generiere_desktop_befehl(ziel_programm, aktion_beschreibung, master_openai_k
     Generiert plattformunabhängige Steuerungsbefehle (für Programme/Hardware) zur manuellen Freigabe.
     """
     prompt = f"Erstelle einen präzisen Systembefehl (Python/PyAutoGUI/OS-Befehl), um folgendes Programm zu steuern:\nProgramm: {ziel_programm}\nAktion: {aktion_beschreibung}\nLiefere AUSSCHLIESSLICH den ausführbaren Code/Befehl zurück."
-    return litellm_router_abfrage("Du bist Desktop-Automation-Engineer.", prompt, model_pref="auto", master_openai_key=master_openai_key) 
-    def verarbeite_sprachbefehl(sprach_text, master_openai_key=""):
+    return litellm_router_abfrage("Du bist Desktop-Automation-Engineer.", prompt, model_pref="auto", master_openai_key=master_openai_key)
+
+def verarbeite_sprachbefehl(sprach_text, master_openai_key=""):
     """
     Verarbeitet den diktierten Text vom iPhone und gibt eine präzise Antwort aus.
     """
